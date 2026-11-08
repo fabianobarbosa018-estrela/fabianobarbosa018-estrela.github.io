@@ -55,6 +55,21 @@
     return v;
   }
 
+  /** folgas de uma atribuição: usa 'dias' (semanas especiais) ou a combinação g */
+  function folgasDe(a) {
+    if (a && typeof a === 'object') {
+      if (Array.isArray(a.dias)) { var v = [false, false, false, false, false, false, false]; a.dias.forEach(function (d) { v[d] = true; }); return v; }
+      return folgasDoGrupo(a.g);
+    }
+    return folgasDoGrupo(a);
+  }
+  function rotulo(a) {
+    if (!a) return '';
+    if (a.devolucao) return 'Seg a qui (folga + 2 devolvidas)';
+    if (Array.isArray(a.dias)) return a.dias.length === 1 ? 'Só ' + DIAS[a.dias[0]].toLowerCase() + ' (festas)' : a.dias.map(function (d) { return DIAS_CURTO[d]; }).join('+');
+    return GRUPOS[a.g] ? GRUPOS[a.g].nome : '?';
+  }
+
   function hash(str) { var h = 0; for (var i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; } return Math.abs(h); }
 
   /* --------------- Elegibilidade --------------- */
@@ -88,7 +103,7 @@
   function trabalhaNoDia(f, g, dataISO) {
     if (emFerias(f, dataISO)) return false;
     if (f.dataEntrada && dataISO < f.dataEntrada) return false;
-    if (g && folgasDoGrupo(g)[diaSemana(dataISO)]) return false;
+    if (g && folgasDe(g)[diaSemana(dataISO)]) return false;
     return true;
   }
   /** quem trabalha em cada dia da semana em um setor (atr: {id: g}) */
@@ -154,7 +169,7 @@
       var k = semanasEntre(esc.semana, sem); // 1 = semana anterior
       Object.keys(esc.atribuicoes).forEach(function (id) {
         var a = esc.atribuicoes[id];
-        (porFunc[id] = porFunc[id] || []).push({ k: k, g: a.g, semana: esc.semana });
+        (porFunc[id] = porFunc[id] || []).push({ k: k, g: a.g, dias: a.dias || null, semana: esc.semana });
       });
     });
     return { porFunc: porFunc, totalSemanas: anteriores.length, maisAntiga: anteriores.length ? anteriores[anteriores.length - 1].semana : null };
@@ -395,6 +410,19 @@
       if (!f) { avisos.push({ setor: a.setorNome || null, funcId: id, msg: nome + ' não existe mais no cadastro, mas está nesta escala.' }); return; }
       if (!elegivel(f, sem)) { var mot = motivoFora(f, sem); avisos.push({ setor: nomeSetor(f.setorId), funcId: id, fora: true, msg: nome + (mot === 'ferias' ? ' está de férias nesta semana' : mot === 'nao_admitido' ? ' ainda não foi admitido nesta semana' : ' está inativo') + ', mas aparece na escala. Use "Atualizar escala" para corrigir.' }); return; }
       var sid = f.setorId;
+      var modo = escala.modo || 'normal';
+      if (Array.isArray(a.dias) || modo === 'festas') {
+        // semanas especiais (festas / devolução de folgas)
+        var dv = Array.isArray(a.dias) ? a.dias.slice().sort() : [];
+        var okEsp = modo === 'festas' ? (dv.length === 1 && dv[0] >= 1 && dv[0] <= 4)
+          : (modo === 'devolucao' && a.devolucao && dv.join(',') === '1,2,3,4');
+        if (!okEsp) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ': ' + (modo === 'festas' ? 'na semana das festas cada funcionário folga só 1 dia, entre segunda e quinta.' : 'folga especial inválida (a devolução é segunda a quinta, emendada com a folga normal).') });
+        var fe = folgasDe(a);
+        DIAS_PROIBIDOS.forEach(function (d) { if (fe[d]) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ' está de folga na ' + DIAS[d].toLowerCase() + ', o que é proibido.' }); });
+        var te = trabPorSetorDia[sid] = trabPorSetorDia[sid] || [0, 0, 0, 0, 0, 0, 0];
+        fe.forEach(function (fo, d) { if (!fo) te[d]++; });
+        return;
+      }
       // 2) combinação permitida
       if (PERMITIDAS.indexOf(a.g) < 0) { erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ': combinação de folgas não permitida. Use apenas segunda e terça, terça e quarta, quarta e quinta, ou domingo, segunda e quinta.' }); return; }
       var folga = folgasDoGrupo(a.g);
@@ -432,9 +460,10 @@
     var regraDoSetor = {};
     Object.keys(setoresComGente).forEach(function (sid) {
       var cad = cadastradosSetor(funcionarios, sid, sem), regra = regraCobertura(cad.length);
+      if (escala.modo === 'festas' && regra === 'reduzida') regra = 'dupla'; // nas festas o hotel não fecha terça/quarta
       regraDoSetor[sid] = regra;
       if (!regra) return;
-      var atr = {}; cad.forEach(function (f) { if (at[f.id] && GRUPOS[at[f.id].g]) atr[f.id] = at[f.id].g; });
+      var atr = {}; cad.forEach(function (f) { if (at[f.id] && (GRUPOS[at[f.id].g] || Array.isArray(at[f.id].dias))) atr[f.id] = at[f.id]; });
       (problemaCobertura(cad, atr, sem, regra) || []).forEach(function (x) { erros.push({ setor: nomeSetor(sid), msg: textoProblema(nomeSetor(sid), cad.length, x) }); });
     });
 
@@ -452,12 +481,131 @@
       var ant = historico.find(function (e) { return e && e.semana === addDias(sem, -7) && e.atribuicoes; });
       if (ant) Object.keys(at).forEach(function (id) {
         var f = funcPorId[id];
-        if (f && ant.atribuicoes[id] && ant.atribuicoes[id].g === at[id].g && elegivel(f, sem) && regraDoSetor[f.setorId] !== 'reduzida')
+        if (f && ant.atribuicoes[id] && !ant.atribuicoes[id].dias && !at[id].dias && GRUPOS[at[id].g] && ant.atribuicoes[id].g === at[id].g && elegivel(f, sem) && regraDoSetor[f.setorId] !== 'reduzida')
           avisos.push({ setor: nomeSetor(f.setorId), funcId: id, msg: f.nome + ' repete a combinação da semana anterior (' + GRUPOS[at[id].g].nome + ').' });
       });
     }
 
+    // semana de transição (copiada da escala de novembro já entregue): problemas viram avisos
+    if (escala.transicao && erros.length) {
+      erros.forEach(function (e) { avisos.push({ setor: e.setor, msg: '(semana copiada da escala de novembro) ' + e.msg }); });
+      erros = [];
+    }
     return { ok: erros.length === 0, erros: erros, avisos: avisos };
+  }
+
+  /* --------------- SEMANAS ESPECIAIS (festas e devolução de folgas) --------------- */
+  /**
+   * params: { semana, modo: 'festas' | 'devolucao', funcionarios, setores, historico, devolvem: [ids], semDomingo }
+   * festas: cada um folga 1 dia (seg a qui), sempre 1 trabalhando no setor.
+   * devolucao: quem está em 'devolvem' folga seg a qui (folga normal + 2 devolvidas, emendadas); os demais seguem as regras normais.
+   * Se a devolução de alguém não couber nas regras do setor, ela fica para outra semana (retorna em 'pendentes').
+   */
+  function gerarEspecial(params) {
+    var sem = params.semana, modo = params.modo;
+    var setores = params.setores || [], setorPorId = {}; setores.forEach(function (s) { setorPorId[s.id] = s; });
+    var todos = params.funcionarios || [];
+    var elegiveis = todos.filter(function (f) { return elegivel(f, sem) && setorPorId[f.setorId]; });
+    var hist = indexarHistorico(sem, params.historico);
+    var mes = sem.slice(0, 7), domNoMes = {};
+    (params.historico || []).forEach(function (e) {
+      if (!e || !e.atribuicoes || e.semana === sem || e.semana.slice(0, 7) !== mes) return;
+      Object.keys(e.atribuicoes).forEach(function (id) { var a = e.atribuicoes[id]; if (a.g === 4 && !a.dias) domNoMes[id] = 1; });
+    });
+    var querDevolver = {}; (params.devolvem || []).forEach(function (id) { querDevolver[id] = 1; });
+    var porSetor = {}; elegiveis.forEach(function (f) { (porSetor[f.setorId] = porSetor[f.setorId] || []).push(f); });
+    var atrib = {}, erros = [], avisos = [], devolveram = [], pendentes = [];
+
+    Object.keys(porSetor).forEach(function (sid) {
+      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.criadoEm || '').localeCompare(b.criadoEm || '') || a.nome.localeCompare(b.nome); });
+      var cad = cadastradosSetor(todos, sid, sem), n = cad.length, regra = regraCobertura(n);
+      if (modo === 'festas' && regra === 'reduzida') regra = 'dupla';
+      if (lista.length > 9) { erros.push({ setor: setorPorId[sid].nome, msg: 'Setor "' + setorPorId[sid].nome + '": muitos funcionários para a semana especial (máximo 9).' }); return; }
+      // ranking de domingo (quem está há mais tempo sem domingo)
+      var espera = {};
+      lista.forEach(function (f) { var l = (hist.porFunc[f.id] || []).filter(function (h) { return h.g === 4; }); espera[f.id] = l.length ? Math.min.apply(null, l.map(function (h) { return h.k; })) : 1000; });
+      var ordemDom = lista.slice().sort(function (a, b) { return espera[b.id] - espera[a.id]; });
+      var rank = {}; ordemDom.forEach(function (f, i) { rank[f.id] = i; });
+      var cand = lista.filter(function (f) { return querDevolver[f.id]; });
+
+      function resolver(devolvendo) {
+        var dv = {}; devolvendo.forEach(function (f) { dv[f.id] = 1; });
+        var opcoes = lista.map(function (f) {
+          if (modo === 'festas') return [1, 2, 3, 4].map(function (d) { return { g: 0, dias: [d] }; });
+          if (dv[f.id]) return [{ g: 2, dias: [1, 2, 3, 4], devolucao: true }];
+          return PERMITIDAS.filter(function (g) { return !(g === 4 && (params.semDomingo || domNoMes[f.id])); }).map(function (g) { return { g: g }; });
+        });
+        var melhor = null, idx = lista.map(function () { return 0; });
+        var total = opcoes.reduce(function (p, o) { return p * o.length; }, 1);
+        for (var k = 0; k < total; k++) {
+          var x = k, atr = {}, doms = 0;
+          lista.forEach(function (f, i) { var o = opcoes[i][x % opcoes[i].length]; x = Math.floor(x / opcoes[i].length); atr[f.id] = o; if (o.g === 4) doms++; });
+          if (doms > 1) continue;
+          if (regra && problemaCobertura(cad, atr, sem, regra)) continue;
+          var c = 0;
+          if (modo === 'festas') {
+            var cont = [0, 0, 0, 0, 0];
+            lista.forEach(function (f) { var d = atr[f.id].dias[0]; cont[d]++; var ant = (hist.porFunc[f.id] || []).filter(function (h) { return h.k === 1; })[0]; if (ant && ant.dias && ant.dias[0] === d) c += 5; });
+            c += 10 * cont.reduce(function (s, q) { return s + q * q; }, 0);
+          } else {
+            var podeDom = !params.semDomingo && lista.some(function (f) { return !dv[f.id] && !domNoMes[f.id]; });
+            if (podeDom && !doms) c += 50000;
+            lista.forEach(function (f) {
+              var o = atr[f.id]; if (o.devolucao) return;
+              if (o.g === 4) c += 100 * rank[f.id];
+              var g1 = grupoHa(hist, f.id, 1); if (g1 === o.g) c += 1000;
+            });
+          }
+          c += k * 1e-9; // desempate determinístico
+          if (!melhor || c < melhor.c) melhor = { c: c, atr: atr };
+        }
+        return melhor;
+      }
+      // tenta devolver o máximo de pessoas possível (na ordem de cadastro); o resto fica para outra semana
+      var sol = null, usados = [];
+      for (var tam = cand.length; tam >= 0 && !sol; tam--) {
+        var combs = combinacoes(cand, tam);
+        for (var ci = 0; ci < combs.length && !sol; ci++) { var r = resolver(combs[ci]); if (r) { sol = r; usados = combs[ci]; } }
+      }
+      if (!sol) {
+        erros.push({ setor: setorPorId[sid].nome, msg: 'Setor "' + setorPorId[sid].nome + '" (' + n + ' funcionários): não é possível montar a semana ' + (modo === 'festas' ? 'das festas' : 'de devolução') + ' com pelo menos 1 trabalhando todos os dias.' });
+        return;
+      }
+      usados.forEach(function (f) { devolveram.push(f.id); });
+      cand.forEach(function (f) { if (usados.indexOf(f) < 0) pendentes.push(f.id); });
+      Object.keys(sol.atr).forEach(function (id) { atrib[id] = sol.atr[id]; });
+    });
+    if (erros.length) return { ok: false, erros: erros, avisos: avisos };
+    var atribuicoes = {};
+    elegiveis.forEach(function (f) {
+      var o = atrib[f.id]; if (!o) return;
+      var a = { g: o.g, bloq: false, nome: f.nome, setorId: f.setorId, setorNome: setorPorId[f.setorId].nome, funcao: f.funcao || '' };
+      if (o.dias) a.dias = o.dias.slice();
+      if (o.devolucao) a.devolucao = true;
+      atribuicoes[f.id] = a;
+    });
+    var doc = { semana: sem, modo: modo, atribuicoes: atribuicoes };
+    var v = validarEscala(doc, todos, setores, params.historico);
+    if (!v.ok) return { ok: false, erros: v.erros, avisos: avisos };
+    return { ok: true, erros: [], avisos: avisos.concat(v.avisos), atribuicoes: atribuicoes, devolveram: devolveram, pendentes: pendentes };
+  }
+  function combinacoes(arr, k) {
+    var out = [];
+    (function rec(ini, atual) { if (atual.length === k) { out.push(atual.slice()); return; } for (var i = ini; i < arr.length; i++) { atual.push(arr[i]); rec(i + 1, atual); atual.pop(); } })(0, []);
+    return out;
+  }
+  /** saldo de folgas a devolver por funcionário: +1 por semana de festas, −2 por semana de devolução */
+  function folgasDevidas(escalas) {
+    var s = {};
+    (escalas || []).forEach(function (e) {
+      if (!e || !e.atribuicoes) return;
+      Object.keys(e.atribuicoes).forEach(function (id) {
+        var a = e.atribuicoes[id];
+        if (e.modo === 'festas') s[id] = (s[id] || 0) + 1;
+        if (a.devolucao) s[id] = (s[id] || 0) - 2;
+      });
+    });
+    return s;
   }
 
   /* --------------- Utilidades de exibição --------------- */
@@ -472,7 +620,7 @@
       return '-';
     }
     var d = diaSemana(dataISO);
-    if (folgasDoGrupo(atrib.g)[d]) return 'F';
+    if (folgasDe(atrib)[d]) return 'F';
     if (DIAS_PROIBIDOS.indexOf(d) >= 0) return 'X';
     return 'T';
   }
@@ -481,7 +629,8 @@
     DIAS: DIAS, DIAS_CURTO: DIAS_CURTO, GRUPOS: GRUPOS, DIAS_PROIBIDOS: DIAS_PROIBIDOS,
     parse: parse, fmt: fmt, addDias: addDias, diaSemana: diaSemana, inicioSemana: inicioSemana, fimSemana: fimSemana,
     semanasEntre: semanasEntre, dataBR: dataBR, hojeISO: hojeISO, diasDaSemana: diasDaSemana, numeroSemana: numeroSemana,
-    folgasDoGrupo: folgasDoGrupo, elegivel: elegivel, gerarEscala: gerarEscala, validarEscala: validarEscala,
+    folgasDoGrupo: folgasDoGrupo, folgasDe: folgasDe, rotulo: rotulo, gerarEspecial: gerarEspecial, folgasDevidas: folgasDevidas,
+    elegivel: elegivel, gerarEscala: gerarEscala, validarEscala: validarEscala,
     statusDia: statusDia, indexarHistorico: indexarHistorico, hungaro: hungaro,
     cadastradosSetor: cadastradosSetor, regraCobertura: regraCobertura, trabalhandoTerQua: trabalhandoTerQua, trabalhandoPorDia: trabalhandoPorDia, IDX_TER: IDX_TER, IDX_QUA: IDX_QUA,
     PERMITIDAS: PERMITIDAS, DIAS_FUNCIONAMENTO: DIAS_FUNCIONAMENTO,
