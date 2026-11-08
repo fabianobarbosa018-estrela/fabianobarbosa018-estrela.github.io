@@ -10,8 +10,11 @@
      e quem folga domingo folga a segunda e a quinta da mesma semana.
    - Terça e quarta (equipe reduzida): setor com 2 ou mais funcionários => pelo menos 1
      trabalhando em cada um desses dias.
-   - Modelo preferido por setor: 1 pessoa com domingo+segunda+quinta (rodízio), e as demais
-     divididas entre segunda+terça e terça+quarta. Quarta+quinta só quando necessário.
+   - Cada funcionário folga no máximo 1 domingo por mês (mês do domingo).
+   - Modelo preferido por setor:
+       semana COM domingo: 1 pessoa domingo+segunda+quinta; as demais entre terça+quarta e
+         segunda+terça (setor de 2: a outra fica com terça+quarta);
+       semana SEM domingo: segunda+terça e quarta+quinta (setor de 3: mais uma em terça+quarta).
    - Funcionário de férias em qualquer dia da semana não recebe folgas nela.
    ===================================================================== */
 (function (root) {
@@ -264,6 +267,12 @@
         if (da !== db) return da < db ? -1 : 1;
         return ((hash(a.f.id) + nSem) % 997) - ((hash(b.f.id) + nSem) % 997);
       });
+      var mes = sem.slice(0, 7);
+      var domNoMes = {};
+      (params.historico || []).forEach(function (e) {
+        if (!e || !e.atribuicoes || e.semana === sem || e.semana.slice(0, 7) !== mes) return;
+        Object.keys(e.atribuicoes).forEach(function (id) { if (e.atribuicoes[id].g === 4) domNoMes[id] = e.semana; });
+      });
       var rank = {}, domPassado = {};
       scored.forEach(function (x, i) { rank[x.f.id] = i; domPassado[x.f.id] = x.domPassado && hist.totalSemanas > 0; });
 
@@ -273,6 +282,7 @@
         if (blq[f.id] !== undefined) return blq[f.id] === g ? 0 : INF;
         var c = 0;
         if (g === 4) {
+          if (domNoMes[f.id]) return INF; // já folgou um domingo neste mês
           c += 100 * rank[f.id];
           if (domPassado[f.id]) c += 200000; // não repetir domingo em semanas seguidas
           return c;
@@ -299,8 +309,10 @@
             var ter = c3 + d + eTer, qua = a + d + eQua; // quem trabalha terça: comb. 3 e 4; quarta: comb. 1 e 4
             if (regra === 'exato1' && (ter !== 1 || qua !== 1)) continue;
             if (regra === 'min1' && (ter < 1 || qua < 1)) continue;
-            // penalidade do modelo: sem domingo, uso de quarta+quinta, desequilíbrio entre seg+ter e ter+qua
-            var pen = (d ? 0 : 50000) + 3000 * c3 + 200 * Math.abs(a - b);
+            // penalidade do modelo de folgas do hotel
+            var pen;
+            if (d) pen = 3000 * c3 + 200 * Math.abs(a - b) + (a > b ? 100 : 0); // com domingo: ter+qua e seg+ter (ter+qua recebe a sobra)
+            else pen = 50000 + 200 * (Math.max(a, b, c3) - Math.min(a, b, c3)) + (a < 1 ? 3000 : 0) + (c3 < 1 ? 3000 : 0) + (b > a + c3 ? 0 : 0); // sem domingo: seg+ter e qua+qui
             padroes.push({ 1: a, 2: b, 3: c3, 4: d, pen: pen });
           }
       padroes.sort(function (x, y) { return x.pen - y.pen; });
@@ -328,7 +340,9 @@
       }
       Object.keys(melhor.atr).forEach(function (id) { atrib[id] = melhor.atr[id]; });
       if (melhor.p && !melhor.p[4] && m > 0) {
-        var porque = scored.length && scored.every(function (x) { return domPassado[x.f.id] || blq[x.f.id] !== undefined; })
+        var porque = scored.length && scored.every(function (x) { return domNoMes[x.f.id] || blq[x.f.id] !== undefined; })
+          ? ' porque todos já folgaram um domingo neste mês (máximo 1 por mês).'
+          : scored.length && scored.every(function (x) { return domNoMes[x.f.id] || domPassado[x.f.id] || blq[x.f.id] !== undefined; })
           ? ' para não repetir a folga dominical de quem folgou no domingo passado.' : ' porque a cobertura obrigatória de terça e quarta (com as férias e bloqueios desta semana) não permite.';
         avisos.push({ setor: setor.nome, msg: 'Setor "' + setor.nome + '": ninguém folga no domingo nesta semana,' + porque });
       }
@@ -397,6 +411,16 @@
     Object.keys(domPorSetor).forEach(function (sid) {
       if (domPorSetor[sid].length > 1) erros.push({ setor: nomeSetor(sid), msg: 'Setor "' + nomeSetor(sid) + '": ' + domPorSetor[sid].length + ' pessoas de folga no mesmo domingo (' + domPorSetor[sid].join(', ') + '). Só é permitido 1 por setor.' });
     });
+
+    // 6b) no máximo 1 domingo de folga por mês para cada funcionário
+    if (historico) {
+      var mesV = sem.slice(0, 7);
+      Object.keys(at).forEach(function (id) {
+        if (!at[id] || at[id].g !== 4 || !funcPorId[id] || !elegivel(funcPorId[id], sem)) return;
+        var outro = historico.find(function (e) { return e && e.semana !== sem && e.semana.slice(0, 7) === mesV && e.atribuicoes && e.atribuicoes[id] && e.atribuicoes[id].g === 4; });
+        if (outro) erros.push({ setor: nomeSetor(funcPorId[id].setorId), funcId: id, msg: funcPorId[id].nome + ' já folgou no domingo ' + dataBR(outro.semana) + '. Cada funcionário só pode folgar 1 domingo por mês.' });
+      });
+    }
 
     // 7) cobertura de terça e quarta (equipe reduzida)
     var setoresComGente = {};
