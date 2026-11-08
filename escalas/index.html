@@ -196,6 +196,8 @@ table.folha tr.sep td{height:22px}
 .ferias-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
 .shade{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:25;display:none}
 .shade.on{display:block}
+.waprev{white-space:pre-wrap;font-family:inherit;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;margin:4px 0;font-size:13px}
+.btn.wa.big{box-shadow:0 4px 14px rgba(37,211,102,.3)}
 /* vale-transporte */
 table.folha.vt{min-width:0;width:auto}
 table.folha.vt th,table.folha.vt td{font-size:11.5px;min-width:64px;white-space:nowrap;height:20px;padding:1px 4px}
@@ -1016,7 +1018,7 @@ const C = window.Core;
 const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de folga não é fixa nem permanente, ela poderá sofrer alterações a qualquer momento ( no dia anterior a folga ) o horário também poderá ser alterado ( no mesmo dia ) de acordo com a necessidade da Fazenda.\nQualquer duvida, podem procurar a gerencia!';
 const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
 const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
-const S = { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
+const S = { setores: [], funcionarios: [], vt: {}, envios: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
 const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
 let DB = null, DL = null;
 const LS_KEY = 'escalas_hotel_v1';
@@ -1058,7 +1060,7 @@ const Store = {
     atualizarStatus();
   },
   assinar() {
-    const cols = ['setores', 'funcionarios', 'escalas', 'auditoria', 'config', 'vt'];
+    const cols = ['setores', 'funcionarios', 'escalas', 'auditoria', 'config', 'vt', 'envios'];
     const timer = setTimeout(() => { if (!S.pronto) { S.pronto = true; S.lento = true; render(); atualizarStatus(); } }, 10000);
     const marcar = (c, snap) => {
       if (!snap.metadata.fromCache) S.carregados[c] = true;
@@ -1071,15 +1073,16 @@ const Store = {
     DB.collection('funcionarios').onSnapshot(s => { S.funcionarios = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('funcionarios', s); }, erro('funcionarios'));
     DB.collection('escalas').onSnapshot(s => { const o = {}, ant = {}; s.docs.forEach(d => { const e = Object.assign({}, d.data(), { semana: d.id }); if (C.diaSemana(d.id) === 0) o[d.id] = e; else ant[d.id] = e; }); S.escalas = o; S.escalasAntigas = ant; marcar('escalas', s); }, erro('escalas'));
     DB.collection('auditoria').orderBy('ts', 'desc').limit(800).onSnapshot(s => { S.auditoria = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('auditoria', s); }, erro('auditoria'));
+    DB.collection('envios').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); S.envios = o; marcar('envios', s); }, erro('envios'));
     DB.collection('vt').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); S.vt = o; marcar('vt', s); }, erro('vt'));
     DB.collection('config').onSnapshot(s => { const g = s.docs.find(d => d.id === 'geral'); if (g) S.config = Object.assign({}, CONFIG_PADRAO, g.data()); marcar('config', s); }, erro('config'));
   },
   carregarLocal() {
-    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, envios: d.envios || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
   },
   salvarLocal() {
     if (S.modo === 'nuvem') return Nuvem.guardarCopia();
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, envios: S.envios, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
   },
   enfileirar(chave, fn) {
     const ant = this.filas[chave] || Promise.resolve();
@@ -1091,6 +1094,7 @@ const Store = {
     if (col === 'escalas') { if (C.diaSemana(id) === 0) S.escalas[id] = Object.assign({}, limpo, { semana: id }); else S.escalasAntigas[id] = Object.assign({}, limpo, { semana: id }); }
     else if (col === 'config') { if (id === 'geral') S.config = Object.assign({}, CONFIG_PADRAO, limpo); }
     else if (col === 'vt') S.vt[id] = limpo;
+    else if (col === 'envios') S.envios[id] = limpo;
     else if (col === 'auditoria') { const i = S.auditoria.findIndex(x => x.id === id); const o = Object.assign({ id }, limpo); if (i >= 0) S.auditoria[i] = o; else S.auditoria.unshift(o); }
     else { const arr = S[col]; const i = arr.findIndex(x => x.id === id); const obj = Object.assign({ id }, limpo); if (i >= 0) arr[i] = obj; else arr.push(obj); }
   },
@@ -1098,6 +1102,7 @@ const Store = {
     if (col === 'escalas') { delete S.escalas[id]; delete S.escalasAntigas[id]; }
     else if (col === 'config') S.config = Object.assign({}, CONFIG_PADRAO);
     else if (col === 'vt') delete S.vt[id];
+    else if (col === 'envios') delete S.envios[id];
     else S[col] = S[col].filter(x => x.id !== id);
   },
   async set(col, id, data) {
@@ -1162,7 +1167,7 @@ const Nuvem = {
   },
   async carregarTudo() {
     const r = await this.rpc('esc_ler', { p_desde: null });
-    Object.assign(S, { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    Object.assign(S, { setores: [], funcionarios: [], vt: {}, envios: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true;
     this.guardarCopia(); render(); atualizarStatus();
@@ -1186,9 +1191,9 @@ const Nuvem = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
   },
-  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
+  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, envios: S.envios, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
   lerCopia() {
-    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
+    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, envios: d.envios || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
   },
   async falhaGravacao(e) {
     if (e && e.code === 'SESSAO_INVALIDA') { this.sair(true); throw e; }
@@ -1204,7 +1209,7 @@ const Nuvem = {
   async sair(expirou) {
     if (!expirou) { try { await this.rpc('esc_sair', {}); } catch (e) { } }
     try { localStorage.removeItem(this.TOKEN); localStorage.removeItem(this.COPIA); } catch (e) { }
-    Object.assign(S, { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], precisaLogin: true, pronto: true, desde: null });
+    Object.assign(S, { setores: [], funcionarios: [], vt: {}, envios: {}, escalas: {}, escalasAntigas: {}, auditoria: [], precisaLogin: true, pronto: true, desde: null });
     if (expirou) toast('Sua sessão expirou. Entre de novo.');
     render(); atualizarStatus();
   }
@@ -1251,6 +1256,7 @@ const ICON = {
   mensal: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/>',
   funcionarios: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5.5"/>',
   vt: '<rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-4M16 21l-1-4"/><circle cx="8.5" cy="14" r=".8"/><circle cx="15.5" cy="14" r=".8"/>',
+  whatsapp: '<path d="M3 21l1.6-4.8A9 9 0 1121 12a9 9 0 01-13.2 7.9z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 01-1.8-1.8l.8-1-1-2z"/>',
   setores: '<path d="M3 21V8l9-5 9 5v13M9 21v-7h6v7"/>',
   historico: '<path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 3"/>',
   exportar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
@@ -1269,7 +1275,7 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['escala', 'Escala semanal'], ['mensal', 'Escala mensal'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+const ROTAS = [['painel', 'Painel'], ['escala', 'Escala semanal'], ['mensal', 'Escala mensal'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['whatsapp', 'WhatsApp e Contatos'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
 
 function toast(msg) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
@@ -1360,7 +1366,7 @@ function render() {
   document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
   if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
   const sy = window.scrollY;
-  const fn = { painel: vPainel, escala: vEscala, mensal: vMensal, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { painel: vPainel, escala: vEscala, mensal: vMensal, vt: vVT, whatsapp: vWhatsApp, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -1370,6 +1376,7 @@ function render() {
   v.innerHTML = topo + fn();
   const foco = UI._foco; if (foco) { const el = document.getElementById(foco); if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { } } UI._foco = null; }
   window.scrollTo(0, sy);
+  if (UI._waModal && UI._waModal._redesenhar) UI._waModal._redesenhar();
 }
 
 /* ---------------- PAINEL ---------------- */
@@ -1529,7 +1536,8 @@ function vMensal() {
   </div>
   <div class="row mt">${sems.map(s => `<a href="#escala" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? (S.escalas[s].status === 'aprovada' ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-draft">rasc.</span>') : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button><button class="btn wa edit-only" data-act="enviarTodos" data-p="mes">${ic('wa')} Enviar para cada funcionário</button></div>
+  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
+  <div class="row mt edit-only"><button class="btn wa big" data-act="enviarTodos" data-p="mes">${ic('wa')} ENVIAR ESCALA PARA OS FUNCIONÁRIOS</button><span class="small muted">Cada funcionário recebe só a própria escala do mês no WhatsApp. Você vê a prévia e confirma antes.</span></div>
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
@@ -1847,10 +1855,6 @@ function vBackup() {
     <div class="row"><button class="btn pri" data-act="trocarSenha">Trocar senha</button><button class="btn danger" data-act="sairNuvem">Sair deste aparelho</button></div>
     <p class="small muted mt">Trocar a senha desconecta os outros aparelhos.</p></div>
   <div class="card"><h2>Backups automáticos do servidor</h2><div id="bkAuto"><button class="btn sm" data-act="listarBk">Ver backups automáticos</button></div></div>` : ''}
-  <div class="card edit-only"><h2>WhatsApp</h2>
-    <div class="fld"><label class="f">Seu número (gerência), com DDD</label><input type="tel" id="cfgTel" value="${esc(S.config.telGerente || '')}" placeholder="(75) 99999-9999"></div>
-    <p class="small muted">Vai no fim de cada mensagem (“Dúvidas: fale com a gerência…”) e serve para você mandar um teste para si mesmo. O número de cada funcionário fica no cadastro dele.</p>
-    <button class="btn pri" data-act="salvarTel">Salvar número</button></div>
   <div class="card edit-only"><h2>Folha de folga</h2>
     <div class="fld"><label class="f">Nome da empresa (topo do sistema e WhatsApp)</label><input type="text" id="cfgNome" value="${esc(S.config.nomeHotel || '')}" maxlength="100"></div>
     <div class="fld"><label class="f">Título da folha</label><input type="text" id="cfgTitulo" value="${esc(S.config.tituloFolha || 'ESCALA DE FOLGA')}" maxlength="60"></div>
@@ -2144,7 +2148,7 @@ function abrirWhatsApp() {
   w.querySelector('[data-x=cp]').onclick = async () => { try { await navigator.clipboard.writeText(ta.value); toast('Texto copiado.'); } catch (e) { ta.select(); toast('Selecione e copie o texto manualmente.'); } };
 }
 
-/* ---------------- ENVIO INDIVIDUAL PELO WHATSAPP ---------------- */
+/* ---------------- WHATSAPP: CONTATOS, ENVIO INDIVIDUAL E HISTÓRICO ---------------- */
 /** número no formato do WhatsApp (55 + DDD + número) ou null */
 function telWA(t) {
   let d = String(t || '').replace(/\D/g, '');
@@ -2153,70 +2157,261 @@ function telWA(t) {
   return /^55\d{10,11}$/.test(d) ? d : (d.length >= 12 && d.length <= 15 && !d.startsWith('55') ? d : null);
 }
 const telBR = t => { const d = telWA(t); if (!d || !d.startsWith('55')) return t || ''; const n = d.slice(2); return '(' + n.slice(0, 2) + ') ' + (n.length === 11 ? n.slice(2, 7) + '-' + n.slice(7) : n.slice(2, 6) + '-' + n.slice(6)); };
-function msgFuncionario(m, l, tipo) {
-  const juntar = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1] : a.join('');
-  const ym = m.cols[0].slice(0, 7), noPer = x => tipo === 'semana' || x.slice(0, 7) === ym;
-  const fol = m.cols.filter((x, i) => l.cel[i] === 'F' && noPer(x)), fer = m.cols.filter((x, i) => l.cel[i] === 'V' && noPer(x));
-  const primeiro = (l.nome || '').trim().split(/\s+/)[0]; const nome = primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
-  let t = '*' + (S.config.nomeHotel || 'Hotel') + '*\nOlá, ' + nome + '! Segue sua escala de folga.\n*' + (tipo === 'semana' ? 'Semana de ' + C.dataBR(m.cols[0]).slice(0, 5) + ' a ' + C.dataBR(m.cols[6]).slice(0, 5) : m.sub.charAt(0) + m.sub.slice(1).toLowerCase()) + '*\n\n';
-  if (fol.length) t += tipo === 'semana' ? '🗓️ Suas folgas: ' + juntar(fol.map(x => C.DIAS[C.diaSemana(x)].toLowerCase() + ' (' + C.dataBR(x).slice(0, 5) + ')')) + '\n' : '🗓️ Suas folgas:\n' + m.sems.map(s => { const f = fol.filter(x => C.inicioSemana(x) === s); return f.length ? '• ' + f.map(x => C.DIAS_CURTO[C.diaSemana(x)].toLowerCase() + ' ' + C.dataBR(x).slice(0, 5)).join(', ') : null; }).filter(Boolean).join('\n') + '\n';
-  else if (!fer.length) t += 'Você não tem folga neste período.\n';
-  if (fer.length) t += '🏖️ Férias: ' + C.dataBR(fer[0]).slice(0, 5) + ' a ' + C.dataBR(fer[fer.length - 1]).slice(0, 5) + '\n';
-  t += 'Nos outros dias você trabalha normalmente.\n';
-  if (m.pend) t += '_(escala ainda em rascunho, pode mudar)_\n';
-  if (S.config.textoImportante) t += '\n*IMPORTANTE:* ' + S.config.textoImportante.replace(/\n/g, ' ') + '\n';
-  if (S.config.telGerente) t += '\nDúvidas: fale com a gerência — ' + telBR(S.config.telGerente);
-  return t;
+const hashTxt = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+const WA_OK = ['enviado', 'entregue', 'lido'];
+const WA_ST = { enviando: ['Enviando…', 'b-draft'], enviado: ['Enviado', 'b-ok'], entregue: ['Entregue', 'b-ok'], lido: ['Lido', 'b-ok'], erro: ['Erro', 'b-err'] };
+const WA_NOME = 'Hotel Fazenda Oásis';
+const waEdge = () => window.NUVEM && window.NUVEM.url + '/functions/v1/esc-whatsapp';
+async function waApi(corpo) {
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 60000);
+  let r; try { r = await fetch(waEdge(), { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', apikey: window.NUVEM.key, Authorization: 'Bearer ' + window.NUVEM.key }, body: JSON.stringify(Object.assign({ token: Nuvem.token() }, corpo)) }); }
+  catch (e) { throw Object.assign(new Error('Sem conexão com o servidor.'), { code: 'SEM_CONEXAO' }); } finally { clearTimeout(t); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.erro || 'HTTP ' + r.status), { code: j.erro });
+  return j;
 }
-UI.enviados = UI.enviados || {};
-function enviarTodos(tipo) {
-  const per = periodoFolha(tipo), m = folhaModelo(per), chave = tipo + ':' + per.ini;
-  if (!m.linhas.length || m.semEscala.length === m.sems.length) return modalMsg('Sem escala', '<p>Não há escala gerada neste período.</p>');
-  const env = UI.enviados[chave] = UI.enviados[chave] || {};
-  const linhas = m.linhas.filter(l => l.f && l.f.ativo);
-  const w = abrirModal(`<div class="mh">Enviar a escala para cada funcionário</div><div class="mbd">
-  <p><b>${esc(tipo === 'semana' ? 'Semana de ' + semanaLabel(per.ini) : per.sub)}</b> — cada um recebe só as próprias folgas, numa conversa separada.</p>
-  ${m.semEscala.length ? '<div class="alert w"><span class="ic">!</span><div>Há semana sem escala neste período: ela fica de fora das mensagens.</div></div>' : ''}
-  <div class="fld"><label class="f">Seu número (vai no fim da mensagem)</label><div class="row"><input type="tel" id="enTel" value="${esc(S.config.telGerente || '')}" placeholder="(75) 99999-9999" style="flex:1"><a class="btn sm" id="enTeste" target="_blank" rel="noopener">Mandar teste para mim</a></div></div>
-  <div class="row mb"><button class="btn wa" id="enProx">${ic('wa')} Enviar para o próximo</button><span class="small muted" id="enCont"></span></div>
-  <div class="tw" style="max-height:46vh"><table class="list"><tbody id="enLista"></tbody></table></div>
-  <p class="small muted mt">Cada toque abre a conversa do funcionário no WhatsApp com a mensagem pronta: é só tocar em <b>enviar</b> e voltar aqui para o próximo. Quem não tem número: digite na lista (fica salvo no cadastro).</p>
-  </div><div class="mf"><button class="btn" data-x="c">Fechar</button></div>`, true);
-  const tel = w.querySelector('#enTel');
-  const link = (num, txt) => 'https://wa.me/' + num + '?text=' + encodeURIComponent(txt);
-  const desenhar = () => {
-    w.querySelector('#enLista').innerHTML = linhas.map(l => {
-      const f = funcPorId(l.id), n = telWA(f.telefone);
-      return `<tr><td><b>${esc(l.nome)}</b><div class="small muted">${esc(l.sNome)}</div></td>
-      <td><input type="tel" class="enNum" data-id="${l.id}" value="${esc(f.telefone || '')}" placeholder="sem número" style="width:150px;${f.telefone && !n ? 'border-color:var(--err)' : ''}"></td>
-      <td class="r">${env[l.id] ? '<span class="badge b-ok">enviado</span> ' : ''}${n ? `<a class="btn sm wa enUm" data-id="${l.id}" href="${link(n, msgFuncionario(m, l, tipo))}" target="_blank" rel="noopener">${ic('wa')} ${env[l.id] ? 'Reenviar' : 'Enviar'}</a>` : '<span class="small muted">sem número</span>'}
-      <button class="btn sm icon" data-x="ver" data-id="${l.id}" title="Ver mensagem">👁</button></td></tr>`;
-    }).join('');
-    const prontos = linhas.filter(l => telWA(funcPorId(l.id).telefone)), faltam = prontos.filter(l => !env[l.id]);
-    w.querySelector('#enCont').textContent = `${prontos.length - faltam.length} de ${prontos.length} enviados` + (linhas.length > prontos.length ? ` · ${linhas.length - prontos.length} sem número` : '');
-    const px = w.querySelector('#enProx'); px.disabled = !faltam.length; px.dataset.id = faltam[0] ? faltam[0].id : '';
-    px.innerHTML = ic('wa') + (faltam[0] ? ' Enviar para o próximo: ' + esc(faltam[0].nome) : ' Todos enviados');
-    const tt = telWA(tel.value), ex = linhas[0]; const te = w.querySelector('#enTeste');
-    if (tt && ex) { te.href = link(tt, msgFuncionario(m, ex, tipo)); te.removeAttribute('disabled'); } else { te.removeAttribute('href'); te.setAttribute('disabled', ''); }
-  };
-  const marcar = id => { env[id] = true; const l = linhas.find(x => x.id === id); log('whatsapp', 'Escala enviada pelo WhatsApp para ' + (l ? l.nome : id) + ' (' + (tipo === 'semana' ? semanaLabel(per.ini) : per.sub) + ')'); setTimeout(desenhar, 300); };
-  w.addEventListener('click', ev => {
-    const a = ev.target.closest('.enUm'); if (a) return marcar(a.dataset.id);
-    const v = ev.target.closest('[data-x=ver]'); if (v) { const l = linhas.find(x => x.id === v.dataset.id); modalMsg('Mensagem para ' + esc(l.nome), '<pre style="white-space:pre-wrap;font-family:inherit;margin:0">' + esc(msgFuncionario(m, l, tipo)) + '</pre>'); }
+/** situação da integração oficial (só na versão online) */
+async function waCarregarCfg(forcar) {
+  if (S.modo !== 'nuvem') { UI.waCfg = { disponivel: false }; return UI.waCfg; }
+  if (UI.waCfg && !forcar) return UI.waCfg;
+  try { const c = await Nuvem.rpc('esc_wa_config_ler', {}); UI.waCfg = Object.assign({ disponivel: true }, c); }
+  catch (e) { UI.waCfg = { disponivel: true, falha: true }; }
+  return UI.waCfg;
+}
+const waApiPronta = () => !!(UI.waCfg && UI.waCfg.disponivel && UI.waCfg.configurado);
+
+/** mensagem individual no modelo pedido pelo hotel */
+function waMensagem(m, l, tipo) {
+  const ym = m.cols[0].slice(0, 7), dentro = x => tipo === 'semana' || x.slice(0, 7) === ym;
+  const cols = m.cols.map((d, i) => ({ d, st: l.cel[i] })).filter(c => dentro(c.d));
+  const fol = cols.filter(c => c.st === 'F').map(c => c.d), fer = cols.filter(c => c.st === 'V').map(c => c.d), trab = cols.filter(c => c.st === '').map(c => c.d);
+  const dd = x => C.DIAS_CURTO[C.diaSemana(x)].toLowerCase() + ' ' + C.dataBR(x).slice(0, 5);
+  const nome = (l.nome || '').trim().split(/\s+/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
+  const [y, mm] = ym.split('-').map(Number), mesNome = MESES[mm - 1].toLowerCase() + ' de ' + y;
+  const ref = tipo === 'semana' ? mesNome + ' (semana de ' + C.dataBR(m.cols[0]).slice(0, 5) + ' a ' + C.dataBR(m.cols[6]).slice(0, 5) + ')' : mesNome;
+  const partes = [];
+  partes.push(fol.length ? '📅 Folgas (' + fol.length + '): ' + fol.map(dd).join(', ') : '📅 Sem folga neste período');
+  if (fer.length) partes.push('🏖️ Férias: ' + C.dataBR(fer[0]).slice(0, 5) + ' a ' + C.dataBR(fer[fer.length - 1]).slice(0, 5));
+  if (trab.length) partes.push('💼 Trabalho (' + trab.length + ' dia' + (trab.length > 1 ? 's' : '') + '): ' + (tipo === 'semana' ? trab.map(dd).join(', ') : 'todos os demais dias do mês'));
+  if (m.pend) partes.push('(escala em rascunho, sujeita a alteração)');
+  const corpo = partes.join('\n');
+  const texto = 'Olá, ' + nome + '!\n\nSegue sua escala de trabalho do ' + WA_NOME + ' referente ao mês de ' + ref + '.\n\n' + corpo + '\n\nEm caso de dúvidas, procure a gerência.\n\n' + WA_NOME + '.';
+  return { nome, ref, corpo, texto, params: [nome, ref, partes.join(' • ')], hash: hashTxt(texto) };
+}
+function waChave(tipo, per) { return (tipo === 'semana' ? 'sem_' : 'mes_') + (tipo === 'semana' ? per.ini : per.ini.slice(0, 7)); }
+/** lista de envio de um período: cada funcionário ativo com a própria mensagem e a situação do último envio */
+function waLista(tipo) {
+  const per = periodoFolha(tipo), m = folhaModelo(per), base = waChave(tipo, per);
+  const linhas = m.linhas.filter(l => l.f && l.f.ativo).map(l => {
+    const msg = waMensagem(m, l, tipo), id = base + '_' + l.id, reg = S.envios[id] || null, num = telWA(l.f.telefone);
+    const ok = reg && WA_OK.includes(reg.status), mudou = ok && reg.hash !== msg.hash;
+    return { l, f: l.f, msg, id, reg, num, ok, mudou };
   });
-  w.querySelector('#enProx').onclick = () => { const id = w.querySelector('#enProx').dataset.id; if (!id) return; const l = linhas.find(x => x.id === id); const n = telWA(funcPorId(id).telefone); window.open(link(n, msgFuncionario(m, l, tipo)), '_blank', 'noopener'); marcar(id); };
+  return { per, m, base, linhas, rotulo: tipo === 'semana' ? 'Semana de ' + semanaLabel(per.ini) : per.sub.charAt(0) + per.sub.slice(1).toLowerCase() };
+}
+const waBadge = it => !it.reg ? '<span class="badge b-off">não enviado</span>' : (() => { const s = WA_ST[it.reg.status] || [it.reg.status, 'b-off']; return `<span class="badge ${s[1]}" title="${esc(it.reg.erro || '')}">${s[0]}${it.reg.modo === 'manual' ? ' (manual)' : ''}</span>${it.mudou ? ' <span class="badge b-draft" title="A escala mudou depois do envio">escala mudou</span>' : ''}`; })();
+
+async function abrirEnvio(tipo, soIds) {
+  await waCarregarCfg();
+  const L0 = waLista(tipo);
+  if (!L0.linhas.length || L0.m.semEscala.length === L0.m.sems.length) return modalMsg('Sem escala', '<p>Não há escala gerada neste período.</p>');
+  const api = waApiPronta();
+  const sel = {}; L0.linhas.forEach(it => { sel[it.id] = soIds ? soIds.includes(it.id) && !!it.num : !!it.num && (!it.ok || it.mudou); });
+  const w = abrirModal(`<div class="mh">Enviar escala para os funcionários</div><div class="mbd">
+  <p style="margin-top:0"><b>${esc(L0.rotulo)}</b> — cada funcionário recebe <b>somente a própria escala</b>, no WhatsApp dele.</p>
+  ${api ? '<div class="alert s"><span class="ic">✓</span><div><b>API oficial do WhatsApp conectada:</b> as mensagens saem automaticamente do número do hotel.</div></div>'
+      : `<div class="alert w"><span class="ic">!</span><div><b>Modo manual:</b> a API oficial ${S.modo === 'nuvem' ? 'ainda não foi configurada (veja <a href="#whatsapp">WhatsApp e Contatos</a>)' : 'só funciona na versão online'}. Cada mensagem abre no seu WhatsApp e você toca em enviar.</div></div>`}
+  ${L0.m.semEscala.length ? '<div class="alert w"><span class="ic">!</span><div>Há semana sem escala neste período: ela fica de fora das mensagens.</div></div>' : ''}
+  <div class="row mb"><button class="btn sm" data-x="todos">Marcar todos com número</button><button class="btn sm" data-x="pend">Só quem não recebeu</button><button class="btn sm" data-x="nenhum">Desmarcar todos</button><div class="sp"></div><span class="small muted" id="enCont"></span></div>
+  <div class="tw" style="max-height:48vh"><table class="list"><tbody id="enLista"></tbody></table></div>
+  <div id="enFila" class="mt"></div>
+  </div><div class="mf"><button class="btn" data-x="c">Fechar</button><button class="btn wa" data-x="env">${ic('wa')} Enviar</button></div>`, true);
+  let fila = null, filaFim = '', enviando = false;
+  const desenhar = () => {
+    const L = waLista(tipo);
+    w.querySelector('#enLista').innerHTML = L.linhas.map(it => `<tr>
+      <td style="width:28px"><input type="checkbox" class="enSel" data-id="${it.id}" ${sel[it.id] ? 'checked' : ''} ${it.num && !enviando ? '' : 'disabled'}></td>
+      <td><b>${esc(it.l.nome)}</b><div class="small muted">${esc(it.l.sNome)}${it.f.funcao ? ' · ' + esc(it.f.funcao) : ''}</div></td>
+      <td>${it.num ? esc(telBR(it.f.telefone)) : `<input type="tel" class="enNum" data-fid="${it.f.id}" placeholder="sem número" style="width:140px">`}</td>
+      <td>${waBadge(it)}${it.reg && it.reg.status === 'erro' ? `<div class="small" style="color:var(--err);max-width:220px">${esc(it.reg.erro || '')}</div>` : ''}${it.reg && it.reg.enviadoEm ? `<div class="small muted">${dtHora(it.reg.enviadoEm)}</div>` : ''}</td>
+      <td class="r"><button class="btn sm" data-x="ver" data-id="${it.id}">Prévia</button></td></tr>
+      <tr class="hide" id="pv_${it.id}"><td></td><td colspan="4"><pre class="waprev">${esc(it.msg.texto)}</pre></td></tr>`).join('');
+    const n = L.linhas.filter(it => sel[it.id] && it.num).length, rec = L.linhas.filter(it => it.ok).length;
+    w.querySelector('#enCont').textContent = `${n} selecionado(s) · ${rec} de ${L.linhas.length} já receberam · ${L.linhas.filter(it => !it.num).length} sem número`;
+    const b = w.querySelector('[data-x=env]'); b.disabled = !n || enviando || !!fila; b.innerHTML = ic('wa') + (enviando ? ' Enviando…' : ' Enviar para ' + n + ' funcionário' + (n === 1 ? '' : 's'));
+  };
+  const desenharFila = () => {
+    const box = w.querySelector('#enFila');
+    if (!fila) { box.innerHTML = filaFim || ''; return; }
+    if (fila.i >= fila.ids.length) { filaFim = `<div class="alert s"><span class="ic">✓</span><div>Fila concluída: ${fila.feitos} conversa(s) aberta(s) no WhatsApp.</div></div>`; fila = null; box.innerHTML = filaFim; desenhar(); return; }
+    const L = waLista(tipo), it = L.linhas.find(x => x.id === fila.ids[fila.i]);
+    if (!it || !it.num) { fila.i++; return desenharFila(); }
+    box.innerHTML = `<div class="card" style="background:#f0fdf4;border-color:#86efac"><div class="row"><div><b>Próximo: ${esc(it.l.nome)}</b><div class="small muted">${fila.i + 1} de ${fila.ids.length} — toque no botão, envie no WhatsApp e volte aqui.</div></div><div class="sp"></div>
+      <a class="btn wa" id="enAbrir" href="https://wa.me/${it.num}?text=${encodeURIComponent(it.msg.texto)}" target="_blank" rel="noopener">${ic('wa')} Abrir conversa de ${esc(it.l.nome.split(' ')[0])}</a><button class="btn sm" data-x="pular">Pular</button><button class="btn sm danger" data-x="parar">Parar</button></div></div>`;
+    box.querySelector('#enAbrir').onclick = async () => {
+      const reg = Object.assign({}, it.reg || {}, { chave: it.id, tipo, periodo: L.base, rotulo: L.rotulo, fid: it.f.id, nome: it.l.nome, setor: it.l.sNome, telefone: it.num, hash: it.msg.hash, texto: it.msg.texto, status: 'enviado', modo: 'manual', enviadoEm: agoraISO(), atualizadoEm: agoraISO() });
+      delete reg.erro; delete reg.wamid; delete reg.entregueEm; delete reg.lidoEm;
+      reg.tentativas = (reg.tentativas || []).concat([{ em: agoraISO(), status: 'enviado', modo: 'manual' }]).slice(-30);
+      sel[it.id] = false; fila.i++; fila.feitos++;
+      try { await Store.set('envios', it.id, reg); log('whatsapp', 'Escala (' + L.rotulo + ') enviada pelo WhatsApp para ' + it.l.nome + ' — manual'); } catch (e) { }
+      setTimeout(() => { desenhar(); desenharFila(); }, 250);
+    };
+    box.querySelector('[data-x=pular]').onclick = () => { fila.i++; desenhar(); desenharFila(); };
+    box.querySelector('[data-x=parar]').onclick = () => { fila = null; desenhar(); desenharFila(); };
+  };
   w.addEventListener('change', async ev => {
+    const c = ev.target.closest('.enSel'); if (c) { sel[c.dataset.id] = c.checked; return desenhar(); }
     const i = ev.target.closest('.enNum');
-    if (i) { const f = funcPorId(i.dataset.id), v = i.value.trim(); if (v && !telWA(v)) { i.style.borderColor = 'var(--err)'; return toast('Número inválido. Use DDD + número.'); } try { await Store.set('funcionarios', f.id, Object.assign({}, f, { telefone: v, atualizadoEm: agoraISO() })); } catch (e) { } desenhar(); return; }
-    if (ev.target === tel) { const v = tel.value.trim(); if (v && !telWA(v)) return toast('Seu número está inválido.'); try { await Store.set('config', 'geral', Object.assign({}, S.config, { telGerente: v, feriados: feriadosLista() })); } catch (e) { } desenhar(); }
+    if (i) { const f = funcPorId(i.dataset.fid), v = i.value.trim(); if (!telWA(v)) return toast('Número inválido. Use DDD + número.'); try { await Store.set('funcionarios', f.id, Object.assign({}, f, { telefone: v, atualizadoEm: agoraISO() })); log('funcionario', 'WhatsApp de ' + f.nome + ' cadastrado'); } catch (e) { } const it = waLista(tipo).linhas.find(x => x.f.id === f.id); if (it) sel[it.id] = true; desenhar(); }
+  });
+  w.addEventListener('click', async ev => {
+    const x = ev.target.closest('[data-x]'); if (!x) return;
+    const L = waLista(tipo);
+    if (x.dataset.x === 'ver') return w.querySelector('#pv_' + CSS.escape(x.dataset.id)).classList.toggle('hide');
+    if (x.dataset.x === 'todos') { L.linhas.forEach(it => sel[it.id] = !!it.num); return desenhar(); }
+    if (x.dataset.x === 'pend') { L.linhas.forEach(it => sel[it.id] = !!it.num && (!it.ok || it.mudou)); return desenhar(); }
+    if (x.dataset.x === 'nenhum') { L.linhas.forEach(it => sel[it.id] = false); return desenhar(); }
+    if (x.dataset.x === 'c') return fecharModal(w);
+    if (x.dataset.x !== 'env' || enviando) return;
+    const alvo = L.linhas.filter(it => sel[it.id] && it.num);
+    if (!alvo.length) return;
+    const reenv = alvo.filter(it => it.ok && !it.mudou);
+    const ok = await confirmar('Confirmar envio?', `<p>A escala individual de <b>${esc(L.rotulo)}</b> será enviada para <b>${alvo.length} funcionário(s)</b>${api ? ' pela API oficial do WhatsApp' : ', uma conversa de cada vez'}:</p>
+      <p class="small">${alvo.map(it => esc(it.l.nome) + ' (' + esc(telBR(it.f.telefone)) + ')').join(', ')}</p>
+      ${reenv.length ? `<div class="alert w"><span class="ic">!</span><div><b>${reenv.length} já recebeu esta mesma escala</b> (${reenv.map(it => esc(it.l.nome)).join(', ')}) e vai receber de novo.</div></div>` : ''}
+      <p class="muted small">Cada pessoa recebe somente a própria escala.</p>`, 'Enviar agora');
+    if (!ok) return;
+    if (!api) { filaFim = ''; fila = { ids: alvo.map(it => it.id), i: 0, feitos: 0 }; desenhar(); return desenharFila(); }
+    enviando = true; desenhar();
+    let nOk = 0, nErr = 0, nDup = 0;
+    try {
+      for (let i = 0; i < alvo.length; i += 10) {
+        const lote = alvo.slice(i, i + 10).map(it => ({ id: it.id, tipo, periodo: L.base, rotulo: L.rotulo, fid: it.f.id, nome: it.l.nome, setor: it.l.sNome, telefone: it.num, hash: it.msg.hash, texto: it.msg.texto, params: it.msg.params, forcar: it.ok }));
+        const r = await waApi({ acao: 'enviar', itens: lote });
+        (r.resultados || []).forEach(x => { if (x.status === 'enviado') nOk++; else if (x.status === 'erro') nErr++; else nDup++; const it = alvo.find(a => a.id === x.id); sel[x.id] = x.status === 'erro'; if (it) log('whatsapp', 'Escala (' + L.rotulo + ') ' + (x.status === 'enviado' ? 'enviada' : x.status === 'erro' ? 'NÃO enviada (' + x.erro + ')' : 'não reenviada (envio duplicado bloqueado)') + ' — ' + it.l.nome); });
+        await Nuvem.sincronizar(true);
+      }
+    } catch (e) {
+      if (e.code === 'SESSAO_INVALIDA') { fecharModal(w); return Nuvem.sair(true); }
+      modalMsg('Falha no envio', '<p>' + esc(e.code === 'API_NAO_CONFIGURADA' ? 'A API do WhatsApp não está configurada.' : e.message) + '</p>');
+    }
+    enviando = false; desenhar();
+    modalMsg('Envio concluído', `<p><b>${nOk}</b> enviada(s)${nErr ? ` · <b style="color:var(--err)">${nErr} com erro</b> (veja o motivo na lista e use “Reenviar”)` : ''}${nDup ? ` · ${nDup} bloqueada(s) por duplicidade` : ''}.</p>`);
   });
   w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w._redesenhar = () => { if (document.body.contains(w)) { desenhar(); desenharFila(); } };
+  UI._waModal = w;
   desenhar();
+}
+
+/* ---- aba WhatsApp e Contatos ---- */
+function vWhatsApp() {
+  if (!UI.waCfg) waCarregarCfg().then(() => { if (UI.rota === 'whatsapp') render(); });
+  const c = UI.waCfg || {}, nuvem = S.modo === 'nuvem';
+  const fs = S.funcionarios.filter(f => f.ativo).sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome));
+  const semNum = fs.filter(f => !telWA(f.telefone)).length;
+  const tab = UI.waTab || 'contatos';
+  let h = `<div class="row mb"><div><h1>WhatsApp e Contatos</h1><p class="sub" style="margin:0">Números dos funcionários, envio individual da escala e histórico de envios</p></div><div class="sp"></div>
+  <button class="btn wa edit-only" data-act="enviarTodos" data-p="mes">${ic('wa')} Enviar escala do mês</button></div>
+  <div class="tabs">${[['contatos', 'Contatos'], ['historico', 'Histórico de envios'], ['config', 'Configuração da API']].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-act="waTab" data-t="${k}">${t}</button>`).join('')}</div>`;
+  if (tab === 'contatos') {
+    h += `<div class="card mb"><h2>Administrador</h2><div class="row"><input type="tel" id="cfgTel" value="${esc(S.config.telGerente || '')}" placeholder="(75) 99999-9999" style="max-width:220px"><button class="btn pri edit-only" data-act="salvarTel">Salvar meu número</button><button class="btn edit-only" data-act="waTeste">${ic('wa')} Mandar teste para mim</button></div>
+    <p class="small muted">Seu WhatsApp como administrador: recebe as mensagens de teste.</p></div>
+    ${semNum ? `<div class="alert w"><span class="ic">!</span><div><b>${semNum} funcionário(s) sem WhatsApp</b>: eles não recebem a escala. Digite o número na lista abaixo (salva sozinho).</div></div>` : '<div class="alert s"><span class="ic">✓</span><div>Todos os funcionários ativos têm WhatsApp cadastrado.</div></div>'}
+    <div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th>Função</th><th>WhatsApp (com DDD)</th><th></th></tr></thead><tbody>
+    ${fs.map(f => { const n = telWA(f.telefone); return `<tr><td><b>${esc(f.nome)}</b></td>
+      <td><select class="ctSet" data-id="${f.id}" ${S.somenteLeitura ? 'disabled' : ''}>${setoresOrd().map(s => `<option value="${s.id}" ${s.id === f.setorId ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></td>
+      <td><input type="text" class="ctFun" data-id="${f.id}" value="${esc(f.funcao || '')}" placeholder="—" style="width:150px" ${S.somenteLeitura ? 'disabled' : ''}></td>
+      <td><input type="tel" class="ctTel" data-id="${f.id}" value="${esc(f.telefone || '')}" placeholder="(75) 99999-9999" style="width:170px;${f.telefone && !n ? 'border-color:var(--err)' : ''}" ${S.somenteLeitura ? 'disabled' : ''}></td>
+      <td>${n ? '<span class="badge b-ok">ok</span>' : f.telefone ? '<span class="badge b-err">inválido</span>' : '<span class="badge b-off">sem número</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div><p class="small muted mt">Setor e função também mudam no cadastro do funcionário (são os mesmos dados). Uma mudança de setor aqui vale para as próximas escalas.</p>`;
+  } else if (tab === 'historico') {
+    const tipo = UI.waHTipo || 'mes';
+    const L = waLista(tipo);
+    const rec = L.linhas.filter(it => it.ok && !it.mudou), err = L.linhas.filter(it => it.reg && it.reg.status === 'erro'), pend = L.linhas.filter(it => !(it.ok && !it.mudou) && !(it.reg && it.reg.status === 'erro'));
+    h += `<div class="card mb"><div class="row"><select id="waHTipo"><option value="mes" ${tipo === 'mes' ? 'selected' : ''}>Escala do mês</option><option value="semana" ${tipo === 'semana' ? 'selected' : ''}>Escala da semana</option></select>
+      ${tipo === 'mes' ? `<button class="btn icon" data-act="mesAnt">${ic('chevL')}</button><input type="month" id="inMes" value="${UI.mes}"><button class="btn icon" data-act="mesProx">${ic('chevR')}</button>` : `<button class="btn icon" data-act="semAnt">${ic('chevL')}</button><input type="date" id="inSemana" value="${UI.semana}"><button class="btn icon" data-act="semProx">${ic('chevR')}</button>`}
+      <b>${esc(L.rotulo)}</b><div class="sp"></div><button class="btn wa edit-only" data-act="enviarTodos" data-p="${tipo}">${ic('wa')} Enviar / reenviar</button></div></div>
+    <div class="grid g3 mb"><div class="card kpi"><div class="l">Receberam</div><div class="n" style="color:var(--ok)">${rec.length}</div></div><div class="card kpi"><div class="l">Ainda não receberam</div><div class="n">${pend.length}</div><div class="x">${pend.filter(it => !it.num).length} sem número</div></div><div class="card kpi"><div class="l">Com erro</div><div class="n" style="color:${err.length ? 'var(--err)' : 'inherit'}">${err.length}</div></div></div>
+    <div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>WhatsApp</th><th>Situação</th><th>Data e hora</th><th>Detalhe</th><th></th></tr></thead><tbody>
+    ${L.linhas.map(it => `<tr><td><b>${esc(it.l.nome)}</b><div class="small muted">${esc(it.l.sNome)}</div></td><td>${it.num ? esc(telBR(it.f.telefone)) : '<span class="muted">sem número</span>'}</td><td>${waBadge(it)}</td>
+      <td class="small">${it.reg ? (it.reg.enviadoEm ? 'Enviado ' + dtHora(it.reg.enviadoEm) : '') + (it.reg.entregueEm ? '<br>Entregue ' + dtHora(it.reg.entregueEm) : '') + (it.reg.lidoEm ? '<br>Lido ' + dtHora(it.reg.lidoEm) : '') + (it.reg.status === 'erro' ? 'Tentativa ' + dtHora(it.reg.atualizadoEm) : '') : '—'}</td>
+      <td class="small" style="max-width:260px;${it.reg && it.reg.status === 'erro' ? 'color:var(--err)' : ''}">${it.reg && it.reg.status === 'erro' ? esc(it.reg.erro || '') : it.reg ? (it.reg.modo === 'manual' ? 'aberto no WhatsApp pelo administrador' : 'API oficial') + ((it.reg.tentativas || []).length > 1 ? ' · ' + it.reg.tentativas.length + ' tentativas' : '') : ''}</td>
+      <td class="r">${it.num ? `<button class="btn sm edit-only" data-act="waReenviar" data-p="${tipo}" data-id="${it.id}">${it.reg ? 'Reenviar' : 'Enviar'}</button>` : ''}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="small muted mt">“Entregue” e “Lido” aparecem quando a API oficial está conectada e o webhook configurado. No modo manual o sistema registra quando você abriu a conversa para enviar.</p>`;
+  } else {
+    const url = waEdge();
+    h += !nuvem ? `<div class="card"><p>A API oficial do WhatsApp funciona na <b>versão online</b> do sistema (o site com senha), porque o token precisa ficar guardado com segurança no servidor. Nesta versão o envio é no modo manual (abre cada conversa no seu WhatsApp).</p></div>`
+      : `<div class="card mb"><h2>Situação</h2><div id="waStatus">${c.configurado ? '<span class="badge b-ok">Configurada</span> <span class="muted small">Phone Number ID ' + esc(c.phone_id || '') + ' · token terminando em …' + esc(c.token_fim || '') + ' · modelo “' + esc(c.template) + '” (' + esc(c.idioma) + ')</span>' : '<span class="badge b-draft">Não configurada</span> <span class="muted small">Enquanto isso, o envio funciona no modo manual.</span>'}</div>
+      <div class="row mt"><button class="btn edit-only" data-act="waTestarCon">Testar conexão com a Meta</button><span class="small" id="waConRes"></span></div></div>
+      <div class="card mb edit-only"><h2>Credenciais (WhatsApp Business Cloud API)</h2>
+      <div class="grid g2" style="gap:12px">
+        <div class="fld"><label class="f">Phone Number ID</label><input type="text" id="waPid" value="${esc(c.phone_id || '')}" placeholder="ex.: 123456789012345"></div>
+        <div class="fld"><label class="f">Token de acesso permanente</label><input type="password" id="waTok" placeholder="${c.token_fim ? 'salvo (…' + esc(c.token_fim) + ') — deixe em branco para manter' : 'cole aqui o token'}" autocomplete="off"></div>
+        <div class="fld"><label class="f">Nome do modelo de mensagem</label><input type="text" id="waTpl" value="${esc(c.template || 'escala_folga')}"></div>
+        <div class="fld"><label class="f">Idioma do modelo</label><input type="text" id="waIdi" value="${esc(c.idioma || 'pt_BR')}"></div>
+        <div class="fld"><label class="f">App Secret (opcional, protege o webhook)</label><input type="password" id="waSec" placeholder="${c.tem_app_secret ? 'salvo — deixe em branco para manter' : 'opcional'}" autocomplete="off"></div>
+      </div><div class="row"><button class="btn pri" data-act="waSalvarCfg">Salvar credenciais</button>${c.configurado ? '<button class="btn danger" data-act="waApagarCfg">Desconectar</button>' : ''}</div>
+      <p class="small muted mt">O token fica guardado só no servidor: nem esta tela consegue lê-lo de volta.</p></div>
+      <div class="card mb"><h2>Webhook (status de entrega e leitura)</h2>
+      <div class="fld"><label class="f">URL de retorno (Callback URL)</label><div class="row"><input type="text" readonly value="${esc(url)}" style="flex:1"><button class="btn sm" data-act="waCopiar" data-v="${esc(url)}">${ic('copy')} Copiar</button></div></div>
+      <div class="fld"><label class="f">Token de verificação (Verify token)</label><div class="row"><input type="text" readonly value="${esc(c.verify_token || '')}" style="flex:1"><button class="btn sm" data-act="waCopiar" data-v="${esc(c.verify_token || '')}">${ic('copy')} Copiar</button></div></div>
+      <p class="small muted">No painel da Meta, em WhatsApp → Configuração → Webhook, cole os dois campos e assine o campo <b>messages</b>.</p></div>
+      <div class="card"><h2>Modelo de mensagem para cadastrar na Meta</h2>
+      <p class="small muted">Categoria <b>Utilidade</b>, nome <b>escala_folga</b>, idioma <b>Portuguese (BR)</b>, corpo:</p>
+      <pre class="waprev">Olá, {{1}}!\n\nSegue sua escala de trabalho do Hotel Fazenda Oásis referente ao mês de {{2}}.\n\n{{3}}\n\nEm caso de dúvidas, procure a gerência.\n\nHotel Fazenda Oásis.</pre>
+      <p class="small muted">Exemplos para a aprovação: {{1}} = Maria · {{2}} = dezembro de 2026 · {{3}} = 📅 Folgas (8): ter 01/12, qua 02/12 • 💼 Trabalho (23 dias): todos os demais dias do mês</p>
+      <button class="btn sm" data-act="waCopiar" data-v="${esc('Olá, {{1}}!\n\nSegue sua escala de trabalho do Hotel Fazenda Oásis referente ao mês de {{2}}.\n\n{{3}}\n\nEm caso de dúvidas, procure a gerência.\n\nHotel Fazenda Oásis.')}">${ic('copy')} Copiar texto do modelo</button></div>`;
+  }
+  return h;
+}
+async function waAcao(act, el) {
+  switch (act) {
+    case 'waTab': UI.waTab = el.dataset.t; if (UI.waTab === 'config') await waCarregarCfg(true); return render();
+    case 'waReenviar': return abrirEnvio(el.dataset.p, [el.dataset.id]);
+    case 'waCopiar': try { await navigator.clipboard.writeText(el.dataset.v); toast('Copiado.'); } catch (e) { toast('Não foi possível copiar.'); } return;
+    case 'waTestarCon': {
+      const out = document.getElementById('waConRes'); out.textContent = 'Testando…';
+      try { const r = await waApi({ acao: 'status' }); out.innerHTML = !r.configurado ? '<span style="color:var(--warn)">Credenciais ainda não salvas.</span>' : r.ok ? `<span style="color:var(--ok)">✓ Conectado: ${esc(r.numero || '')} — ${esc(r.nome || '')}${r.qualidade ? ' (qualidade ' + esc(r.qualidade) + ')' : ''}</span>` : `<span style="color:var(--err)">✗ ${esc(r.erro || 'falhou')}</span>`; }
+      catch (e) { out.innerHTML = `<span style="color:var(--err)">✗ ${esc(e.message)}</span>`; }
+      return;
+    }
+    case 'waSalvarCfg': case 'waApagarCfg': {
+      const apagar = act === 'waApagarCfg';
+      if (apagar && !await confirmar('Desconectar a API?', '<p>O token será apagado do servidor. O envio volta para o modo manual.</p>', 'Desconectar', true)) return;
+      const v = id => document.getElementById(id).value.trim();
+      const pid = apagar ? '' : v('waPid'), tok = apagar ? '' : (v('waTok') || null);
+      if (!apagar && pid && !/^\d{6,20}$/.test(pid)) return toast('O Phone Number ID tem só números.');
+      try {
+        await Nuvem.rpc('esc_wa_config_salvar', { p_phone_id: pid, p_api_token: tok, p_template: apagar ? '' : v('waTpl'), p_idioma: apagar ? '' : v('waIdi'), p_app_secret: apagar ? '' : (v('waSec') || null) });
+        log('whatsapp', apagar ? 'API do WhatsApp desconectada' : 'Credenciais da API do WhatsApp alteradas'); await waCarregarCfg(true); render(); toast(apagar ? 'Desconectado.' : 'Credenciais salvas.');
+      } catch (e) { toast('Não foi possível salvar: ' + e.message); }
+      return;
+    }
+    case 'waTeste': {
+      const t = (document.getElementById('cfgTel') || {}).value || S.config.telGerente, n = telWA(t);
+      if (!n) return toast('Cadastre seu número primeiro.');
+      await waCarregarCfg();
+      const msg = { params: ['Administrador', 'teste', '📅 Mensagem de teste do sistema de escalas'], texto: 'Olá, Administrador!\n\nSegue sua escala de trabalho do ' + WA_NOME + ' referente ao mês de teste.\n\n📅 Mensagem de teste do sistema de escalas\n\nEm caso de dúvidas, procure a gerência.\n\n' + WA_NOME + '.' };
+      if (waApiPronta()) { try { const r = await waApi({ acao: 'teste', para: n, params: msg.params }); toast(r.ok ? 'Teste enviado pela API para ' + telBR(t) + '.' : 'Falhou: ' + r.erro); } catch (e) { toast('Falhou: ' + e.message); } }
+      else window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(msg.texto), '_blank', 'noopener');
+      return;
+    }
+  }
+}
+async function waContato(t) {
+  const f = funcPorId(t.dataset.id); if (!f) return;
+  let mud = {}, txt = '';
+  if (t.classList.contains('ctTel')) { const v = t.value.trim(); if (v && !telWA(v)) { t.style.borderColor = 'var(--err)'; return toast('Número inválido. Use DDD + número, ex.: (75) 99999-9999.'); } mud = { telefone: v }; txt = 'WhatsApp de ' + f.nome + (v ? ': ' + telBR(v) : ' removido'); }
+  if (t.classList.contains('ctFun')) { mud = { funcao: t.value.trim() }; txt = 'Função de ' + f.nome + ': ' + (t.value.trim() || '—'); }
+  if (t.classList.contains('ctSet')) { if (!await confirmar('Transferir ' + esc(f.nome) + '?', `<p>De <b>${esc(nomeSetor(f.setorId))}</b> para <b>${esc(nomeSetor(t.value))}</b>.</p>`, 'Transferir')) { t.value = f.setorId; return; } mud = { setorId: t.value }; txt = 'Transferência: ' + f.nome + ' de ' + nomeSetor(f.setorId) + ' para ' + nomeSetor(t.value); }
+  try { await Store.set('funcionarios', f.id, Object.assign({}, f, mud, { atualizadoEm: agoraISO() })); log('funcionario', txt); toast('Salvo.'); } catch (e) { }
 }
 
 /* ---------------- BACKUP / RESTAURAÇÃO ---------------- */
 async function baixarBackup() {
-  const dados = { sistema: 'escalas-hotel', versao: 1, exportadoEm: agoraISO(), config: S.config, setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria };
+  const dados = { sistema: 'escalas-hotel', versao: 1, exportadoEm: agoraISO(), config: S.config, setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, envios: S.envios, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria };
   await salvarArquivo('backup-escalas-' + C.hojeISO() + '.json', JSON.stringify(dados, null, 1));
   try { localStorage.setItem('escalas_ultimo_backup', agoraISO()); } catch (e) { }
   log('sistema', 'Backup baixado');
@@ -2235,6 +2430,7 @@ async function restaurar(file) {
     for (const s of d.setores) await Store.set('setores', s.id, s);
     for (const f of d.funcionarios) await Store.set('funcionarios', f.id, f);
     for (const k of Object.keys(d.escalas || {})) await Store.set('escalas', k, d.escalas[k]);
+    if (d.envios) for (const k of Object.keys(d.envios)) await Store.set('envios', k, d.envios[k]);
     if (d.vt) { for (const k of Object.keys(S.vt)) if (!d.vt[k]) await Store.del('vt', k); for (const k of Object.keys(d.vt)) await Store.set('vt', k, d.vt[k]); }
     if (d.config) await Store.set('config', 'geral', d.config);
     const existentes = new Set(S.auditoria.map(a => a.id));
@@ -2774,8 +2970,8 @@ document.addEventListener('click', async ev => {
     case 'baixarBk': {
       try {
         const b = await Nuvem.rpc('esc_obter_backup', { p_id: +id });
-        const d = { sistema: 'escalas-hotel', versao: 1, exportadoEm: b.feito_em, config: CONFIG_PADRAO, setores: [], funcionarios: [], escalas: {}, vt: {}, auditoria: [] };
-        (b.docs || []).forEach(x => { const o = Object.assign({ id: x.i }, x.d); if (x.c === 'vt') d.vt[x.i] = x.d; else if (x.c === 'escalas') d.escalas[x.i] = Object.assign({}, x.d, { semana: x.i }); else if (x.c === 'config') { if (x.i === 'geral') d.config = x.d; } else d[x.c].push(o); });
+        const d = { sistema: 'escalas-hotel', versao: 1, exportadoEm: b.feito_em, config: CONFIG_PADRAO, setores: [], funcionarios: [], escalas: {}, vt: {}, envios: {}, auditoria: [] };
+        (b.docs || []).forEach(x => { const o = Object.assign({ id: x.i }, x.d); if (x.c === 'vt') d.vt[x.i] = x.d; else if (x.c === 'envios') d.envios[x.i] = x.d; else if (x.c === 'escalas') d.escalas[x.i] = Object.assign({}, x.d, { semana: x.i }); else if (x.c === 'config') { if (x.i === 'geral') d.config = x.d; } else d[x.c].push(o); });
         await salvarArquivo('backup-automatico-' + String(b.feito_em).slice(0, 10) + '.json', JSON.stringify(d, null, 1));
       } catch (e) { toast('Não foi possível baixar.'); }
       return;
@@ -2796,7 +2992,8 @@ document.addEventListener('click', async ev => {
     case 'expPrint': return exportarPDF(true);
     case 'expXLS': return exportarExcel();
     case 'expWA': return abrirWhatsApp();
-    case 'enviarTodos': return enviarTodos(el.dataset.p || 'semana');
+    case 'enviarTodos': return abrirEnvio(el.dataset.p || 'semana');
+    case 'waTab': case 'waReenviar': case 'waCopiar': case 'waTestarCon': case 'waSalvarCfg': case 'waApagarCfg': case 'waTeste': return waAcao(act, el);
     case 'backup': return baixarBackup();
     case 'salvarTel': { const t = document.getElementById('cfgTel').value.trim(); if (t && !telWA(t)) return toast('Número inválido. Use DDD + número.'); try { await Store.set('config', 'geral', Object.assign({}, S.config, { telGerente: t, feriados: feriadosLista() })); log('sistema', 'Número da gerência alterado'); toast('Número salvo.'); } catch (e) { } return; }
     case 'salvarCfg': { const n = document.getElementById('cfgNome').value.trim(), t = document.getElementById('cfgTitulo').value.trim(), imp = document.getElementById('cfgImp').value.trim(); try { await Store.set('config', 'geral', Object.assign({}, S.config, { nomeHotel: n, tituloFolha: t || 'ESCALA DE FOLGA', textoImportante: imp, feriados: feriadosLista() })); log('sistema', 'Configurações alteradas'); toast('Configurações salvas.'); } catch (e) { } return; }
@@ -2807,6 +3004,8 @@ document.addEventListener('change', ev => {
   if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
   else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
   else if (t.id === 'vtMes' && t.value) { UI.vtMes = t.value; render(); }
+  else if (t.id === 'waHTipo') { UI.waHTipo = t.value; render(); }
+  else if (t.classList && (t.classList.contains('ctTel') || t.classList.contains('ctFun') || t.classList.contains('ctSet'))) waContato(t);
   else if (t.id === 'fSetor') { UI.filtroSetor = t.value; render(); }
   else if (t.id === 'fSit') { UI.situacao = t.value; render(); }
   else if (t.id === 'expPeriodo') { UI.expPeriodo = t.value; render(); }
