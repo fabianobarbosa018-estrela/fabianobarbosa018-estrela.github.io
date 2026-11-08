@@ -1453,7 +1453,7 @@ function vEscala() {
     <button class="btn pri big" data-act="gerar">${ic('bolt')} ${e ? 'REGENERAR ESCALA AUTOMÁTICA' : 'GERAR ESCALA AUTOMÁTICA'}</button>
     ${e && !aprov ? `<button class="btn ok" data-act="aprovar">${ic('check')} Aprovar escala</button>` : ''}
     ${aprov ? `<button class="btn" data-act="reabrir">${ic('edit')} Reabrir para edição</button>` : ''}
-    ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar / WhatsApp</a>` : ''}
+    ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar / WhatsApp</a><button class="btn wa edit-only" data-act="enviarTodos" data-p="semana">${ic('wa')} Enviar para todos</button>` : ''}
     ${e ? `<button class="btn danger sm" data-act="excluirEscala">${ic('trash')} Excluir escala</button>` : ''}
   </div></div>`;
   if (!e) {
@@ -1529,7 +1529,7 @@ function vMensal() {
   </div>
   <div class="row mt">${sems.map(s => `<a href="#escala" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? (S.escalas[s].status === 'aprovada' ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-draft">rasc.</span>') : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
+  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button><button class="btn wa edit-only" data-act="enviarTodos" data-p="mes">${ic('wa')} Enviar para cada funcionário</button></div>
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
@@ -1625,7 +1625,7 @@ function listaFuncHTML() {
   if (!fs.length) return '<div class="card empty"><b>Nenhum resultado</b>Ajuste os filtros.</div>';
   const sem = C.inicioSemana(C.hojeISO()), e = S.escalas[sem];
   return `<div class="tw"><table class="list"><thead><tr><th>Nome</th><th class="hide-m">Setor</th><th class="hide-m">Função</th><th>Situação</th><th class="hide-m">Entrada</th><th class="hide-m">Folga atual</th><th class="edit-only">Ações</th></tr></thead><tbody>
-  ${fs.map(f => `<tr><td><b>${esc(f.nome)}</b><div class="small muted show-m">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</div>${f.obs ? `<div class="small muted">${esc(f.obs)}</div>` : ''}</td>
+  ${fs.map(f => `<tr><td><b>${esc(f.nome)}</b><div class="small muted show-m">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</div>${f.telefone ? `<div class="small muted">📱 ${esc(telBR(f.telefone))}</div>` : ''}${f.obs ? `<div class="small muted">${esc(f.obs)}</div>` : ''}</td>
   <td class="hide-m">${setorPorId(f.setorId) ? esc(nomeSetor(f.setorId)) : '<span class="badge b-err">Sem setor</span>'}</td><td class="hide-m">${esc(f.funcao || '')}</td>
   <td>${f.ativo ? (C.emFerias(f, C.hojeISO()) ? '<span class="badge" style="background:#fee2e2;color:#b91c1c">De férias</span>' : '<span class="badge b-ok">Ativo</span>') : '<span class="badge b-off">Inativo</span>'}${(f.ferias || []).filter(p => p.fim >= C.hojeISO()).map(p => `<div class="small muted">Férias ${C.dataBR(p.ini).slice(0, 5)}–${C.dataBR(p.fim).slice(0, 5)}</div>`).join('')}</td><td class="hide-m">${C.dataBR(f.dataEntrada)}</td>
   <td class="hide-m">${e && e.atribuicoes && e.atribuicoes[f.id] ? pillA(e.atribuicoes[f.id]) + ' <span class="small">' + esc(C.rotulo(e.atribuicoes[f.id])) + '</span>' : '<span class="muted small">—</span>'}</td>
@@ -1638,6 +1638,7 @@ function formFunc(f) {
   <div class="fld"><label class="f">Nome completo *</label><input type="text" name="nome" required value="${esc(f.nome || '')}" maxlength="120"></div>
   <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Setor *</label><select name="setorId" required><option value="">Selecione…</option>${setoresOrd().map(s => `<option value="${s.id}" ${f.setorId === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>
   <div class="fld"><label class="f">Função</label><input type="text" name="funcao" value="${esc(f.funcao || '')}" maxlength="80"></div>
+  <div class="fld"><label class="f">WhatsApp (com DDD)</label><input type="tel" name="telefone" value="${esc(f.telefone || '')}" placeholder="(75) 99999-9999" maxlength="20"></div>
   <div class="fld"><label class="f">Situação</label><select name="ativo"><option value="1" ${f.ativo ? 'selected' : ''}>Ativo</option><option value="0" ${!f.ativo ? 'selected' : ''}>Inativo</option></select></div>
   <div class="fld"><label class="f">Data de entrada <span class="muted small">(deixe em branco se já trabalha no hotel)</span></label><input type="date" name="dataEntrada" value="${esc(f.dataEntrada || '')}"></div></div>
   <div class="fld"><label class="f">Férias</label><div id="ferLista">${(f.ferias || []).map(feriasRow).join('')}</div><button type="button" class="btn sm" data-x="addFer">${ic('plus')} Adicionar período de férias</button>
@@ -1665,7 +1666,7 @@ function abrirFormFunc(f) {
     w.querySelectorAll('.ferias-row').forEach(r => { const ini = r.querySelector('.fIni').value, fim = r.querySelector('.fFim').value; if (!ini && !fim) return; if (!ini || !fim) ferErr = 'Preencha o início e o fim das férias.'; else if (fim < ini) ferErr = 'O fim das férias não pode ser antes do início.'; else ferias.push({ ini, fim }); });
     if (ferErr) return toast(ferErr);
     ferias.sort((a, b) => a.ini.localeCompare(b.ini));
-    const novo = { nome, setorId, funcao: (fd.get('funcao') || '').trim(), ativo: fd.get('ativo') === '1', dataEntrada: fd.get('dataEntrada') || '', obs: (fd.get('obs') || '').trim(), ferias, criadoEm: (f && f.criadoEm) || agoraISO(), atualizadoEm: agoraISO() };
+    const novo = { nome, setorId, telefone: (fd.get('telefone') || '').trim(), funcao: (fd.get('funcao') || '').trim(), ativo: fd.get('ativo') === '1', dataEntrada: fd.get('dataEntrada') || '', obs: (fd.get('obs') || '').trim(), ferias, criadoEm: (f && f.criadoEm) || agoraISO(), atualizadoEm: agoraISO() };
     const id = (f && f.id) || uid('f');
     // vale-transporte: um novo valor passa a valer a partir do mês atual (os meses anteriores mantêm o valor antigo)
     const vAnt = C.vtValorEm(f, C.hojeISO()), vS = vAnt && vAnt.fixo ? '' : (fd.get('vtValor') || '').trim(), vV = numBR(vS), vQ = numBR(fd.get('vtQtd') || '1');
@@ -1819,7 +1820,8 @@ function vExportar() {
     <button class="btn pri" data-act="expPDF" ${temEsc ? '' : 'disabled'}>${ic('pdf')} Baixar PDF</button>
     <button class="btn" data-act="expXLS" ${temEsc ? '' : 'disabled'}>${ic('xls')} Exportar Excel</button>
     <button class="btn" data-act="expPrint" ${temEsc ? '' : 'disabled'}>${ic('print')} Imprimir</button>
-    <button class="btn wa" data-act="expWA" ${temEsc ? '' : 'disabled'}>${ic('wa')} WhatsApp</button>
+    <button class="btn wa" data-act="expWA" ${temEsc ? '' : 'disabled'}>${ic('wa')} WhatsApp (grupo)</button>
+    <button class="btn wa edit-only" data-act="enviarTodos" data-p="${UI.expPeriodo}" ${temEsc ? '' : 'disabled'}>${ic('wa')} Enviar para cada funcionário</button>
   </div>
   <p class="small muted mt">Imprimir gera um PDF em A4 paisagem pronto para impressão (abra o arquivo e imprima). Os arquivos baixados pedem sua confirmação antes de salvar.</p></div>`;
 }
@@ -1845,6 +1847,10 @@ function vBackup() {
     <div class="row"><button class="btn pri" data-act="trocarSenha">Trocar senha</button><button class="btn danger" data-act="sairNuvem">Sair deste aparelho</button></div>
     <p class="small muted mt">Trocar a senha desconecta os outros aparelhos.</p></div>
   <div class="card"><h2>Backups automáticos do servidor</h2><div id="bkAuto"><button class="btn sm" data-act="listarBk">Ver backups automáticos</button></div></div>` : ''}
+  <div class="card edit-only"><h2>WhatsApp</h2>
+    <div class="fld"><label class="f">Seu número (gerência), com DDD</label><input type="tel" id="cfgTel" value="${esc(S.config.telGerente || '')}" placeholder="(75) 99999-9999"></div>
+    <p class="small muted">Vai no fim de cada mensagem (“Dúvidas: fale com a gerência…”) e serve para você mandar um teste para si mesmo. O número de cada funcionário fica no cadastro dele.</p>
+    <button class="btn pri" data-act="salvarTel">Salvar número</button></div>
   <div class="card edit-only"><h2>Folha de folga</h2>
     <div class="fld"><label class="f">Nome da empresa (topo do sistema e WhatsApp)</label><input type="text" id="cfgNome" value="${esc(S.config.nomeHotel || '')}" maxlength="100"></div>
     <div class="fld"><label class="f">Título da folha</label><input type="text" id="cfgTitulo" value="${esc(S.config.tituloFolha || 'ESCALA DE FOLGA')}" maxlength="60"></div>
@@ -2136,6 +2142,76 @@ function abrirWhatsApp() {
   ta.oninput = () => { ln.href = 'https://wa.me/?text=' + encodeURIComponent(ta.value); };
   w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
   w.querySelector('[data-x=cp]').onclick = async () => { try { await navigator.clipboard.writeText(ta.value); toast('Texto copiado.'); } catch (e) { ta.select(); toast('Selecione e copie o texto manualmente.'); } };
+}
+
+/* ---------------- ENVIO INDIVIDUAL PELO WHATSAPP ---------------- */
+/** número no formato do WhatsApp (55 + DDD + número) ou null */
+function telWA(t) {
+  let d = String(t || '').replace(/\D/g, '');
+  if (d.startsWith('0')) d = d.replace(/^0+/, '');
+  if (d.length === 10 || d.length === 11) d = '55' + d;
+  return /^55\d{10,11}$/.test(d) ? d : (d.length >= 12 && d.length <= 15 && !d.startsWith('55') ? d : null);
+}
+const telBR = t => { const d = telWA(t); if (!d || !d.startsWith('55')) return t || ''; const n = d.slice(2); return '(' + n.slice(0, 2) + ') ' + (n.length === 11 ? n.slice(2, 7) + '-' + n.slice(7) : n.slice(2, 6) + '-' + n.slice(6)); };
+function msgFuncionario(m, l, tipo) {
+  const juntar = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1] : a.join('');
+  const ym = m.cols[0].slice(0, 7), noPer = x => tipo === 'semana' || x.slice(0, 7) === ym;
+  const fol = m.cols.filter((x, i) => l.cel[i] === 'F' && noPer(x)), fer = m.cols.filter((x, i) => l.cel[i] === 'V' && noPer(x));
+  const primeiro = (l.nome || '').trim().split(/\s+/)[0]; const nome = primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
+  let t = '*' + (S.config.nomeHotel || 'Hotel') + '*\nOlá, ' + nome + '! Segue sua escala de folga.\n*' + (tipo === 'semana' ? 'Semana de ' + C.dataBR(m.cols[0]).slice(0, 5) + ' a ' + C.dataBR(m.cols[6]).slice(0, 5) : m.sub.charAt(0) + m.sub.slice(1).toLowerCase()) + '*\n\n';
+  if (fol.length) t += tipo === 'semana' ? '🗓️ Suas folgas: ' + juntar(fol.map(x => C.DIAS[C.diaSemana(x)].toLowerCase() + ' (' + C.dataBR(x).slice(0, 5) + ')')) + '\n' : '🗓️ Suas folgas:\n' + m.sems.map(s => { const f = fol.filter(x => C.inicioSemana(x) === s); return f.length ? '• ' + f.map(x => C.DIAS_CURTO[C.diaSemana(x)].toLowerCase() + ' ' + C.dataBR(x).slice(0, 5)).join(', ') : null; }).filter(Boolean).join('\n') + '\n';
+  else if (!fer.length) t += 'Você não tem folga neste período.\n';
+  if (fer.length) t += '🏖️ Férias: ' + C.dataBR(fer[0]).slice(0, 5) + ' a ' + C.dataBR(fer[fer.length - 1]).slice(0, 5) + '\n';
+  t += 'Nos outros dias você trabalha normalmente.\n';
+  if (m.pend) t += '_(escala ainda em rascunho, pode mudar)_\n';
+  if (S.config.textoImportante) t += '\n*IMPORTANTE:* ' + S.config.textoImportante.replace(/\n/g, ' ') + '\n';
+  if (S.config.telGerente) t += '\nDúvidas: fale com a gerência — ' + telBR(S.config.telGerente);
+  return t;
+}
+UI.enviados = UI.enviados || {};
+function enviarTodos(tipo) {
+  const per = periodoFolha(tipo), m = folhaModelo(per), chave = tipo + ':' + per.ini;
+  if (!m.linhas.length || m.semEscala.length === m.sems.length) return modalMsg('Sem escala', '<p>Não há escala gerada neste período.</p>');
+  const env = UI.enviados[chave] = UI.enviados[chave] || {};
+  const linhas = m.linhas.filter(l => l.f && l.f.ativo);
+  const w = abrirModal(`<div class="mh">Enviar a escala para cada funcionário</div><div class="mbd">
+  <p><b>${esc(tipo === 'semana' ? 'Semana de ' + semanaLabel(per.ini) : per.sub)}</b> — cada um recebe só as próprias folgas, numa conversa separada.</p>
+  ${m.semEscala.length ? '<div class="alert w"><span class="ic">!</span><div>Há semana sem escala neste período: ela fica de fora das mensagens.</div></div>' : ''}
+  <div class="fld"><label class="f">Seu número (vai no fim da mensagem)</label><div class="row"><input type="tel" id="enTel" value="${esc(S.config.telGerente || '')}" placeholder="(75) 99999-9999" style="flex:1"><a class="btn sm" id="enTeste" target="_blank" rel="noopener">Mandar teste para mim</a></div></div>
+  <div class="row mb"><button class="btn wa" id="enProx">${ic('wa')} Enviar para o próximo</button><span class="small muted" id="enCont"></span></div>
+  <div class="tw" style="max-height:46vh"><table class="list"><tbody id="enLista"></tbody></table></div>
+  <p class="small muted mt">Cada toque abre a conversa do funcionário no WhatsApp com a mensagem pronta: é só tocar em <b>enviar</b> e voltar aqui para o próximo. Quem não tem número: digite na lista (fica salvo no cadastro).</p>
+  </div><div class="mf"><button class="btn" data-x="c">Fechar</button></div>`, true);
+  const tel = w.querySelector('#enTel');
+  const link = (num, txt) => 'https://wa.me/' + num + '?text=' + encodeURIComponent(txt);
+  const desenhar = () => {
+    w.querySelector('#enLista').innerHTML = linhas.map(l => {
+      const f = funcPorId(l.id), n = telWA(f.telefone);
+      return `<tr><td><b>${esc(l.nome)}</b><div class="small muted">${esc(l.sNome)}</div></td>
+      <td><input type="tel" class="enNum" data-id="${l.id}" value="${esc(f.telefone || '')}" placeholder="sem número" style="width:150px;${f.telefone && !n ? 'border-color:var(--err)' : ''}"></td>
+      <td class="r">${env[l.id] ? '<span class="badge b-ok">enviado</span> ' : ''}${n ? `<a class="btn sm wa enUm" data-id="${l.id}" href="${link(n, msgFuncionario(m, l, tipo))}" target="_blank" rel="noopener">${ic('wa')} ${env[l.id] ? 'Reenviar' : 'Enviar'}</a>` : '<span class="small muted">sem número</span>'}
+      <button class="btn sm icon" data-x="ver" data-id="${l.id}" title="Ver mensagem">👁</button></td></tr>`;
+    }).join('');
+    const prontos = linhas.filter(l => telWA(funcPorId(l.id).telefone)), faltam = prontos.filter(l => !env[l.id]);
+    w.querySelector('#enCont').textContent = `${prontos.length - faltam.length} de ${prontos.length} enviados` + (linhas.length > prontos.length ? ` · ${linhas.length - prontos.length} sem número` : '');
+    const px = w.querySelector('#enProx'); px.disabled = !faltam.length; px.dataset.id = faltam[0] ? faltam[0].id : '';
+    px.innerHTML = ic('wa') + (faltam[0] ? ' Enviar para o próximo: ' + esc(faltam[0].nome) : ' Todos enviados');
+    const tt = telWA(tel.value), ex = linhas[0]; const te = w.querySelector('#enTeste');
+    if (tt && ex) { te.href = link(tt, msgFuncionario(m, ex, tipo)); te.removeAttribute('disabled'); } else { te.removeAttribute('href'); te.setAttribute('disabled', ''); }
+  };
+  const marcar = id => { env[id] = true; const l = linhas.find(x => x.id === id); log('whatsapp', 'Escala enviada pelo WhatsApp para ' + (l ? l.nome : id) + ' (' + (tipo === 'semana' ? semanaLabel(per.ini) : per.sub) + ')'); setTimeout(desenhar, 300); };
+  w.addEventListener('click', ev => {
+    const a = ev.target.closest('.enUm'); if (a) return marcar(a.dataset.id);
+    const v = ev.target.closest('[data-x=ver]'); if (v) { const l = linhas.find(x => x.id === v.dataset.id); modalMsg('Mensagem para ' + esc(l.nome), '<pre style="white-space:pre-wrap;font-family:inherit;margin:0">' + esc(msgFuncionario(m, l, tipo)) + '</pre>'); }
+  });
+  w.querySelector('#enProx').onclick = () => { const id = w.querySelector('#enProx').dataset.id; if (!id) return; const l = linhas.find(x => x.id === id); const n = telWA(funcPorId(id).telefone); window.open(link(n, msgFuncionario(m, l, tipo)), '_blank', 'noopener'); marcar(id); };
+  w.addEventListener('change', async ev => {
+    const i = ev.target.closest('.enNum');
+    if (i) { const f = funcPorId(i.dataset.id), v = i.value.trim(); if (v && !telWA(v)) { i.style.borderColor = 'var(--err)'; return toast('Número inválido. Use DDD + número.'); } try { await Store.set('funcionarios', f.id, Object.assign({}, f, { telefone: v, atualizadoEm: agoraISO() })); } catch (e) { } desenhar(); return; }
+    if (ev.target === tel) { const v = tel.value.trim(); if (v && !telWA(v)) return toast('Seu número está inválido.'); try { await Store.set('config', 'geral', Object.assign({}, S.config, { telGerente: v, feriados: feriadosLista() })); } catch (e) { } desenhar(); }
+  });
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  desenhar();
 }
 
 /* ---------------- BACKUP / RESTAURAÇÃO ---------------- */
@@ -2720,7 +2796,9 @@ document.addEventListener('click', async ev => {
     case 'expPrint': return exportarPDF(true);
     case 'expXLS': return exportarExcel();
     case 'expWA': return abrirWhatsApp();
+    case 'enviarTodos': return enviarTodos(el.dataset.p || 'semana');
     case 'backup': return baixarBackup();
+    case 'salvarTel': { const t = document.getElementById('cfgTel').value.trim(); if (t && !telWA(t)) return toast('Número inválido. Use DDD + número.'); try { await Store.set('config', 'geral', Object.assign({}, S.config, { telGerente: t, feriados: feriadosLista() })); log('sistema', 'Número da gerência alterado'); toast('Número salvo.'); } catch (e) { } return; }
     case 'salvarCfg': { const n = document.getElementById('cfgNome').value.trim(), t = document.getElementById('cfgTitulo').value.trim(), imp = document.getElementById('cfgImp').value.trim(); try { await Store.set('config', 'geral', Object.assign({}, S.config, { nomeHotel: n, tituloFolha: t || 'ESCALA DE FOLGA', textoImportante: imp, feriados: feriadosLista() })); log('sistema', 'Configurações alteradas'); toast('Configurações salvas.'); } catch (e) { } return; }
   }
 });
