@@ -4,17 +4,16 @@
    - Semana de domingo (0) a sábado (6), como na folha de escala do hotel.
    - Sexta (5) e sábado (6): ninguém folga.
    - Combinações permitidas (exatamente uma por funcionário) — REGRAS FIXAS DO HOTEL:
-       1 = Segunda e terça | 2 = Terça e quarta | 4 = Domingo, segunda e quinta
-       (a combinação 3, quarta e quinta, NÃO é permitida)
+       1 = Segunda e terça | 2 = Terça e quarta | 3 = Quarta e quinta
+       4 = Domingo, segunda e quinta (semana do domingo de folga)
    - No máximo 1 funcionário por setor de folga no domingo (combinação 4),
      e quem folga domingo folga a segunda e a quinta da mesma semana.
    - Cada funcionário folga no máximo 1 domingo por mês (mês do domingo).
-   - Cobertura (setor com 2 ou mais): pelo menos 1 trabalhando nos dias em que o hotel funciona
-     (domingo, segunda, quinta, sexta e sábado). Terça e quarta o hotel fecha: setor com mais de
-     2 funcionários tem no máximo 1 trabalhando nesses dias.
+   - Cobertura (setor com 2 ou mais): SEMPRE pelo menos 1 trabalhando, todos os dias.
+     Terça e quarta (hotel fechado): setor com mais de 2 funcionários tem no máximo 1 trabalhando.
    - Modelo:
        semana COM domingo: quem folga domingo folga dom+seg+qui; os demais terça+quarta;
-       semana SEM domingo: 1 pessoa segunda+terça e as demais terça+quarta.
+       semana SEM domingo: 1 pessoa segunda+terça, 1 pessoa quarta+quinta e as demais terça+quarta.
    - Funcionário de férias em qualquer dia da semana não recebe folgas nela.
    ===================================================================== */
 (function (root) {
@@ -25,12 +24,12 @@
   var GRUPOS = {
     1: { dias: [1, 2], nome: 'Segunda e terça' },
     2: { dias: [2, 3], nome: 'Terça e quarta' },
-    3: { dias: [3, 4], nome: 'Quarta e quinta (não permitida)' },
+    3: { dias: [3, 4], nome: 'Quarta e quinta' },
     4: { dias: [0, 1, 4], nome: 'Domingo, segunda e quinta' }
   };
   var IDX_TER = 2, IDX_QUA = 3;
-  var PERMITIDAS = [1, 2, 4];
-  var DIAS_FUNCIONAMENTO = [0, 1, 4, 5, 6]; // terça e quarta o hotel fecha
+  var PERMITIDAS = [1, 2, 3, 4];
+  var DIAS_FUNCIONAMENTO = [0, 1, 2, 3, 4, 5, 6]; // sempre pelo menos 1 trabalhando, todos os dias
   var DIAS_PROIBIDOS = [5, 6]; // sexta e sábado
   var IDX_DOMINGO = 0, IDX_QUINTA = 4;
 
@@ -112,11 +111,11 @@
     return out.length ? out : null;
   }
   function textoProblema(nomeSetor, n, x) {
-    if (x.tipo === 'vazio') return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): ninguém trabalha na ' + x.dia + '. Precisa haver pelo menos 1 trabalhando nos dias em que o hotel funciona.';
+    if (x.tipo === 'vazio') return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): ninguém trabalha na ' + x.dia + '. Precisa haver sempre pelo menos 1 funcionário trabalhando.';
     return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): na ' + x.dia + ' trabalham ' + x.qtd + ' (' + x.nomes.join(', ') + '). Na terça e na quarta o hotel fecha e o setor deve ter no máximo 1 trabalhando.';
   }
   function explicarImpossivel(setor, n, regra, lista, cad, blq, sem) {
-    var msg = 'Setor "' + setor.nome + '" (' + n + ' funcionários): não é possível montar a escala respeitando as regras (só as combinações seg+ter, ter+qua e dom+seg+qui; pelo menos 1 trabalhando no domingo, segunda e quinta' + (regra === 'reduzida' ? '; no máximo 1 trabalhando na terça e na quarta' : '') + ').';
+    var msg = 'Setor "' + setor.nome + '" (' + n + ' funcionários): não é possível montar a escala respeitando as regras (combinações seg+ter, ter+qua, qua+qui e dom+seg+qui; sempre pelo menos 1 trabalhando' + (regra === 'reduzida' ? '; no máximo 1 trabalhando na terça e na quarta' : '') + ').';
     var motivos = [];
     var bl = lista.filter(function (f) { return blq[f.id] !== undefined; });
     if (bl.length) motivos.push('Combinações bloqueadas: ' + bl.map(function (f) { return f.nome + ' (' + GRUPOS[blq[f.id]].nome + ')'; }).join(', ') + '.');
@@ -305,25 +304,28 @@
       var foraSemana = cad.filter(function (f) { return !elegivel(f, sem); });
       var ext = function (d) { return foraSemana.filter(function (f) { return trabalhaNoDia(f, null, addDias(sem, d)); }).length; };
       var eTer = ext(IDX_TER), eQua = ext(IDX_QUA), eSeg = ext(1);
+      var eQui = ext(IDX_QUINTA);
       var padroes = [];
       for (var d = 0; d <= Math.min(1, m); d++)
-        for (var a = 0; a <= m - d; a++) {
-          var b = m - d - a;
-          // terça: só quem folga domingo trabalha; quarta: seg+ter e quem folga domingo; segunda: ter+qua
-          if (regra === 'reduzida' && (d + eTer > 1 || a + d + eQua > 1)) continue;
-          if (regra && b + eSeg < 1) continue;
-          var pen = d ? 0 : 50000; // preferir que haja folga de domingo (rodízio)
-          if (regra === 'dupla') pen += d ? 3000 * a : (a === 1 ? 0 : 3000); // setor de 2: dom+seg+qui com ter+qua; sem domingo: seg+ter com ter+qua
-          if (regra === 'reduzida' && !d) pen += a === 1 ? 0 : 100; // sem domingo: 1 pessoa seg+ter
-          padroes.push({ 1: a, 2: b, 3: 0, 4: d, pen: pen });
-        }
+        for (var a = 0; a <= m - d; a++)
+          for (var c3 = 0; c3 <= m - d - a; c3++) {
+            var b = m - d - a - c3;
+            // terça: qua+qui e dom+seg+qui; quarta: seg+ter e dom+seg+qui; segunda: ter+qua e qua+qui; quinta: seg+ter e ter+qua
+            var ter = c3 + d + eTer, qua = a + d + eQua;
+            if (regra && (ter < 1 || qua < 1 || b + c3 + eSeg < 1 || a + b + eQui < 1)) continue;
+            if (regra === 'reduzida' && (ter > 1 || qua > 1)) continue;
+            var pen = d ? 0 : 50000; // preferir que haja folga de domingo (rodízio)
+            if (regra === 'dupla') pen += d ? 3000 * (a + c3) : 0; // com domingo: o outro folga ter+qua
+            if (!regra) pen += 5 * (Math.max(a, b, c3) - Math.min(a, b, c3));
+            padroes.push({ 1: a, 2: b, 3: c3, 4: d, pen: pen });
+          }
       padroes.sort(function (x, y) { return x.pen - y.pen; });
       var melhor = null, validos = 0;
       for (var pi = 0; pi < padroes.length && validos < 6; pi++) {
         var p = padroes[pi];
         if (melhor && p.pen > melhor.custo) break; // nenhum padrão seguinte pode ser melhor
         var vagas = [];
-        [4, 1, 2].forEach(function (g) { for (var i = 0; i < p[g]; i++) vagas.push(g); });
+        [4, 1, 2, 3].forEach(function (g) { for (var i = 0; i < p[g]; i++) vagas.push(g); });
         if (!vagas.length) { if (!melhor) melhor = { custo: 0, atr: {}, p: p }; continue; }
         var mat = lista.map(function (f) { return vagas.map(function (g) { return custo(f, g); }); });
         var res = hungaro(mat);
@@ -394,9 +396,9 @@
       if (!elegivel(f, sem)) { var mot = motivoFora(f, sem); avisos.push({ setor: nomeSetor(f.setorId), funcId: id, fora: true, msg: nome + (mot === 'ferias' ? ' está de férias nesta semana' : mot === 'nao_admitido' ? ' ainda não foi admitido nesta semana' : ' está inativo') + ', mas aparece na escala. Use "Atualizar escala" para corrigir.' }); return; }
       var sid = f.setorId;
       // 2) combinação permitida
-      if (PERMITIDAS.indexOf(a.g) < 0) { erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ': combinação de folgas não permitida' + (GRUPOS[a.g] ? ' (' + GRUPOS[a.g].nome.replace(' (não permitida)', '') + ')' : '') + '. Use apenas segunda e terça, terça e quarta, ou domingo, segunda e quinta.' }); return; }
+      if (PERMITIDAS.indexOf(a.g) < 0) { erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ': combinação de folgas não permitida. Use apenas segunda e terça, terça e quarta, quarta e quinta, ou domingo, segunda e quinta.' }); return; }
       var folga = folgasDoGrupo(a.g);
-      // 3) quantidade de folgas: 2 (seg+ter, ter+qua); a semana do domingo tem dom+seg+qui
+      // 3) quantidade de folgas: 2 (seg+ter, ter+qua, qua+qui); a semana do domingo tem dom+seg+qui
       var n = folga.filter(Boolean).length, esperado = GRUPOS[a.g].dias.length;
       if (n !== esperado) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ' tem ' + n + ' folgas na semana (a combinação ' + a.g + ' tem ' + esperado + ').' });
       // 4) sexta e sábado
