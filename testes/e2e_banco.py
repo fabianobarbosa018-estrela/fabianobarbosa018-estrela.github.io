@@ -10,7 +10,7 @@ async def main():
         async def login(u,s):
             await p.wait_for_selector('#fLogin'); await p.fill('#fLogin [name=login]',u); await p.fill('#fLogin [name=senha]',s); await p.click('#fLogin button'); await p.wait_for_selector('#main h1')
         await p.goto(U); await login('professor','Prof@2026')
-        await p.click('#nav [data-go=p_banco]'); await p.wait_for_selector('[data-a=banDisc]'); await p.screenshot(path='/tmp/banco1.png')
+        await p.click('#nav [data-go=p_atividades]'); await p.click('.hub [data-go=p_banco]'); await p.wait_for_selector('[data-a=banDisc]'); await p.screenshot(path='/tmp/banco1.png')
         await p.click('[data-a=banDisc][data-id=matematica]'); await p.wait_for_selector('.banA')
         print('assuntos de matemática:', await p.locator('.banA').count())
         await p.check('.banA[value="4"]'); await p.check('.banA[value="5"]')   # porcentagem e regra de três

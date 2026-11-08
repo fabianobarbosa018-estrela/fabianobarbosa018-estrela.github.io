@@ -18,3 +18,11 @@ Este repositório é público: não contém senhas nem chaves. As senhas iniciai
 - O conteúdo fica **criptografado** em `server/banco.enc.txt` (AES-256-GCM). A chave fica só no banco de dados do Supabase, então os gabaritos não ficam expostos neste repositório público.
 - Só professores e administradores acessam o banco. O aluno recebe a atividade sem gabarito e só vê as explicações depois da correção, quando o professor libera as notas.
 - A IA também cria atividades só a partir do assunto e do nível (Educação Infantil, Fundamental I e II, Médio e cursos livres).
+
+## Desafio diário (50 questões por dia)
+- Todo dia o servidor prepara um desafio de 50 questões para cada nível (Fundamental I, Fundamental II e Médio), distribuídas entre Português, Matemática, História, Geografia, Educação Física, Física, Química e Biologia.
+- O nível de cada turma vem da série (ex.: "6º ano" → Fundamental II) e pode ser ajustado pelo professor.
+- As questões são geradas pela IA (Google Gemini, cota gratuita) e passam por uma segunda revisão da IA, que descarta as que tiverem problema. Se a IA falhar, o desafio é completado com o Banco de Atividades, sem repetir as questões usadas recentemente.
+- Um agendamento (pg_cron + pg_net) chama o servidor a cada 15 minutos: prepara o desafio do dia, libera o gabarito no encerramento e atualiza o histórico.
+- Abertura, encerramento e liberação do gabarito são configuráveis (geral pelo administrador e por professor). Contagem regressiva para o aluno e bloqueio automático após o encerramento.
+- Correção automática das objetivas, placar de acertos e erros, discursivas para o professor corrigir e histórico de desempenho (sd_desafiohist).

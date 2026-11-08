@@ -62,6 +62,30 @@ troca('''  <div class="card"><label>Título<input data-e="titulo"''','''  ${ED.i
   <div class="card"><label>Título<input data-e="titulo"''')
 troca("  if(a.instrucoes)h+=`<div class=\"apoio\">${linkify(a.instrucoes)}</div>`;",
       "  if(a.instrucoes)h+=`<div class=\"apoio\">${linkify(a.instrucoes)}</div>`;\n  if(S.iaTutor)h+=`<button class=\"btn sm\" style=\"margin-bottom:12px\" data-go=\"a_tutor\" data-p=\"${P({atividade:a.id})}\">🤖 Pedir ajuda ao Tutor IA</button>`;")
-troca('/* =================== INÍCIO =================== */', open('/home/claude/supa/web_ia.js').read() + '\n' + open('/home/claude/supa/web_banco.js').read() + '\n/* =================== INÍCIO =================== */')
+troca('/* =================== INÍCIO =================== */', open('/home/claude/supa/web_ia.js').read() + '\n' + open('/home/claude/supa/web_banco.js').read() + '\n' + open('/home/claude/supa/web_desafio.js').read() + '\n/* =================== INÍCIO =================== */')
+# ---- Desafio diário e área única de atividades ----
+troca('</style>', """.hub{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px;padding:4px;background:#eef1f7;border-radius:16px}
+.hub button{flex:none;border:0;background:transparent;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px;cursor:pointer;color:var(--mut)}
+.hub button.on{background:#fff;color:var(--ink);box-shadow:var(--sh)}.hub .novo{background:var(--pri);color:#fff}
+.desafio{background:linear-gradient(135deg,#2f5bea,#7b4dff);color:#fff;border-radius:var(--r);padding:18px;margin-bottom:16px;box-shadow:var(--sh)}
+.desafio p{margin:6px 0;opacity:.95}.desafio .small{opacity:.9}.desafio .pill{background:rgba(255,255,255,.2);color:#fff;margin-left:6px}
+.desafio .btn{margin-top:10px}.desafio .btn:not(.pri){background:#fff;color:var(--ink)}.desafio .btn.pri{background:#fff;color:#2f5bea}
+.desafio .bar{background:rgba(255,255,255,.3)}.desafio .bar i{background:#fff}
+.dz-t{font-size:19px;font-weight:900}.dz-cd{font-size:16px;font-weight:800;margin-top:8px}.cd{font-variant-numeric:tabular-nums;font-weight:900}.cd.urg{color:#ffd166}
+.dz-placar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;font-weight:800}.dz-placar span{background:rgba(255,255,255,.18);padding:5px 10px;border-radius:20px}
+.card .dz-placar span,.modal .dz-placar span{background:#eef1f7}.ok{color:var(--ok)}.bad{color:var(--bad)}.desafio .ok,.desafio .bad{color:#fff}
+.dz-barra{position:sticky;top:0;z-index:5;background:var(--warnb);color:var(--warn);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-weight:800;box-shadow:var(--sh)}.dz-barra .cd.urg{color:var(--bad)}
+</style>""")
+troca("const A=await api('atividades');const f=p.f||'todas';", "const A=(await api('atividades')).filter(a=>a.tipo!=='desafio');const f=p.f||'todas';")
+troca("Object.entries(TIPO).map(([k,v])=>`<option value=\"${k}\" ${a.tipo===k?'selected':''}>${v}</option>`)", "Object.entries(TIPO).filter(([k])=>k!=='desafio'||a.tipo==='desafio').map(([k,v])=>`<option value=\"${k}\" ${a.tipo===k?'selected':''}>${v}</option>`)")
+troca('<span class="qtag">${TIPOQ[q.tipo]}</span>', '<span class="qtag">${TIPOQ[q.tipo]}</span>${q.disciplina?`<span class="qtag">${ic(q.disciplina)} ${esc(q.disciplina)}</span>`:\'\'}')
+troca("const lib=enviado&&e.status==='corrigida'&&e.correcao;", "const lib=enviado&&e.correcao&&(e.status==='corrigida'||a.tipo==='desafio');")
+troca("else if(enviado)h+=`<div class=\"msg\">📨 Atividade enviada! A nota aparecerá aqui quando o professor liberar a correção.</div>`;",
+      "else if(enviado)h+=a.tipo==='desafio'?`<div class=\"msg\">📨 Desafio enviado! O gabarito com as explicações aparece ${a.encerramento>Date.now()?'depois do encerramento ('+quando(a.encerramento)+')':'quando o professor liberar'}.</div>`:`<div class=\"msg\">📨 Atividade enviada! A nota aparecerá aqui quando o professor liberar a correção.</div>`;")
+troca("<button class=\"btn sm\" style=\"margin-top:12px\" data-a=\"pedirRevisao\">Pedir revisão da nota</button>`}</div>`}",
+      "<button class=\"btn sm\" style=\"margin-top:12px\" data-a=\"pedirRevisao\">Pedir revisão da nota</button>`}${a.tipo==='desafio'&&e.status!=='corrigida'?'<div class=\"info\" style=\"margin-top:10px\">✍️ As questões discursivas ainda serão corrigidas pelo professor. A nota final aparece depois.</div>':''}</div>`}")
+troca("<h2>Atividade enviada!</h2><p class=\"muted\">Recebemos sua atividade em <b>${fdh(r.enviadoEm)}</b>.${r.atrasada?'<br>(entrega após o prazo)':''}</p>",
+      "<h2>${r.resultado?'Desafio enviado!':'Atividade enviada!'}</h2><p class=\"muted\">Recebemos sua atividade em <b>${fdh(r.enviadoEm)}</b>.${r.atrasada?'<br>(entrega após o prazo)':''}</p>${resultadoDesafioHtml(r.resultado)}")
+
 open('/home/claude/supa/web/index.html', 'w').write(h)
 print('ok', API)

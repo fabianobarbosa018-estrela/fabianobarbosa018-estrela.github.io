@@ -159,6 +159,17 @@ tr:last-child td{border-bottom:0}
   .shell main{margin:0;width:100%}
 }
 @media print{.top,.nav,.savebar,.btn{display:none!important}main{padding:0}}
+.hub{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px;padding:4px;background:#eef1f7;border-radius:16px}
+.hub button{flex:none;border:0;background:transparent;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px;cursor:pointer;color:var(--mut)}
+.hub button.on{background:#fff;color:var(--ink);box-shadow:var(--sh)}.hub .novo{background:var(--pri);color:#fff}
+.desafio{background:linear-gradient(135deg,#2f5bea,#7b4dff);color:#fff;border-radius:var(--r);padding:18px;margin-bottom:16px;box-shadow:var(--sh)}
+.desafio p{margin:6px 0;opacity:.95}.desafio .small{opacity:.9}.desafio .pill{background:rgba(255,255,255,.2);color:#fff;margin-left:6px}
+.desafio .btn{margin-top:10px}.desafio .btn:not(.pri){background:#fff;color:var(--ink)}.desafio .btn.pri{background:#fff;color:#2f5bea}
+.desafio .bar{background:rgba(255,255,255,.3)}.desafio .bar i{background:#fff}
+.dz-t{font-size:19px;font-weight:900}.dz-cd{font-size:16px;font-weight:800;margin-top:8px}.cd{font-variant-numeric:tabular-nums;font-weight:900}.cd.urg{color:#ffd166}
+.dz-placar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;font-weight:800}.dz-placar span{background:rgba(255,255,255,.18);padding:5px 10px;border-radius:20px}
+.card .dz-placar span,.modal .dz-placar span{background:#eef1f7}.ok{color:var(--ok)}.bad{color:var(--bad)}.desafio .ok,.desafio .bad{color:#fff}
+.dz-barra{position:sticky;top:0;z-index:5;background:var(--warnb);color:var(--warn);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-weight:800;box-shadow:var(--sh)}.dz-barra .cd.urg{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -421,12 +432,12 @@ VIEWS.a_fazer=async function(p){
   const r=await api('abrirAtividade',{id:p.id});const a=r.atividade,e=r.entrega;
   const enviado=e&&(e.status==='enviada'||e.status==='corrigida');
   PL={a,e,resp:(e&&e.respostas)||[],fotos:(e&&e.fotos)||{},dirty:false,timer:null,salvoEm:e&&e.atualizadoEm,pode:r.podeEnviar,envi:enviado,sit:r.situacao};
-  const lib=enviado&&e.status==='corrigida'&&e.correcao;
+  const lib=enviado&&e.correcao&&(e.status==='corrigida'||a.tipo==='desafio');
   let h=`<button class="back" data-go="a_atividades">← Atividades</button><div class="ph"><div><h1>${esc(a.titulo)}</h1><p>${TIPO[a.tipo]||''} · ${esc(a.disciplina||'')} · ${pl(a.questoes.length,'questão','questões')} · ${pts(a.questoes.reduce((s,q)=>s+q.pontos,0))} pontos</p></div></div>`;
   h+=`<div class="card"><div class="kv"><b>Abertura</b><span>${fdh(a.abertura)}</span><b>Encerramento</b><span>${fdh(a.encerramento)}${a.aceitaAtraso&&a.encerramento?' (aceita entrega atrasada)':''}</span>${enviado?`<b>Enviada em</b><span>${fdh(e.enviadoEm)}${e.atrasada?' <span class="pill atrasada">atrasada</span>':''}</span><b>Protocolo</b><span>${esc(e.id.toUpperCase())}</span>`:''}</div></div>`;
   if(lib){h+=`<div class="card center"><div class="muted" style="font-weight:800">Sua nota</div><div class="score">${nota(e.nota,e.notaMax)}</div><div class="muted">${pts(e.nota)} de ${pts(e.notaMax)} pontos</div>${e.comentario?`<div class="fb" style="text-align:left"><b>💬 Comentário do professor:</b>\n${esc(e.comentario)}</div>`:''}
-    ${e.revisaoPedida?'<div class="info" style="margin-top:12px">Pedido de revisão enviado. Aguarde o professor.</div>':`<button class="btn sm" style="margin-top:12px" data-a="pedirRevisao">Pedir revisão da nota</button>`}</div>`}
-  else if(enviado)h+=`<div class="msg">📨 Atividade enviada! A nota aparecerá aqui quando o professor liberar a correção.</div>`;
+    ${e.revisaoPedida?'<div class="info" style="margin-top:12px">Pedido de revisão enviado. Aguarde o professor.</div>':`<button class="btn sm" style="margin-top:12px" data-a="pedirRevisao">Pedir revisão da nota</button>`}${a.tipo==='desafio'&&e.status!=='corrigida'?'<div class="info" style="margin-top:10px">✍️ As questões discursivas ainda serão corrigidas pelo professor. A nota final aparece depois.</div>':''}</div>`}
+  else if(enviado)h+=a.tipo==='desafio'?`<div class="msg">📨 Desafio enviado! O gabarito com as explicações aparece ${a.encerramento>Date.now()?'depois do encerramento ('+quando(a.encerramento)+')':'quando o professor liberar'}.</div>`:`<div class="msg">📨 Atividade enviada! A nota aparecerá aqui quando o professor liberar a correção.</div>`;
   else if(!r.podeEnviar)h+=`<div class="note">O prazo desta atividade terminou e ela não aceita entregas atrasadas.</div>`;
   else if(r.situacao==='atrasada')h+=`<div class="note">O prazo terminou, mas o professor aceita entrega atrasada.</div>`;
   if(a.instrucoes)h+=`<div class="apoio">${linkify(a.instrucoes)}</div>`;
@@ -438,7 +449,7 @@ VIEWS.a_fazer=async function(p){
 function htmlQuestaoAluno(q,i,eCorr,ro){
   const r=PL.resp[i];const c=eCorr&&eCorr.correcao;const pt=c?c.pontos[i]:null;
   const cls=c?(pt>=q.pontos&&q.pontos>0?'ok':(pt===0?'bad':'')):'';
-  let h=`<div class="q ${cls}" id="q${i}"><div class="qh"><span class="qn">${i+1}</span><span class="qtag">${TIPOQ[q.tipo]}</span><span class="qpts">${c?pts(pt)+' / ':''}${pts(q.pontos)} pt${q.pontos==1?'':'s'}</span></div>`;
+  let h=`<div class="q ${cls}" id="q${i}"><div class="qh"><span class="qn">${i+1}</span><span class="qtag">${TIPOQ[q.tipo]}</span>${q.disciplina?`<span class="qtag">${ic(q.disciplina)} ${esc(q.disciplina)}</span>`:''}<span class="qpts">${c?pts(pt)+' / ':''}${pts(q.pontos)} pt${q.pontos==1?'':'s'}</span></div>`;
   if(q.textoApoio)h+=`<div class="apoio">${linkify(q.textoApoio)}</div>`;
   if(q.imagem)h+=`<img class="qimg" data-img="${esc(q.imagem)}" alt="Imagem da questão">`;
   h+=`<div class="enun">${esc(q.enunciado)}</div>`;
@@ -488,7 +499,7 @@ ACOES.enviarAtiv=async(d,b)=>{
   const ok=await confirmar('Enviar atividade',(falta.length?`<b>Atenção:</b> a${falta.length>1?'s':''} questã${falta.length>1?'ões':'o'} ${falta.join(', ')} est${falta.length>1?'ão':'á'} sem resposta.<br><br>`:'')+'Depois de enviar, não será possível alterar as respostas. Deseja enviar agora?','Enviar atividade');
   if(!ok)return;clearTimeout(PL.timer);
   await busy(b,async()=>{try{const r=await api('enviarAtividade',{id:PL.a.id,respostas:PL.resp});PL.envi=true;
-    modal(`<div class="center"><div style="font-size:54px">✅</div><h2>Atividade enviada!</h2><p class="muted">Recebemos sua atividade em <b>${fdh(r.enviadoEm)}</b>.${r.atrasada?'<br>(entrega após o prazo)':''}</p><div class="card"><div class="small muted">Protocolo</div><div class="code" style="font-size:20px">${esc(r.protocolo)}</div></div><button class="btn pri full" data-a="fecharEnvio">Ver minha atividade</button></div>`)}
+    modal(`<div class="center"><div style="font-size:54px">✅</div><h2>${r.resultado?'Desafio enviado!':'Atividade enviada!'}</h2><p class="muted">Recebemos sua atividade em <b>${fdh(r.enviadoEm)}</b>.${r.atrasada?'<br>(entrega após o prazo)':''}</p>${resultadoDesafioHtml(r.resultado)}<div class="card"><div class="small muted">Protocolo</div><div class="code" style="font-size:20px">${esc(r.protocolo)}</div></div><button class="btn pri full" data-a="fecharEnvio">Ver minha atividade</button></div>`)}
   catch(e){toast(e.message)}})};
 ACOES.fecharEnvio=()=>{fechar();render()};
 ACOES.pedirRevisao=()=>{modal(`<div class="hd"><h2>Pedir revisão da nota</h2><button class="x" data-a="fechar">✕</button></div><label>Explique ao professor o motivo<textarea id="rvM" rows="4"></textarea></label><div class="err" id="rvE"></div><div class="ft2"><button class="btn" data-a="fechar">Cancelar</button><button class="btn pri" id="rvB">Enviar pedido</button></div>`);
@@ -559,7 +570,7 @@ function itemAtivProf(a){
   <div class="end">${a.status!=='publicada'?'<span class="pill rascunho">Rascunho</span>':''}${a.totalAlunos!=null&&a.status==='publicada'?`<span class="pill">${a.entregues}/${a.totalAlunos} entregas</span>`:''}${a.aCorrigir?`<span class="pill enviada">${a.aCorrigir} p/ corrigir</span>`:''}${a.status==='publicada'&&!a.notasLiberadas?'<span class="pill">notas ocultas</span>':''}</div></button>`;
 }
 VIEWS.p_atividades=async function(p){
-  const A=await api('atividades');const f=p.f||'todas';const b=(p.b||'').toLowerCase();
+  const A=(await api('atividades')).filter(a=>a.tipo!=='desafio');const f=p.f||'todas';const b=(p.b||'').toLowerCase();
   const g={todas:A,publicada:A.filter(a=>a.status==='publicada'),rascunho:A.filter(a=>a.status!=='publicada'),corrigir:A.filter(a=>a.aCorrigir>0)};
   const l=g[f].filter(a=>!b||(a.titulo+' '+a.disciplina).toLowerCase().includes(b));
   const tab=(k,t)=>`<button class="${f===k?'on':''}" data-go="p_atividades" data-p="${P({f:k,b:p.b})}">${t} (${g[k].length})</button>`;
@@ -607,7 +618,7 @@ function drawEditor(){
   let h=`<button class="back" data-go="p_atividades">← Atividades</button><div class="ph"><div><h1>${a.id?'Editar atividade':'Nova atividade'}</h1><p>${pl(a.questoes.length,'questão','questões')} · ${pts(total)} pontos${a.id?' · '+(a.status==='publicada'?'Publicada':'Rascunho'):''}</p></div></div>
   ${ED.ia&&ED.ia.origem==='banco'?`<div class="info">📚 <b>${ED.a.questoes.length} questões do Banco de Atividades</b>${ED.ia.pedidas>ED.a.questoes.length?` (só havia ${ED.a.questoes.length} com esses filtros)`:''}. Revise, ajuste o que quiser, escolha a turma e salve ou publique.</div>`:ED.ia?`<div class="info">✨ <b>${ED.a.questoes.length} questões geradas pela IA</b>${ED.ia.pedidas&&ED.ia.pedidas>ED.a.questoes.length?` (de ${ED.ia.pedidas} pedidas)`:''}. Revise com atenção, corrija o que precisar, escolha a turma e salve ou publique.${ED.ia.custo?` Custo desta geração: US$ ${ED.ia.custo.toFixed(3)}.`:''}</div>`:''}
   <div class="card"><label>Título<input data-e="titulo" value="${esc(a.titulo)}" placeholder="Ex.: Prova – Frações e decimais"></label>
-  <div class="row2"><label>Tipo<select data-e="tipo">${Object.entries(TIPO).map(([k,v])=>`<option value="${k}" ${a.tipo===k?'selected':''}>${v}</option>`).join('')}</select></label>
+  <div class="row2"><label>Tipo<select data-e="tipo">${Object.entries(TIPO).filter(([k])=>k!=='desafio'||a.tipo==='desafio').map(([k,v])=>`<option value="${k}" ${a.tipo===k?'selected':''}>${v}</option>`).join('')}</select></label>
   <label>Disciplina<input data-e="disciplina" value="${esc(a.disciplina)}" list="dlD" placeholder="Ex.: Matemática"></label></div><datalist id="dlD">${Object.keys(DISC_IC).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
   <label>Instruções / texto de apoio geral <span class="opt">(opcional — links viram clicáveis)</span><textarea data-e="instrucoes" rows="3">${esc(a.instrucoes)}</textarea></label></div>
   <div class="card"><h3 style="margin-bottom:10px">Publicação</h3>
@@ -617,7 +628,7 @@ function drawEditor(){
   <div class="row2"><label>Abertura <span class="opt">(vazio = imediata)</span><input type="datetime-local" data-e="abertura" value="${toLocalInput(a.abertura)}"></label><label>Encerramento <span class="opt">(vazio = sem prazo)</span><input type="datetime-local" data-e="encerramento" value="${toLocalInput(a.encerramento)}"></label></div>
   <label class="chk"><input type="checkbox" data-e="aceitaAtraso" ${a.aceitaAtraso?'checked':''}><span>Aceitar entregas depois do encerramento (ficam marcadas como atrasadas)</span></label></div>
   <h3 style="margin:16px 0 10px">Questões</h3>`;
-  a.questoes.forEach((q,i)=>{h+=`<div class="qed"><div class="qh"><span class="qn">${i+1}</span><span class="qtag">${TIPOQ[q.tipo]}</span><div class="tools"><button data-a="qMv" data-i="${i}" data-v="-1" title="Subir">↑</button><button data-a="qMv" data-i="${i}" data-v="1" title="Descer">↓</button><button data-a="qDup" data-i="${i}" title="Duplicar">⧉</button><button data-a="qDel" data-i="${i}" title="Excluir" style="color:var(--bad)">✕</button></div></div>
+  a.questoes.forEach((q,i)=>{h+=`<div class="qed"><div class="qh"><span class="qn">${i+1}</span><span class="qtag">${TIPOQ[q.tipo]}</span>${q.disciplina?`<span class="qtag">${ic(q.disciplina)} ${esc(q.disciplina)}</span>`:''}<div class="tools"><button data-a="qMv" data-i="${i}" data-v="-1" title="Subir">↑</button><button data-a="qMv" data-i="${i}" data-v="1" title="Descer">↓</button><button data-a="qDup" data-i="${i}" title="Duplicar">⧉</button><button data-a="qDel" data-i="${i}" title="Excluir" style="color:var(--bad)">✕</button></div></div>
     <label>Enunciado<textarea data-qe="${i}" data-f="enunciado" rows="2">${esc(q.enunciado)}</textarea></label>
     ${q.textoApoio||ED.abrirApoio[i]?`<label>Texto de apoio<textarea data-qe="${i}" data-f="textoApoio" rows="4" placeholder="Texto, poema, trecho, tabela…">${esc(q.textoApoio)}</textarea></label>`:''}
     ${q.imagem?`<div style="position:relative;margin-bottom:10px"><img class="qimg" data-img="${esc(q.imagem)}" style="max-height:220px"><button class="btn sm dan" data-a="qImgRm" data-i="${i}">Remover imagem</button></div>`:''}
@@ -769,7 +780,7 @@ MENUS.professor.splice(3,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(4,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(MENUS.admin.length-1,0,['ad_ia','🤖','IA: uso e custos']);
 MENUS.aluno.splice(4,0,['a_tutor','🤖','Tutor IA']);
-async function iaVerificar(){if(!S.u||S.u.trocarSenha)return;try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;S.iaTutor=!!r.tutor;S.iaFotoTutor=!!r.fotoTutor;S.iaProv=r.provedor;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
+async function iaVerificar(){if(!S.u||S.u.trocarSenha)return;try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;S.iaTutor=!!r.tutor;S.iaFotoTutor=!!r.fotoTutor;S.iaProv=r.provedor;if(antes!==S.iaAtiva){if($('#nav'))shell();const hb=$('.hub');if(hb&&typeof hubAtiv==='function'){const on=hb.querySelector('button.on');hb.outerHTML=hubAtiv(on?on.dataset.go:'')}}}catch(e){}}
 function mdSimples(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^\s*[-•]\s+/gm,'• ').replace(/\n/g,'<br>')}
 function lerArquivo(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Não foi possível ler '+f.name));r.readAsDataURL(f)})}
 
@@ -954,6 +965,117 @@ ACOES.banIA=()=>{
   GER=Object.assign({arquivos:[]},{assunto:marc[0].nome,disc:D.nome.split(' / ')[0],nivel:({F1:'f1',F2:'f2',EM:'em'})[marc[0].nivel]||'',qtd:[5,10,15,20,30].includes(BAN.qtd)?BAN.qtd:10});
   go('p_ia');
 };
+
+/* =================== DESAFIO DIÁRIO + ÁREA ÚNICA DE ATIVIDADES =================== */
+TIPO.desafio='Desafio diário';DISC_IC['Desafio diário']='🏆';
+// Professor e admin: Banco, IA e Desafio ficam dentro de "Atividades" (abas internas)
+['professor','admin'].forEach(p=>{MENUS[p]=MENUS[p].filter(([k])=>k!=='p_banco'&&k!=='p_ia')});
+Object.assign(MENU_DE,{p_banco:'p_atividades',p_ia:'p_atividades',p_desafio:'p_atividades'});
+function hubAtiv(atual){
+  const abas=[['p_atividades','📝','Minhas atividades'],['p_desafio','🏆','Desafio diário'],['p_banco','📚','Banco de Atividades']].concat(S.iaAtiva?[['p_ia','✨','Criar com IA']]:[]);
+  return `<div class="hub">${abas.map(([k,i,l])=>`<button class="${atual===k?'on':''}" data-go="${k}">${i} ${l}</button>`).join('')}<button class="novo" data-go="p_editor">＋ Nova atividade</button></div>`;
+}
+function comHub(nome){const orig=VIEWS[nome];VIEWS[nome]=async function(p){const r=await orig(p);if(typeof r==='string')return hubAtiv(nome)+r;return Object.assign({},r,{html:hubAtiv(nome)+r.html})}}
+['p_atividades','p_banco','p_ia'].forEach(comHub);
+
+/* ---- contagem regressiva (todas as telas) ---- */
+function dur(ms){if(ms<0)ms=0;const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;const p=n=>String(n).padStart(2,'0');return (d?d+'d ':'')+p(h)+':'+p(m)+':'+p(x)}
+function cd(ts,prefixo){return `<span class="cd" data-cd="${ts}">${prefixo||''}${dur(ts-Date.now())}</span>`}
+let CD_REND=0;
+setInterval(()=>{const els=document.querySelectorAll('[data-cd]');let fim=false;els.forEach(el=>{const ts=+el.dataset.cd;const r=ts-Date.now();el.textContent=dur(r);if(r<=0&&r>-1500)fim=true;el.classList.toggle('urg',r>0&&r<15*60e3)});
+  if(fim&&Date.now()-CD_REND>3000){CD_REND=Date.now();if(PL&&S.view==='a_fazer'&&!PL.envi)salvarRasc();setTimeout(()=>render(),800)}},1000);
+function hora(ts){return new Date(ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+function quando(ts){const d=new Date(ts),h=new Date();const am=new Date(Date.now()+864e5);const mesmo=(a,b)=>a.toDateString()===b.toDateString();return (mesmo(d,h)?'hoje':mesmo(d,am)?'amanhã':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}))+' às '+hora(ts)}
+
+/* ---- ALUNO ---- */
+// as listas normais não misturam os desafios diários (eles têm o seu cartão e o seu histórico)
+const _alunoDados=alunoDados;
+alunoDados=async function(){const d=await _alunoDados();const c=Object.assign({},d,{atividades:d.atividades.filter(a=>a.tipo!=='desafio')});
+  const pend=c.atividades.filter(a=>a.situacao==='pendente'||a.situacao==='atrasada'&&a.podeEnviar).length+d.atividades.filter(a=>a.tipo==='desafio'&&a.situacao==='pendente').length;S.badge={a_atividades:pend||0};return c};
+function cartaoDesafio(h){
+  if(!h||(!h.desafios.length&&!h.temDesafio))return '';
+  if(!h.desafios.length)return `<div class="desafio"><div class="dz-t">🏆 Desafio do dia</div><p>O próximo desafio de 50 questões abre ${h.proximo?quando(h.proximo):'em breve'}.</p>${h.proximo?`<div class="dz-cd">Abre em ${cd(h.proximo)}</div>`:''}</div>`;
+  return h.desafios.map(x=>{
+    let corpo='',botao='';
+    if(x.situacao==='agendada'){corpo=`<p>${x.qtd} questões • abre ${quando(x.abertura)} • termina ${quando(x.encerramento)}</p><div class="dz-cd">Abre em ${cd(x.abertura)}</div>`}
+    else if(x.situacao==='pendente'){const p=Math.round(100*x.respondidas/x.qtd);
+      corpo=`<p>${x.qtd} questões de 8 disciplinas • envie até ${quando(x.encerramento)}</p><div class="dz-cd">⏳ Tempo restante ${cd(x.encerramento)}</div><div class="bar" style="margin:10px 0 4px"><i style="width:${p}%"></i></div><div class="small">${x.respondidas} de ${x.qtd} respondidas</div>`;
+      botao=`<button class="btn pri" data-go="a_fazer" data-p="${P({id:x.id})}">${x.rascunho?'Continuar ▶':'Começar desafio ▶'}</button>`}
+    else if(x.situacao==='enviada'||x.situacao==='corrigida'){
+      corpo=`<p>✅ Enviado ${quando(x.enviadoEm)}.</p>${x.acertos!==undefined?`<div class="dz-placar"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span>${x.discPendentes?`<span>✍️ ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} com o professor</span>`:''}</div>`:''}
+        ${x.liberado?(x.nota!==undefined?`<p><b>Nota: ${nota(x.nota,x.notaMax)}</b></p>`:''):`<p class="small">Gabarito e explicações ${x.encerramento>Date.now()?'liberados após o encerramento ('+quando(x.encerramento)+')':'serão liberados pelo professor'}.</p>`}`;
+      botao=`<button class="btn" data-go="a_fazer" data-p="${P({id:x.id})}">${x.liberado?'Ver correção e explicações':'Ver minhas respostas'}</button>`}
+    else{corpo=`<p>⏰ Este desafio encerrou ${quando(x.encerramento)} sem envio.</p>`;botao=x.liberado?`<button class="btn" data-go="a_fazer" data-p="${P({id:x.id})}">Ver as questões</button>`:''}
+    return `<div class="desafio"><div class="dz-t">🏆 Desafio do dia <span class="pill">${esc(x.nivelNome||'')}</span></div>${corpo}${botao}</div>`}).join('');
+}
+const _aInicio=VIEWS.a_inicio;
+VIEWS.a_inicio=async function(p){const [r,h]=await Promise.all([_aInicio(p),api('desafioHoje').catch(()=>null)]);const html=typeof r==='string'?r:r.html;
+  const i=html.indexOf('<div class="grid g4"');const c=cartaoDesafio(h);return i>=0?html.slice(0,i)+c+html.slice(i):c+html};
+const _aAtiv=VIEWS.a_atividades;
+VIEWS.a_atividades=async function(p){
+  if(p.f==='desafios')return viewHistDesafio();
+  const [r,h]=await Promise.all([_aAtiv(p),api('desafioHoje').catch(()=>null)]);let html=typeof r==='string'?r:r.html;
+  html=html.replace('<h1>Atividades</h1><p>Exercícios, provas e simulados das suas turmas</p>','<h1>Atividades</h1><p>Desafio do dia, exercícios, provas e simulados — tudo num só lugar</p>');
+  const i=html.indexOf('<div class="tabs">');
+  const abaDesafio=`<button data-go="a_atividades" data-p="${P({f:'desafios'})}">🏆 Desafios</button>`;
+  if(i>=0)html=html.slice(0,i)+cartaoDesafio(h)+html.slice(i).replace('</div>',abaDesafio+'</div>');
+  return html;
+};
+async function viewHistDesafio(){
+  const [h,H]=await Promise.all([api('desafioHoje'),api('desafioHistorico')]);
+  const tabs=`<div class="tabs"><button data-go="a_atividades" data-p="${P({f:'pendentes'})}">← Atividades</button><button class="on">🏆 Desafios</button></div>`;
+  const linha=x=>{const tot=(x.acertos||0)+(x.erros||0);const p=tot?Math.round(100*x.acertos/tot):0;const dt=String(x.dia).split('-').reverse().slice(0,2).join('/');
+    const sit=x.enviadoEm||x.situacao==='enviada'||x.situacao==='corrigida'?(x.acertos!==undefined?`<span class="ok">✔ ${x.acertos}</span> <span class="bad">✘ ${x.erros}</span>`:'Enviado'):x.situacao==='pendente'?'<b>Em aberto</b>':x.situacao==='agendada'?'Em breve':'<span class="muted">Não enviado</span>';
+    return `<button class="it" ${x.antigo?'disabled style="opacity:.9"':`data-go="a_fazer" data-p="${P({id:x.id})}"`}><div class="ic">🏆</div><div class="mid"><div class="t">Desafio de ${dt}</div><div class="s">${esc(x.nivelNome||'')}${x.nota!==undefined&&x.nota!==null?' · Nota '+nota(x.nota,x.notaMax):''}</div>${tot?`<div class="bar" style="margin-top:6px"><i style="width:${p}%"></i></div>`:''}</div><div class="end">${sit}</div></button>`};
+  return `<div class="ph"><div><h1>🏆 Meus desafios</h1><p>Histórico de desempenho nos desafios diários</p></div></div>${tabs}${cartaoDesafio(h)}
+  <div class="grid g4" style="margin-bottom:16px"><div class="stat"><b>${H.sequencia}🔥</b><span>Dias seguidos</span></div><div class="stat"><b>${H.feitos}</b><span>Desafios enviados</span></div><div class="stat"><b>${H.aproveitamento===null?'—':H.aproveitamento.toLocaleString('pt-BR')+'%'}</b><span>Acertos nas objetivas</span></div></div>
+  <div class="list">${H.lista.length?H.lista.map(linha).join(''):empty('🏆','Nenhum desafio ainda','Todos os dias um novo desafio de 50 questões aparece aqui.')}</div>`;
+}
+// tela de resolver: barra com o tempo restante e o resultado no envio
+const _aFazer=VIEWS.a_fazer;
+VIEWS.a_fazer=async function(p){const r=await _aFazer(p);if(!PL||PL.a.tipo!=='desafio')return r;const a=PL.a;
+  let barra='';if(!PL.envi&&PL.pode&&a.encerramento)barra=`<div class="dz-barra">⏳ Tempo restante: ${cd(a.encerramento)} <span class="small">• termina ${quando(a.encerramento)}</span></div>`;
+  return Object.assign({},r,{html:barra+r.html})};
+function resultadoDesafioHtml(x){if(!x)return '';return `<div class="dz-placar" style="justify-content:center;margin:10px 0"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span></div><p class="small muted">nas ${x.objetivas} questões objetivas${x.discPendentes?` • ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} serão corrigidas pelo professor`:''}. O gabarito com as explicações aparece depois da liberação.</p>`}
+
+/* ---- PROFESSOR / ADMIN: painel do desafio ---- */
+const ORIGEM={ia:'✨ IA (revisada)','ia+banco':'✨ IA + 📚 Banco',banco:'📚 Banco (reserva)',copia:'Cópia'};
+VIEWS.p_desafio=async function(){
+  const d=await api('desafioPainel');const g=d.global,m=d.meu,pr=d.proprio||{};
+  const hoje=d.recentes.filter(x=>x.dia===d.dia);
+  const nivSel=(t)=>`<select data-tniv="${t.id}"><option value="" ${!t.fixo?'selected':''}>Automático (${t.nivelAuto?{F1:'Fund. I',F2:'Fund. II',EM:'Médio',INF:'Infantil'}[t.nivelAuto]:'padrão: '+({F1:'Fund. I',F2:'Fund. II',EM:'Médio'}[g.nivelPadrao]||'Fund. II')})</option>${[['F1','Fund. I'],['F2','Fund. II'],['EM','Ensino Médio'],['INF','Sem desafio']].map(([k,v])=>`<option value="${k}" ${t.fixo===k?'selected':''}>${v}</option>`).join('')}</select>`;
+  const hh=(id,v)=>`<input type="time" id="${id}" value="${esc(v||'')}">`;
+  let h=`${hubAtiv('p_desafio')}<div class="ph"><div><h1>🏆 Desafio diário</h1><p>Todos os dias, 50 questões novas de 8 disciplinas para cada turma, no nível certo de cada série.</p></div></div>
+  ${!g.ativo?'<div class="note">O desafio diário está <b>desligado</b> nas configurações gerais.</div>':''}
+  ${!d.iaChave||!g.ia?`<div class="note">${!d.iaChave?'🔑 A IA ainda não está conectada (falta a chave do Google Gemini no servidor).':'A geração com IA está desligada.'} Enquanto isso, os desafios são montados automaticamente com o <b>Banco de Atividades</b>, sem repetir as questões dos dias anteriores até o banco se esgotar.</div>`:''}
+  <div class="card"><h3 style="margin-bottom:10px">Hoje (${d.dia.split('-').reverse().join('/')})</h3>
+   ${hoje.length?`<div class="list">${hoje.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||esc(x.origem||'')} · abre ${quando(x.abertura)} · termina ${quando(x.encerramento)}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end"><span class="pill">${x.entregues}/${x.alunos} enviaram</span></div></div>`).join('')}</div>`:'<p class="muted">Os desafios de hoje ainda não foram preparados.</p>'}
+   ${d.pendentes.length?`<p class="small muted">Falta preparar: ${d.pendentes.map(n=>({F1:'Fund. I',F2:'Fund. II',EM:'Médio'}[n])).join(', ')}. O sistema prepara sozinho todas as madrugadas; se quiser, prepare agora.</p><button class="btn pri" data-a="dzGerar">✨ Preparar agora</button>`:''}</div>
+  <div class="card"><h3 style="margin-bottom:6px">⏰ Meu prazo</h3><p class="small muted" style="margin-top:0">Vale para as suas turmas. Mudanças valem também para o desafio de hoje, se ainda estiver aberto.</p>
+   <label class="chk"><input type="checkbox" id="dzMAtivo" ${pr.ativo===false?'':'checked'}><span>Enviar o desafio diário para as minhas turmas</span></label>
+   <div class="row2"><label>Abre às${hh('dzMAb',m.abertura)}</label><label>Encerra às${hh('dzMEn',m.encerramento)}</label></div>
+   <div class="row2"><label>Encerramento<select id="dzMDias">${[0,1,2,3].map(n=>`<option value="${n}" ${m.diasPrazo===n?'selected':''}>${n===0?'No mesmo dia':n===1?'No dia seguinte':n+' dias depois'}</option>`).join('')}</select></label>
+   <label>Gabarito e explicações<select id="dzMLib"><option value="encerramento" ${m.liberar!=='manual'?'selected':''}>Liberar sozinho no encerramento</option><option value="manual" ${m.liberar==='manual'?'selected':''}>Eu libero manualmente</option></select></label></div>
+   <button class="btn pri" data-a="dzSalvarMeu">Salvar meu prazo</button></div>
+  <div class="card"><h3 style="margin-bottom:6px">🎓 Nível de cada turma</h3><p class="small muted" style="margin-top:0">O nível vem da série da turma (ex.: “6º ano” → Fundamental II). Ajuste se precisar. Turmas sem alunos não recebem desafio.</p>
+   ${d.turmas.length?`<div class="tbl"><table><tr><th>Turma</th><th>Série</th><th>Alunos</th><th>Nível do desafio</th></tr>${d.turmas.map(t=>`<tr><td class="wrap"><b>${esc(t.nome)}</b>${t.professor?`<br><span class="small muted">${esc(t.professor)}</span>`:''}</td><td>${esc(t.serie||'—')}</td><td>${t.alunos}</td><td>${nivSel(t)}</td></tr>`).join('')}</table></div>`:'<p class="muted">Nenhuma turma ativa.</p>'}</div>`;
+  if(d.admin)h+=`<div class="card"><h3 style="margin-bottom:6px">⚙️ Configuração geral (administrador)</h3>
+   <label class="chk"><input type="checkbox" id="dzGAtivo" ${g.ativo?'checked':''}><span>Desafio diário ligado na plataforma</span></label>
+   <label class="chk"><input type="checkbox" id="dzGIa" ${g.ia?'checked':''}><span>Gerar questões novas com IA (com revisão automática; se falhar, usa o banco)</span></label>
+   <label class="chk"><input type="checkbox" id="dzGPlacar" ${g.placar?'checked':''}><span>Mostrar acertos e erros logo após o envio</span></label>
+   <div class="row2"><label>Abertura padrão${hh('dzGAb',g.abertura)}</label><label>Encerramento padrão${hh('dzGEn',g.encerramento)}</label></div>
+   <div class="row2"><label>Encerramento<select id="dzGDias">${[0,1,2,3].map(n=>`<option value="${n}" ${g.diasPrazo===n?'selected':''}>${n===0?'No mesmo dia':n===1?'No dia seguinte':n+' dias depois'}</option>`).join('')}</select></label>
+   <label>Gabarito<select id="dzGLib"><option value="encerramento" ${g.liberar!=='manual'?'selected':''}>Liberar no encerramento</option><option value="manual" ${g.liberar==='manual'?'selected':''}>Professor libera</option></select></label></div>
+   <div class="row2"><label>Discursivas por desafio (de 50)<input type="number" id="dzGDisc" min="0" max="10" value="${g.discursivas}"></label>
+   <label>Nível quando a série não informa<select id="dzGNiv">${[['F1','Fundamental I'],['F2','Fundamental II'],['EM','Ensino Médio']].map(([k,v])=>`<option value="${k}" ${g.nivelPadrao===k?'selected':''}>${v}</option>`).join('')}</select></label></div>
+   <button class="btn" data-a="dzSalvarGeral">Salvar configuração geral</button></div>`;
+  h+=`<h3 style="margin:16px 0 8px">📅 Desafios recentes</h3><div class="list">${d.recentes.length?d.recentes.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||''} · ${x.entregues}/${x.alunos} enviaram${x.aproveitamento!==null?' · '+x.aproveitamento.toLocaleString('pt-BR')+'% de acertos':''}${x.aCorrigir?` · <b>${x.aCorrigir} para corrigir</b>`:''}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm" data-go="p_entregas" data-p="${P({id:x.id})}">Entregas</button>${!x.liberado?`<button class="btn sm" data-a="liberar" data-id="${x.id}" data-v="1">Liberar gabarito</button>`:'<span class="pill corrigida">Gabarito liberado</span>'}</div></div>`).join(''):empty('🏆','Nenhum desafio ainda','O primeiro desafio é preparado automaticamente.')}</div>`;
+  return {html:h,depois(){$$('[data-tniv]').forEach(s=>s.addEventListener('change',async()=>{try{await api('desafioTurmaNivel',{id:s.dataset.tniv,nivel:s.value});toast('Nível da turma salvo ✓')}catch(e){toast(e.message)}}))}};
+};
+ACOES.dzSalvarMeu=async(d,b)=>{await busy(b,async()=>{try{const r=await api('desafioConfigSalvar',{meu:{ativo:$('#dzMAtivo').checked,abertura:$('#dzMAb').value,encerramento:$('#dzMEn').value,diasPrazo:+$('#dzMDias').value,liberar:$('#dzMLib').value}});toast('Prazo salvo ✓'+(r.ajustados?' (desafio de hoje ajustado)':''));render()}catch(e){toast(e.message)}})};
+ACOES.dzSalvarGeral=async(d,b)=>{await busy(b,async()=>{try{await api('desafioConfigSalvar',{global:{ativo:$('#dzGAtivo').checked,ia:$('#dzGIa').checked,placar:$('#dzGPlacar').checked,abertura:$('#dzGAb').value,encerramento:$('#dzGEn').value,diasPrazo:+$('#dzGDias').value,liberar:$('#dzGLib').value,discursivas:+$('#dzGDisc').value,nivelPadrao:$('#dzGNiv').value}});toast('Configuração salva ✓');render()}catch(e){toast(e.message)}})};
+ACOES.dzGerar=async(d,b)=>{modal(`<div class="center"><div class="spin" style="margin:20px auto"></div><h2>Preparando os desafios…</h2><p class="muted">Com a IA isso leva de 30 segundos a 2 minutos. Não feche esta tela.</p></div>`);
+  try{const r=await api('desafioGerarAgora');fechar();toast(r.preparados.map(p=>p.questoes+' questões ('+(ORIGEM[p.origem]||p.origem)+')').join(' • ')||'Pronto ✓');render()}catch(e){fechar();toast(e.message)}};
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}

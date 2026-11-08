@@ -197,7 +197,7 @@ for proib in ['SpreadsheetApp', 'DriveApp', 'MailApp', 'LockService', 'ScriptApp
     if proib in src: print('ATENÇÃO resta', proib, [m.start() for m in re.finditer(re.escape(proib), src)][:3])
 ia = open('/home/claude/supa/server/ia_rotas.js').read()
 ia = "TAB.IaUso = ['mes', 'modo', 'chamadas', 'usd'];\n" + ia
-wrapper = wrapper.replace("    instalar(dados) {", "    limparIA(saida, meta) { return iaLimparQuestoes_(saida, meta); },\n    instalar(dados) {")
-banco = open('/home/claude/supa/server/banco_rotas.js').read()
+wrapper = wrapper.replace("    instalar(dados) {", "    limparIA(saida, meta) { return iaLimparQuestoes_(saida, meta); },\n    sistema(dados, nome, args) { preparar(dados); let r; try { r = DESAFIO_SIS[nome](args || {}); } catch (e) { if (typeof console !== 'undefined') console.error('sistema', nome, e && e.stack || e); throw e; } return Object.assign({ resultado: r }, coletar()); },\n    instalar(dados) {")
+banco = open('/home/claude/supa/server/banco_rotas.js').read() + '\n' + open('/home/claude/supa/server/desafio_rotas.js').read()
 open('/home/claude/supa/server/core.js', 'w').write(wrapper.replace('/*CODIGO*/', src + '\n' + ia + '\n' + banco))
 print('core.js', len(src))

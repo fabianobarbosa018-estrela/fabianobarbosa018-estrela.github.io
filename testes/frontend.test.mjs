@@ -195,7 +195,7 @@ async function navegarTudo(B, nome) {
   C.set('#fTs [name=atual]', senhaCaio); C.set('#fTs [name=nova]', 'caio123'); C.set('#fTs [name=nova2]', 'caio123'); C.submit('#fTs');
   await C.espera(() => /Olá, Caio/.test(C.txt('#main')));
   t('após trocar senha entra no painel', /Olá, Caio/.test(C.txt('#main')));
-  t('caio vê a prova da turma', /1/.test(C.txt('#main .stat b')));
+  t('caio vê a prova da turma (e o desafio do dia)', Number(C.txt('#main .stat b')) >= 1);
 
   // ---------- ADMIN ----------
   const A = abrir(); await login(A, 'admin', 'Admin@2026');

@@ -24,9 +24,9 @@ function abrir() { const erros = [];
   const login = async (u, s) => { await espera(() => $('#fLogin')); set('#fLogin [name=login]', u); set('#fLogin [name=senha]', s); $('#fLogin').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await espera(() => $('#main') && !$('#main .spin')); };
   return { w, d, $, $$, txt, click, set, espera, login, erros }; }
 // professor
-const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() => P.$('#nav [data-go="p_ia"]'));
-t('menu do professor tem "Gerar com IA"', !!P.$('#nav [data-go="p_ia"]'));
-P.click('#nav [data-go="p_ia"]'); await P.espera(() => P.$('[data-a="iaGerar"]'));
+const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() => P.$('#nav [data-go="p_atividades"]')); P.click('#nav [data-go="p_atividades"]'); await P.espera(() => P.$('.hub [data-go="p_ia"]'));
+t('menu do professor tem "Gerar com IA"', !!P.$('.hub [data-go="p_ia"]') && !P.$('#nav [data-go="p_ia"]'));
+P.click('.hub [data-go="p_ia"]'); await P.espera(() => P.$('[data-a="iaGerar"]'));
 t('tela do gerador com foto, galeria e PDF', P.$$('[data-iaf]').length === 3 && /Usos hoje/.test(P.txt('#main')));
 t('aviso para não enviar dados de alunos', /Não envie fotos com nomes/.test(P.txt('#main')));
 P.click('[data-a="iaGerar"]'); await P.espera(() => P.txt('#iaErr'));
@@ -72,7 +72,7 @@ t('IA desligada: aluno não vê Tutor', !A2.$('#nav [data-go="a_tutor"]'));
 A2.click('#nav [data-go="a_atividades"]'); await A2.espera(() => A2.$('#main .it')); A2.click(A2.$$('#main .it')[0]); await A2.espera(() => A2.$('.savebar'));
 t('IA desligada: sem botão do tutor na atividade', !A2.$('#main [data-go="a_tutor"]'));
 const P2 = abrir(); await P2.login('professor', 'Prof@2026'); await sleep(200);
-t('IA desligada: professor não vê Gerar com IA', !P2.$('#nav [data-go="p_ia"]'));
+P2.click('#nav [data-go="p_atividades"]'); await P2.espera(() => P2.$('.hub')); t('IA desligada: professor não vê Gerar com IA', !P2.$('[data-go="p_ia"]'));
 t('IA desligada: admin ainda vê a tela para religar', !!D.$('#nav [data-go="ad_ia"]'));
 const todos = [P, A, D, A2, P2].flatMap(b => b.erros); t('sem erros de JavaScript', !todos.length, todos.join(' | '));
 console.log(`\nIA (telas): ${ok} testes OK, ${falhas} falha(s)`); process.exit(0);

@@ -87,8 +87,8 @@ r = (await (await api(tkP, 'alunoSenha', { alunoId: 'naoexiste' }))); // inváli
 t('reset de senha de aluno inexistente falha', !r.ok);
 
 // ---------- ATIVIDADES ----------
-r = (await api(tkA, 'alunoDados')); t('aluno demo vê 10 atividades', r.d.atividades.length === 10, r.d.atividades.length);
-t('aluno de outra turma não vê atividades demo', (await api(tkAna, 'alunoDados')).d.atividades.length === 0);
+r = (await api(tkA, 'alunoDados')); t('aluno demo vê 10 atividades (+ desafio do dia)', r.d.atividades.filter(a => a.tipo !== 'desafio').length === 10, r.d.atividades.length);
+t('aluno de outra turma não vê atividades demo', (await api(tkAna, 'alunoDados')).d.atividades.filter(a => a.tipo !== 'desafio').length === 0);
 const qs = [
   { tipo: 'mc', enunciado: '2+2?', opcoes: ['3', '4', '5'], correta: 1, pontos: 2 },
   { tipo: 'vf', enunciado: 'O céu é azul', correta: true, pontos: 1 },
@@ -223,7 +223,7 @@ r = (await api(tkAd, 'atividadeObter', { id: r.d.id })); t('lê atividade grande
 // fórmula maliciosa vira texto
 r = (await api(tkAd, 'turmaSalvar', { nome: '=IMPORTXML("http://x")' })); t('texto com = salvo como texto', r.ok && (await api(tkAd, 'turmas')).d.some(x => x.nome.startsWith('=IMPORTXML')));
 
-t('banco sem acesso pela chave pública (RLS)', (await E.q("select count(*)::int n from pg_tables where tablename like 'sd_%' and rowsecurity"))[0].n === 11);
+t('banco sem acesso pela chave pública (RLS)', (await E.q("select count(*)::int n from pg_tables where tablename like 'sd_%' and rowsecurity"))[0].n === 12);
 
 t('sem erros internos', E.erros.length === 0, E.erros);
 console.log(`\nBACK-END: ${ok} testes OK, ${falhas} falha(s)`);

@@ -26,5 +26,6 @@ export async function criarAmbiente(opcoes = {}) {
   const origErr = console.error; console.error = (...a) => erros.push(a.join(' '));
   const api = async (tk, acao, d) => JSON.parse(JSON.stringify(await S.processar({ token: tk, acao, d: d || {} })));
   const q = async (sql, p) => (await db.query(sql, p)).rows;
-  return { ia, db, api, q, storage, erros, instalar: S.instalar, restaurarConsole: () => { console.error = origErr; } };
+  const processar = async b => S.processar(b);
+  return { ia, db, api, q, processar, storage, erros, instalar: S.instalar, restaurarConsole: () => { console.error = origErr; } };
 }

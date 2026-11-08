@@ -15,6 +15,10 @@ export function criarServidor(io) {
       try { await instalar(); } catch (e) { }
       dados = await io.carregar();
     }
+    if (b.acao === 'desafioCron') return desafioCron(b, dados);
+    if (ACOES_DESAFIO.indexOf(b.acao) >= 0) {   // garante que ninguém fica sem o desafio do dia (reserva do banco)
+      try { if (await desafioReserva(dados)) dados = await io.carregar(); } catch (e) { if (typeof console !== 'undefined') console.error('desafio reserva', String(e && e.message || e)); }
+    }
     const x = N.executar(dados, String(b.token || ''), String(b.acao || ''), b.d || {});
     let resp = x.resposta;
     if (resp && resp.ok) {
@@ -30,6 +34,8 @@ export function criarServidor(io) {
       if (resp.d && resp.d.__assinar) resp = { ok: true, d: await io.assinar(resp.d.__assinar) };
       else if (resp.d && resp.d.__ia) resp = await executarIA(resp.d.__ia);
       else if (resp.d && resp.d.__banco) resp = await executarBanco(resp.d.__banco);
+      else if (resp.d && resp.d.__desafio) resp = { ok: true, d: await desafioPreparar({ usarIA: true }) };
+      if (b.acao === 'desafioPainel' && resp.ok) resp.d.iaChave = !!(io.chaveGemini || io.chaveIA);
     } else {
       // em caso de erro nada é gravado, exceto contadores de segurança (tentativas) e o registro de auditoria
       const seg = x.ops.filter(o => o.op === 'kv' || o.t === 'Log');
@@ -192,6 +198,214 @@ export function criarServidor(io) {
     if (comTexto) escolhidas.forEach(q => { q.textoApoio = ''; });
     return { ok: true, d: { origem: 'banco', titulo: D.nome + ' — ' + (sel.length === 1 ? sel[0].a : sel.length + ' assuntos'), disciplina: D.nome,
       instrucoes: instr, questoes: escolhidas, pedidas: b.quantidade, disponiveis: disponiveis, custo: 0 } };
+  }
+  // ---------- Desafio diário ----------
+  const ACOES_DESAFIO = ['alunoDados', 'desafioHoje', 'desafioHistorico', 'profPainel', 'desafioPainel', 'atividades'];
+  const DISC_BANCO = { portugues: 'Português', matematica: 'Matemática', historia: 'História', geografia: 'Geografia', educacao_fisica: 'Educação Física', fisica: 'Física', quimica: 'Química', ciencias_biologia: 'Biologia' };
+  const COTAS = { 'Português': 7, 'Matemática': 7, 'História': 6, 'Geografia': 6, 'Educação Física': 6, 'Física': 6, 'Química': 6, 'Biologia': 6 };
+  const ORDEM_DISC = Object.keys(COTAS);
+  const ORDEM_DISCURSIVA = ['Português', 'História', 'Biologia', 'Geografia', 'Matemática', 'Física', 'Química', 'Educação Física'];
+  const ELEGIVEIS = { F1: ['F1'], F2: ['F2', 'F1'], EM: ['EM', 'F2'] };
+  const NIVEL_DESC = { F1: 'Ensino Fundamental I (crianças de 6 a 10 anos, 1º ao 5º ano): linguagem simples, frases curtas, números pequenos; em Física e Química use Ciências do cotidiano (luz, som, água, misturas)',
+    F2: 'Ensino Fundamental II (11 a 14 anos, 6º ao 9º ano): conteúdos do Fundamental II segundo a BNCC; nada de conteúdo exclusivo do Ensino Médio; em Física e Química use Ciências introdutórias',
+    EM: 'Ensino Médio (15 a 17 anos): conteúdos do Ensino Médio e do ENEM' };
+  function hashQ(txt) {
+    const s = String(txt || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+    let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  }
+  const normaliza = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  function discCanonica(d) { const n = normaliza(d); return ORDEM_DISC.find(x => n.indexOf(normaliza(x).slice(0, 6)) === 0 || (n.indexOf('ciencia') === 0 && x === 'Biologia')) || ''; }
+  function cotasDiscursivas(total) { const o = {}; ORDEM_DISCURSIVA.slice(0, total).forEach(d => { o[d] = 1; }); return o; }
+  async function comPrazo(p, ms) { let t; const lim = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('tempo esgotado')), ms); }); try { return await Promise.race([p, lim]); } finally { clearTimeout(t); } }
+  // chamada genérica à IA que devolve JSON
+  async function iaJson(provedor, sistema, texto, maxTokens, modo) {
+    if (provedor !== 'claude' && io.chaveGemini) {
+      const corpo = { systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: texto }] }],
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: maxTokens, temperature: modo === 'desafio_revisao' ? 0.1 : 0.9 } };
+      const modelos = io.modeloGemini ? [io.modeloGemini].concat(GEMINI_MODELOS) : GEMINI_MODELOS;
+      let r, j;
+      for (const m of modelos) {
+        r = await comPrazo(io.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent', { method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': io.chaveGemini }, body: JSON.stringify(corpo) }), 58000);
+        j = await r.json(); if (r.status !== 404) break;
+      }
+      if (!r.ok) throw new Error('Gemini ' + r.status + ' ' + String(j && j.error && j.error.status || ''));
+      const um = j.usageMetadata || {};
+      try { await io.rpc('sd_ia_registrar', { p_mes: new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7), p_modo: modo, p_usd: 0, p_in: um.promptTokenCount || 0, p_out: um.candidatesTokenCount || 0 }); } catch (e) { }
+      return lerJson((((j.candidates || [])[0] || {}).content || { parts: [] }).parts.map(p => p.text || '').join(''));
+    }
+    if (provedor === 'claude' && io.chaveIA) {
+      const modelo = modo === 'desafio_revisao' ? 'claude-haiku-5-5' : 'claude-sonnet-5-5';
+      const r = await comPrazo(io.fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': io.chaveIA, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: modelo, max_tokens: maxTokens, system: sistema, messages: [{ role: 'user', content: texto + '\n\nResponda SOMENTE com o JSON.' }] }) }), 58000);
+      const j = await r.json(); if (!r.ok) throw new Error('IA ' + r.status);
+      const uso = j.usage || {}; const p = PRECO[modelo];
+      try { await io.rpc('sd_ia_registrar', { p_mes: new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7), p_modo: modo, p_usd: ((uso.input_tokens || 0) * p.in + (uso.output_tokens || 0) * p.out) / 1e6, p_in: uso.input_tokens || 0, p_out: uso.output_tokens || 0 }); } catch (e) { }
+      return lerJson((j.content || []).filter(c => c.type === 'text').map(c => c.text).join(''));
+    }
+    throw new Error('sem chave de IA');
+  }
+  function lerJson(t) {
+    t = String(t || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    try { return JSON.parse(t); } catch (e) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); return JSON.parse(t.slice(a, b + 1)); }
+  }
+  function validarIA(q, permitidas, evitar) {
+    if (!q || typeof q !== 'object') return null;
+    const tipo = ['mc', 'vf', 'disc'].indexOf(q.tipo) >= 0 ? q.tipo : null; const disc = discCanonica(q.disciplina);
+    const en = String(q.enunciado || '').trim(); const ex = String(q.explicacao || '').trim();
+    if (!tipo || !disc || permitidas.indexOf(disc) < 0 || en.length < 12 || en.length > 2500 || ex.length < 3) return null;
+    const h = hashQ(en); if (evitar.has(h)) return null;
+    const o = { tipo: tipo, enunciado: en, textoApoio: String(q.textoApoio || '').trim().slice(0, 4000), imagem: '', pontos: tipo === 'disc' ? 2 : 1, permiteFoto: tipo === 'disc',
+      explicacao: ex.slice(0, 3000), disciplina: disc, assunto: String(q.assunto || '').trim().slice(0, 80), dificuldade: [1, 2, 3].indexOf(Number(q.dificuldade)) >= 0 ? Number(q.dificuldade) : 2, _h: h };
+    if (tipo === 'mc') {
+      const op = Array.isArray(q.opcoes) ? q.opcoes.map(x => String(x || '').trim()).filter(Boolean) : [];
+      const c = Number(q.correta_indice);
+      if (op.length !== 4 || new Set(op.map(normaliza)).size !== 4 || !(Number.isInteger(c) && c >= 0 && c < 4)) return null;
+      const ordem = embaralhar([0, 1, 2, 3]); o.opcoes = ordem.map(i => op[i].slice(0, 600)); o.correta = ordem.indexOf(c);
+    }
+    if (tipo === 'vf') { if (q.correta_vf !== true && q.correta_vf !== false) return null; o.correta = q.correta_vf; }
+    return o;
+  }
+  async function gerarLoteIA(est, nivel, discs, discursivas, sugestoes) {
+    const total = discs.reduce((s, d) => s + COTAS[d], 0);
+    const evitarAssuntos = (est.assuntos[nivel] || []).slice(0, 60);
+    const txt = 'Crie EXATAMENTE ' + total + ' questões NOVAS e ORIGINAIS para o desafio diário de estudantes de ' + NIVEL_DESC[nivel] + '.\n' +
+      'Quantidade por disciplina: ' + discs.map(d => d + ' ' + COTAS[d] + (discursivas[d] ? ' (sendo ' + discursivas[d] + ' discursiva)' : ' (todas objetivas)')).join('; ') + '.\n' +
+      'Regras:\n- Entre as objetivas, cerca de 70% múltipla escolha (exatamente 4 alternativas, uma única correta) e 30% verdadeiro ou falso.\n' +
+      (discs.indexOf('Português') >= 0 ? '- Em Português, inclua 2 questões de interpretação com um texto de apoio ORIGINAL de até 100 palavras no campo textoApoio, e questões de gramática e ortografia adequadas ao nível.\n' : '') +
+      (discs.indexOf('Matemática') >= 0 ? '- Em Matemática, inclua problemas do cotidiano e 2 questões de raciocínio lógico (sequências, padrões, deduções).\n' : '') +
+      '- Pelo menos metade das questões deve ser contextualizada no cotidiano de estudantes brasileiros (pode citar Pernambuco e o Nordeste).\n' +
+      '- Dificuldade variada: cerca de 40% fácil (1), 40% média (2) e 20% difícil (3), sempre dentro do nível indicado.\n' +
+      '- Varie os assuntos dentro de cada disciplina. Sugestões de assuntos para hoje (pode usar outros do mesmo nível): ' + discs.map(d => d + ': ' + (sugestoes[d] || []).join(', ')).join(' | ') + '.\n' +
+      (evitarAssuntos.length ? '- Evite repetir estes assuntos usados nos últimos dias: ' + evitarAssuntos.join('; ') + '.\n' : '') +
+      '- Conteúdo correto e atual, linguagem adequada à idade, sem pegadinhas injustas, sem reproduzir textos de livros. Não use imagens: descreva em palavras o que for necessário.\n' +
+      '- Explicação curta e didática para cada questão (nas discursivas: a resposta esperada).\n' +
+      'Responda SOMENTE com JSON: {"questoes":[{"disciplina": string, "assunto": string, "tipo": "mc"|"vf"|"disc", "dificuldade": 1|2|3, "enunciado": string, "textoApoio": string, "opcoes": [4 strings, só mc], "correta_indice": 0-3 (só mc), "correta_vf": true|false (só vf), "explicacao": string}]}';
+    const j = await iaJson(est.provedor, 'Você é um professor experiente que cria avaliações de alta qualidade para a educação básica brasileira, alinhadas à BNCC. Todo conteúdo é original e correto.', txt, 16000, 'desafio');
+    return Array.isArray(j && j.questoes) ? j.questoes : [];
+  }
+  async function revisarLoteIA(est, nivel, qs) {
+    if (!qs.length) return [];
+    const L = qs.map((q, i) => ({ i: i, disciplina: q.disciplina, tipo: q.tipo, apoio: q.textoApoio ? q.textoApoio.slice(0, 500) : undefined, enunciado: q.enunciado,
+      alternativas: q.opcoes ? q.opcoes.map((o, k) => String.fromCharCode(65 + k) + ') ' + o) : undefined,
+      gabarito: q.tipo === 'mc' ? String.fromCharCode(65 + q.correta) : q.tipo === 'vf' ? (q.correta ? 'Verdadeiro' : 'Falso') : 'discursiva', explicacao: q.explicacao }));
+    const txt = 'Revise as questões abaixo, feitas para ' + NIVEL_DESC[nivel] + '. Reprove toda questão que tenha: gabarito errado, mais de uma alternativa correta, nenhuma alternativa correta, enunciado confuso ou ambíguo, erro de conteúdo, explicação errada, ou conteúdo inadequado ao nível ou à idade.\n' +
+      'Questões (JSON):\n' + JSON.stringify(L) + '\nResponda SOMENTE com JSON: {"reprovadas":[{"i": número, "motivo": string}]} (lista vazia se todas estiverem corretas).';
+    const j = await iaJson(est.provedor, 'Você é um revisor pedagógico rigoroso. Confira cada gabarito resolvendo a questão você mesmo.', txt, 4000, 'desafio_revisao');
+    if (!j || !Array.isArray(j.reprovadas)) throw new Error('revisão inválida');
+    const fora = new Set(j.reprovadas.map(x => Number(x && x.i)));
+    return qs.filter((q, i) => !fora.has(i));
+  }
+  function sugestoesAssuntos(B, nivel, evitar) {
+    const o = {};
+    B.disciplinas.forEach(d => { const nome = DISC_BANCO[d.id]; if (!nome) return;
+      o[nome] = embaralhar(d.assuntos.filter(a => ELEGIVEIS[nivel].indexOf(a.n) >= 0 && evitar.indexOf(a.a) < 0).map(a => a.a.split(':')[0])).slice(0, 3); });
+    return o;
+  }
+  // reserva: questões do Banco de Atividades, priorizando as que não foram usadas há mais tempo
+  function sortearBanco(B, nivel, falta, faltaDisc, uso, jaUsadas) {
+    const out = [];
+    ORDEM_DISC.forEach(disc => {
+      const D = B.disciplinas.find(x => DISC_BANCO[x.id] === disc); if (!D) return;
+      const cand = [];
+      D.assuntos.forEach(a => { const pri = ELEGIVEIS[nivel].indexOf(a.n); if (pri < 0) return;
+        a.q.forEach(q => { const h = hashQ(q[2]); if (jaUsadas.has(h)) return; cand.push({ q: q, a: a, h: h, uso: uso[h] || '', pri: pri, r: Math.random() }); }); });
+      cand.sort((x, y) => (x.uso < y.uso ? -1 : x.uso > y.uso ? 1 : 0) || (x.pri - y.pri) || (x.r - y.r));
+      const pegar = (filtro, n) => { const sel = []; for (const c of cand) { if (sel.length >= n) break; if (!c.usado && filtro(c.q)) { c.usado = 1; sel.push(c); } } return sel; };
+      const nd = faltaDisc[disc] || 0; const no = Math.max(0, (falta[disc] || 0) - nd);
+      // objetivas: equilibra os assuntos (no máximo 2 por assunto, se houver opções)
+      const objs = []; const porAss = {};
+      for (const c of cand) { if (objs.length >= no) break; if (c.usado || c.q[0] === 'd') continue; if ((porAss[c.a.a] || 0) >= 2) continue; c.usado = 1; porAss[c.a.a] = (porAss[c.a.a] || 0) + 1; objs.push(c); }
+      if (objs.length < no) objs.push(...pegar(q => q[0] !== 'd', no - objs.length));
+      const discs = pegar(q => q[0] === 'd', nd);
+      objs.concat(discs).forEach(c => { const q = converter(c.q, c.a); delete q.dificuldade; q.disciplina = disc; q.assunto = c.a.a; q._h = c.h; jaUsadas.add(c.h); out.push(q); });
+    });
+    return out;
+  }
+  async function montarNivel(est, nivel, B, usarIA) {
+    const discTot = cotasDiscursivas(est.discursivas);
+    const evitar = new Set(Object.keys(est.uso[nivel] || {}).filter(h => (est.uso[nivel][h] || '') >= new Date(Date.now() - 3 * 3600e3 - 30 * 864e5).toISOString().slice(0, 10)));
+    let ia = []; let motivo = '';
+    if (usarIA) {
+      const sug = sugestoesAssuntos(B, nivel, est.assuntos[nivel] || []);
+      const lotes = [ORDEM_DISC.slice(0, 4), ORDEM_DISC.slice(4)];
+      const res = await Promise.all(lotes.map(async discs => {
+        try {
+          const brutas = await gerarLoteIA(est, nivel, discs, discTot, sug);
+          const vistos = new Set(); const val = [];
+          brutas.forEach(q => { const v = validarIA(q, discs, evitar); if (v && !vistos.has(v._h)) { vistos.add(v._h); val.push(v); } });
+          return await revisarLoteIA(est, nivel, val);
+        } catch (e) { motivo = String(e && e.message || e).slice(0, 120); if (typeof console !== 'undefined') console.error('desafio IA', nivel, motivo); return []; }
+      }));
+      res.forEach(r => { ia = ia.concat(r); });
+    }
+    // respeita as cotas por disciplina e de discursivas
+    const final = []; const falta = {}; const faltaDisc = {};
+    ORDEM_DISC.forEach(disc => {
+      const daIA = ia.filter(q => q.disciplina === disc);
+      const nd = discTot[disc] || 0; const no = COTAS[disc] - nd;
+      const objs = daIA.filter(q => q.tipo !== 'disc').slice(0, no); const dis = daIA.filter(q => q.tipo === 'disc').slice(0, nd);
+      final.push(...objs, ...dis); falta[disc] = COTAS[disc] - objs.length - dis.length; faltaDisc[disc] = nd - dis.length;
+    });
+    const deIA = final.length;
+    const usadas = new Set([...evitar, ...final.map(q => q._h)]);
+    let reserva = sortearBanco(B, nivel, falta, faltaDisc, est.uso[nivel] || {}, usadas);
+    let todas = final.concat(reserva);
+    if (todas.length < DESAFIO_TOTAL) {   // completa com qualquer disciplina, se faltar
+      const extra = {}; ORDEM_DISC.forEach(d => { extra[d] = DESAFIO_TOTAL; });
+      todas = todas.concat(sortearBanco(B, nivel, extra, {}, est.uso[nivel] || {}, usadas).slice(0, DESAFIO_TOTAL - todas.length));
+    }
+    const ordemT = { mc: 0, vf: 1, disc: 2 };
+    todas.sort((x, y) => (ORDEM_DISC.indexOf(x.disciplina) - ORDEM_DISC.indexOf(y.disciplina)) || (ordemT[x.tipo] - ordemT[y.tipo]));
+    const assuntos = [...new Set(todas.map(q => q.assunto).filter(Boolean))];
+    todas.forEach(q => { delete q._h; delete q.assunto; delete q.dificuldade; });
+    return { questoes: todas.slice(0, DESAFIO_TOTAL), origem: deIA >= 45 ? 'ia' : deIA > 0 ? 'ia+banco' : 'banco', deIA: deIA, assuntos: assuntos, motivo: motivo };
+  }
+  const DESAFIO_TOTAL = 50;
+  // prepara os desafios pendentes de hoje; usarIA=false usa só a reserva (instantâneo)
+  async function desafioPreparar(op) {
+    let dados = await io.carregar();
+    const est = N.sistema(dados, 'estado', { dia: N.sistema(dados, 'dia').resultado }).resultado;
+    if (!est.pendentes.length) return { preparados: [] };
+    const niveis = op.niveis ? est.pendentes.filter(n => op.niveis.indexOf(n) >= 0) : est.pendentes;
+    const chave = N.sistema(dados, 'bancoChave').resultado;
+    const B = chave ? await abrirBanco(chave) : { disciplinas: [] };
+    const usarIA = !!op.usarIA && est.ia && !!(io.chaveGemini || io.chaveIA);
+    const montados = await Promise.all(niveis.map(async nv => est.existentes[nv] ? { questoes: est.existentes[nv], origem: 'copia', assuntos: [] } : montarNivel(est, nv, B, usarIA)));
+    const out = [];
+    for (let i = 0; i < niveis.length; i++) {
+      const m = montados[i]; if (!m.questoes.length) continue;
+      dados = await io.carregar();
+      const x = N.sistema(dados, 'criar', { dia: est.dia, nivel: niveis[i], questoes: m.questoes, origem: m.origem, assuntos: m.assuntos });
+      await gravar(x);
+      out.push({ nivel: niveis[i], questoes: m.questoes.length, origem: m.origem, deIA: m.deIA || 0, motivo: m.motivo || '' });
+    }
+    return { preparados: out };
+  }
+  // reserva imediata: se já passou do horário de abertura e o desafio de algum nível não existe, monta com o banco
+  async function desafioReserva(dados) {
+    const t = Date.now();
+    const est = N.sistema(dados, 'estado', { dia: N.sistema(dados, 'dia').resultado }).resultado;
+    const devidos = est.pendentes.filter(nv => est.abertura[nv] && est.abertura[nv] <= t + 5 * 60e3);
+    if (!devidos.length) return false;
+    await desafioPreparar({ usarIA: false, niveis: devidos });
+    return true;
+  }
+  // chamado pelo agendamento (pg_cron) a cada 15 minutos
+  async function desafioCron(b, dados) {
+    const seg = N.sistema(dados, 'segredo').resultado;
+    if (!seg || String(b.segredo || '') !== seg) return { ok: false, erro: 'Não autorizado.' };
+    const m = N.sistema(dados, 'manutencao'); await gravar(m);
+    dados = await io.carregar();
+    const est = N.sistema(dados, 'estado', { dia: N.sistema(dados, 'dia').resultado }).resultado;
+    let prep = { preparados: [] };
+    if (est.pendentes.length) {
+      // antes da abertura tenta a IA; se já passou da abertura, usa a reserva na hora
+      const t = Date.now(); const atrasado = est.pendentes.some(nv => est.abertura[nv] && est.abertura[nv] <= t + 5 * 60e3);
+      prep = await desafioPreparar({ usarIA: !atrasado });
+    }
+    return { ok: true, d: { manutencao: m.resultado, dia: est.dia, preparados: prep.preparados } };
   }
   async function instalar() { const x = N.instalar(await io.carregar()); await gravar(x); return x.msgs; }
   return { processar, instalar, nucleo: N };

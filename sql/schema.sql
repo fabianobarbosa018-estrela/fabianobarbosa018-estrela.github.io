@@ -12,6 +12,7 @@ create table if not exists sd_entregas   (id text primary key, data jsonb not nu
 create table if not exists sd_config     (id text primary key, data jsonb not null, atualizado timestamptz not null default now());
 create table if not exists sd_arquivos   (id text primary key, data jsonb not null, atualizado timestamptz not null default now());
 create table if not exists sd_log        (id text primary key, data jsonb not null, atualizado timestamptz not null default now());
+create table if not exists sd_desafiohist (id text primary key, data jsonb not null, atualizado timestamptz not null default now());
 create table if not exists sd_kv         (k text primary key, v text not null, expira timestamptz);
 create table if not exists sd_ia_uso     (mes text not null, modo text not null, chamadas int not null default 0, usd numeric not null default 0, tin bigint not null default 0, tout bigint not null default 0, primary key (mes, modo));
 create table if not exists sd_backups    (id bigserial primary key, criado timestamptz not null default now(), dados jsonb not null);
@@ -28,7 +29,7 @@ alter table sd_usuarios enable row level security;   alter table sd_turmas enabl
 alter table sd_matriculas enable row level security; alter table sd_atividades enable row level security;
 alter table sd_entregas enable row level security;   alter table sd_config enable row level security;
 alter table sd_arquivos enable row level security;   alter table sd_log enable row level security;
-alter table sd_kv enable row level security;         alter table sd_backups enable row level security;
+alter table sd_kv enable row level security;         alter table sd_desafiohist enable row level security;         alter table sd_backups enable row level security;
 
 -- carrega tudo o que uma requisição precisa (uma ida ao banco)
 create or replace function sd_carregar() returns jsonb language sql security definer set search_path = public as $$
@@ -36,8 +37,10 @@ create or replace function sd_carregar() returns jsonb language sql security def
     'Usuarios',   coalesce((select jsonb_agg(data) from sd_usuarios), '[]'),
     'Turmas',     coalesce((select jsonb_agg(data) from sd_turmas), '[]'),
     'Matriculas', coalesce((select jsonb_agg(data) from sd_matriculas), '[]'),
-    'Atividades', coalesce((select jsonb_agg(data) from sd_atividades), '[]'),
-    'Entregas',   coalesce((select jsonb_agg(data) from sd_entregas), '[]'),
+    -- desafios diários encerrados há mais de 21 dias ficam só no banco (o resumo continua em DesafioHist)
+    'Atividades', coalesce((select jsonb_agg(data) from sd_atividades where not (data->>'tipo' = 'desafio' and coalesce((data->>'encerramento')::bigint, 0) < (extract(epoch from now() - interval '21 days') * 1000))), '[]'),
+    'Entregas',   coalesce((select jsonb_agg(e.data) from sd_entregas e where not exists (select 1 from sd_atividades a where a.id = e.data->>'atividadeId' and a.data->>'tipo' = 'desafio' and coalesce((a.data->>'encerramento')::bigint, 0) < (extract(epoch from now() - interval '21 days') * 1000))), '[]'),
+    'DesafioHist', coalesce((select jsonb_agg(data) from sd_desafiohist), '[]'),
     'Config',     coalesce((select jsonb_agg(data) from sd_config), '[]'),
     'Arquivos',   coalesce((select jsonb_agg(data) from sd_arquivos), '[]'),
     'Log',        coalesce((select jsonb_agg(data order by (data->>'data')::bigint) from (select data from sd_log order by (data->>'data')::bigint desc limit 200) x), '[]'),
@@ -59,7 +62,7 @@ begin
       continue;
     end if;
     tab := 'sd_' || lower(o->>'t');
-    if tab not in ('sd_usuarios','sd_turmas','sd_matriculas','sd_atividades','sd_entregas','sd_config','sd_arquivos','sd_log') then
+    if tab not in ('sd_usuarios','sd_turmas','sd_matriculas','sd_atividades','sd_entregas','sd_config','sd_arquivos','sd_log','sd_desafiohist') then
       raise exception 'tabela invalida %', tab;
     end if;
     if o->>'op' = 'set' then
@@ -78,7 +81,7 @@ begin
     'usuarios',(select coalesce(jsonb_agg(data),'[]') from sd_usuarios),'turmas',(select coalesce(jsonb_agg(data),'[]') from sd_turmas),
     'matriculas',(select coalesce(jsonb_agg(data),'[]') from sd_matriculas),'atividades',(select coalesce(jsonb_agg(data),'[]') from sd_atividades),
     'entregas',(select coalesce(jsonb_agg(data),'[]') from sd_entregas),'config',(select coalesce(jsonb_agg(data),'[]') from sd_config),
-    'arquivos',(select coalesce(jsonb_agg(data),'[]') from sd_arquivos));
+    'arquivos',(select coalesce(jsonb_agg(data),'[]') from sd_arquivos),'desafiohist',(select coalesce(jsonb_agg(data),'[]') from sd_desafiohist));
   delete from sd_backups where criado < now() - interval '30 days';
   insert into sd_kv(k, v) values ('p:ULTIMO_BACKUP', (extract(epoch from now()) * 1000)::bigint::text) on conflict (k) do update set v = excluded.v;
 end $$;
@@ -89,10 +92,10 @@ revoke all on function sd_backup() from public, anon, authenticated;
 
 -- acesso SOMENTE para o servidor (service_role); chave pública (anon) não acessa nada
 grant usage on schema public to service_role;
-grant select, insert, update, delete on sd_usuarios, sd_turmas, sd_matriculas, sd_atividades, sd_entregas, sd_config, sd_arquivos, sd_log, sd_kv, sd_backups to service_role;
+grant select, insert, update, delete on sd_usuarios, sd_turmas, sd_matriculas, sd_atividades, sd_entregas, sd_config, sd_arquivos, sd_log, sd_kv, sd_backups, sd_desafiohist to service_role;
 grant usage, select on sequence sd_backups_id_seq to service_role;
 grant execute on function sd_carregar(), sd_aplicar(jsonb), sd_backup() to service_role;
-revoke all on sd_usuarios, sd_turmas, sd_matriculas, sd_atividades, sd_entregas, sd_config, sd_arquivos, sd_log, sd_kv, sd_backups from anon, authenticated;
+revoke all on sd_usuarios, sd_turmas, sd_matriculas, sd_atividades, sd_entregas, sd_config, sd_arquivos, sd_log, sd_kv, sd_backups, sd_desafiohist from anon, authenticated;
 
 alter table sd_ia_uso enable row level security;
 create or replace function sd_ia_registrar(p_mes text, p_modo text, p_usd numeric, p_in bigint, p_out bigint) returns void language sql security definer set search_path = public as $$

@@ -24,16 +24,16 @@ function abrir() { const erros = [];
   const login = async (u, s) => { await espera(() => $('#fLogin')); set('#fLogin [name=login]', u); set('#fLogin [name=senha]', s); $('#fLogin').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await espera(() => $('#main') && !$('#main .spin')); };
   return { w, d, $, $$, txt, click, set, espera, login, erros }; }
 
-const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() => P.$('#nav [data-go="p_banco"]'));
-t('menu do professor tem Banco de Atividades', !!P.$('#nav [data-go="p_banco"]'));
-P.click('#nav [data-go="p_banco"]'); await P.espera(() => P.$('[data-a="banDisc"]'));
+const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() => P.$('#nav [data-go="p_atividades"]')); P.click('#nav [data-go="p_atividades"]'); await P.espera(() => P.$('.hub [data-go="p_banco"]'));
+t('menu do professor tem Banco de Atividades', !!P.$('.hub [data-go="p_banco"]') && !P.$('#nav [data-go="p_banco"]'));
+P.click('.hub [data-go="p_banco"]'); await P.espera(() => P.$('[data-a="banDisc"]'));
 t('mostra as 8 disciplinas', P.$$('[data-a="banDisc"]').length === 8, P.$$('[data-a="banDisc"]').length);
-t('mostra o total de questões', /672 questões/.test(P.txt('#main')), P.txt('.ph'));
+t('mostra o total de questões', /726 questões/.test(P.txt('#main')), P.txt('.ph'));
 P.click('[data-a="banDisc"][data-id="historia"]'); await P.espera(() => P.$$('.banA').length);
-t('lista os 11 assuntos de História', P.$$('.banA').length === 11, P.$$('.banA').length);
-P.set('#banNivel', 'EM'); await P.espera(() => P.$$('.banA').length && P.$$('.banA').length < 11);
-t('filtro de nível', P.$$('.banA').length > 0 && P.$$('.banA').length < 11, P.$$('.banA').length);
-P.set('#banNivel', ''); await P.espera(() => P.$$('.banA').length === 11);
+t('lista os 12 assuntos de História', P.$$('.banA').length === 12, P.$$('.banA').length);
+P.set('#banNivel', 'EM'); await P.espera(() => P.$$('.banA').length && P.$$('.banA').length < 12);
+t('filtro de nível', P.$$('.banA').length > 0 && P.$$('.banA').length < 12, P.$$('.banA').length);
+P.set('#banNivel', ''); await P.espera(() => P.$$('.banA').length === 12);
 P.click('[data-a="banTexto"]'); await P.espera(() => /📄/.test(P.txt('.modal, #modal, body')) && P.$('.apoio'));
 t('abre o texto de apoio', P.$('.apoio') && P.$('.apoio').textContent.length > 150);
 P.click('[data-a="fechar"]');
@@ -45,11 +45,11 @@ P.click('[data-a="banMontar"]'); await P.espera(() => /Banco de Atividades<\/b>/
 t('abre o editor com as questões do banco', /8 questões do Banco de Atividades/.test(P.txt('#main')), P.txt('#main').slice(0, 300));
 t('editor recebeu título e texto de apoio', /História/.test(P.$('[data-e="titulo"]').value) && /📄/.test((P.$('[data-e="instrucoes"]') || {}).value || ''));
 // volta e testa o botão de IA (IA ligada por padrão)
-P.click('#nav [data-go="p_banco"]'); await P.espera(() => P.$('[data-a="banIA"]'));
+P.click('#nav [data-go="p_atividades"]'); await P.espera(() => P.$('.hub [data-go="p_banco"]')); P.click('.hub [data-go="p_banco"]'); await P.espera(() => P.$('[data-a="banIA"]'));
 t('oferece criar com IA', !!P.$('[data-a="banIA"]'));
 P.click('[data-a="banIA"]'); await P.espera(() => P.txt('#banErr') || P.$('#iaAssunto'));
 const marcados = P.$$('.banA').filter(x => x.checked).length;
-if (marcados !== 1) { t('pede um único assunto para IA', /exatamente um/.test(P.txt('#banErr'))); P.click('[data-a="banNenhum"]'); await P.espera(() => P.$$('.banA').every(x => !x.checked)); const c = P.$$('.banA')[2]; c.checked = true; c.dispatchEvent(new P.w.Event('change', { bubbles: true })); P.click('[data-a="banIA"]'); await P.espera(() => P.$('#iaAssunto')); }
+if (marcados !== 1) { t('pede um único assunto para IA', /exatamente um/.test(P.txt('#banErr'))); P.click('[data-a="banNenhum"]'); await P.espera(() => P.$$('.banA').length === 12 && P.$$('.banA').every(x => !x.checked)); const c = P.$$('.banA')[2]; c.checked = true; c.dispatchEvent(new P.w.Event('change', { bubbles: true })); P.click('[data-a="banIA"]'); await P.espera(() => P.$('#iaAssunto')); }
 t('IA abre com assunto e nível preenchidos', P.$('#iaAssunto') && P.$('#iaAssunto').value.length > 3 && P.$('#iaNivel').value !== '', P.$('#iaAssunto') && P.$('#iaAssunto').value);
 // aluno não vê
 const A = abrir(); await A.login('aluno', 'Aluno@2026'); await A.espera(() => A.$('#nav'));

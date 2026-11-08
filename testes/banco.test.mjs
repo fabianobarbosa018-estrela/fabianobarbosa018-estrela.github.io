@@ -16,7 +16,7 @@ r = await api(A, 'bancoIndice'); t('aluno não acessa o banco', !r.ok && /permis
 r = await api(A, 'bancoMontar', { disciplina: 'matematica', assuntos: [0], quantidade: 5 }); t('aluno não monta atividade (gabarito protegido)', !r.ok, r);
 r = await api(P, 'bancoIndice'); t('professor vê o índice', r.ok, r);
 const I = r.d;
-const esperado = { portugues: 12, matematica: 25, historia: 11, geografia: 11, ciencias_biologia: 14, fisica: 14, quimica: 13, educacao_fisica: 12 };
+const esperado = { portugues: 12, matematica: 28, historia: 12, geografia: 11, ciencias_biologia: 15, fisica: 17, quimica: 14, educacao_fisica: 12 };
 t('8 disciplinas', I.disciplinas.length === 8, I.disciplinas.map(d => d.id));
 for (const [id, n] of Object.entries(esperado)) { const d = I.disciplinas.find(x => x.id === id); t('assuntos de ' + id, d && d.assuntos.length === n, d && d.assuntos.length); }
 t('índice não traz gabaritos nem textos', !JSON.stringify(I).includes('"q"') && !JSON.stringify(I).includes('correta'));
