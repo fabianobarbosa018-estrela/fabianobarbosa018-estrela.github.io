@@ -1,0 +1,47 @@
+# IMPRIMIR PROVA: gera o PDF de verdade no Chrome (celular e computador) e confere o conteúdo
+import asyncio, json, re, io, unicodedata, urllib.request
+from playwright.async_api import async_playwright
+from pypdf import PdfReader
+U='http://localhost:8770/'; erros=[]; ok=0; falhas=0
+def t(n,c,x=''):
+    global ok,falhas
+    if c: ok+=1
+    else: falhas+=1; print('❌',n,str(x)[:300])
+def api(tok,acao,d=None):
+    r=urllib.request.urlopen(urllib.request.Request(U+'api',data=json.dumps({'token':tok,'acao':acao,'d':d or {}}).encode(),headers={'content-type':'application/json'})); return json.loads(r.read())
+norm=lambda s: re.sub(r'\s+','',unicodedata.normalize('NFC',s))
+async def main():
+    tp=api('', 'entrar', {'login':'professor','senha':'Prof@2026'})['d']['token']
+    async with async_playwright() as pw:
+        b=await pw.chromium.launch(executable_path='/usr/bin/google-chrome',args=['--no-sandbox'])
+        for nome,vp in [('cel',{'width':390,'height':844}),('pc',{'width':1366,'height':860})]:
+            c=await b.new_context(viewport=vp,accept_downloads=True,device_scale_factor=2 if nome=='cel' else 1)
+            p=await c.new_page(); p.on('pageerror',lambda e:erros.append(str(e)))
+            await p.goto(U); await p.wait_for_selector('#fLogin'); await p.fill('#fLogin [name=login]','aluno'); await p.fill('#fLogin [name=senha]','Aluno@2026'); await p.click('#fLogin button'); await p.wait_for_selector('#main h1')
+            tok=await p.evaluate('S.token')
+            await p.click('#nav [data-go=a_atividades]'); await p.click('.pv-capa [data-go=a_prova]'); await p.wait_for_selector('[data-a=provaImprimir]')
+            t(nome+': as duas opções aparecem antes de iniciar', await p.locator('[data-a=provaIniciar]').count()==1 and await p.locator('[data-a=provaImprimir]').count()==1)
+            await p.screenshot(path=f'/tmp/pdf_{nome}_opcoes.png', full_page=True)
+            hoje=api(tok,'desafioHoje')['d']['desafios'][0]
+            async with p.expect_download(timeout=60000) as dl:
+                await p.click('[data-a=provaImprimir]')
+            d=await dl.value; caminho=f'/tmp/prova_{nome}.pdf'; await d.save_as(caminho)
+            await p.wait_for_selector('#sheet >> text=Prova em PDF pronta'); await p.screenshot(path=f'/tmp/pdf_{nome}_modal.png')
+            t(nome+': nome do arquivo', d.suggested_filename.startswith('Prova-do-dia-') and d.suggested_filename.endswith('.pdf'), d.suggested_filename)
+            R=PdfReader(caminho); txt='\n'.join(pg.extract_text() for pg in R.pages); N=norm(txt)
+            t(nome+': PDF válido com várias páginas', len(R.pages)>=5, len(R.pages))
+            for k in ['SALA DIGITAL','PROVA DO DIA','Aluno Demonstração','6º Ano A','6º ano','08/11/2026','FOLHA DE RESPOSTAS']: t(nome+': PDF tem '+k, norm(k) in N, k)
+            A=api(tp,'atividadeObter',{'id':hoje['id']})['d']['atividade']; qs=A['questoes']
+            t(nome+': 50 questões numeradas', all(norm('Questão %d'%(i+1)) in N for i in range(len(qs))) and len(qs)==50)
+            faltam=[i+1 for i,q in enumerate(qs) if norm(q['enunciado'])[:40] not in N]
+            t(nome+': mesmas questões, na mesma ordem', not faltam and all(N.index(norm(qs[i]['enunciado'])[:40])<N.index(norm(qs[i+1]['enunciado'])[:40]) for i in range(len(qs)-1)), faltam)
+            alts=[(i+1,o) for i,q in enumerate(qs) if q['tipo']=='mc' for o in q['opcoes'] if norm(o)[:30] not in N]
+            t(nome+': todas as alternativas', not alts, alts[:5])
+            expl=[i+1 for i,q in enumerate(qs) if len(norm(q.get('explicacao','')))>25 and norm(q['explicacao'])[:40] in N]
+            t(nome+': sem gabarito nem explicações', not expl and 'Gabarito' not in txt and 'correta' not in txt.lower(), expl)
+            ordem=[N.index(norm(q['enunciado'])[:40]) for q in qs]
+            depois=api(tok,'desafioHoje')['d']['desafios'][0]
+            t(nome+': imprimir não iniciou a prova digital', depois['rascunho']==hoje['rascunho'] and depois.get('enviadoEm')==hoje.get('enviadoEm') and depois['situacao']==hoje['situacao'], [hoje,depois])
+            await c.close()
+        print('ERROS JS:', erros); print(f'PDF: {ok} ok, {falhas} falhas')
+asyncio.run(main())

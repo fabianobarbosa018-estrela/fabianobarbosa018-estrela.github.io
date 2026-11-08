@@ -62,7 +62,7 @@ troca('''  <div class="card"><label>Título<input data-e="titulo"''','''  ${ED.i
   <div class="card"><label>Título<input data-e="titulo"''')
 troca("  if(a.instrucoes)h+=`<div class=\"apoio\">${linkify(a.instrucoes)}</div>`;",
       "  if(a.instrucoes)h+=`<div class=\"apoio\">${linkify(a.instrucoes)}</div>`;\n  if(S.iaTutor)h+=`<button class=\"btn sm\" style=\"margin-bottom:12px\" data-go=\"a_tutor\" data-p=\"${P({atividade:a.id})}\">🤖 Pedir ajuda ao Tutor IA</button>`;")
-troca('/* =================== INÍCIO =================== */', open('/home/claude/supa/web_ia.js').read() + '\n' + open('/home/claude/supa/web_banco.js').read() + '\n' + open('/home/claude/supa/web_desafio.js').read() + '\n/* =================== INÍCIO =================== */')
+troca('/* =================== INÍCIO =================== */', open('/home/claude/supa/web_ia.js').read() + '\n' + open('/home/claude/supa/web_banco.js').read() + '\n' + open('/home/claude/supa/web_desafio.js').read() + '\n' + open('/home/claude/supa/web_pdf.js').read() + '\n/* =================== INÍCIO =================== */')
 # ---- Desafio diário e área única de atividades ----
 troca('</style>', """.hub{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px;padding:4px;background:#eef1f7;border-radius:16px}
 .hub button{flex:none;border:0;background:transparent;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px;cursor:pointer;color:var(--mut)}
@@ -103,7 +103,7 @@ troca('</style>', """.pv-folha{background:#fff;border:1px solid #d9dde8;border-r
 .pv-mapa-g button.ok{background:var(--ok);border-color:var(--ok);color:#fff}.pv-mapa-g button.at{outline:3px solid var(--pri);outline-offset:1px}
 .pv-leg{font-size:12px;color:var(--mut);margin-top:10px}.pv-leg .ok{color:var(--ok)}
 .pv-final{display:block;width:100%;min-height:56px;font-size:17px;font-weight:900;letter-spacing:.5px;background:var(--ok);color:#fff;border:0;margin-top:16px}
-.pv-res{text-align:center}.pv-mini{padding:10px 14px;font-size:14px;line-height:1.4}@media(min-width:900px){[data-a=provaMapa]{display:none}}.pv-dias{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 12px}.pv-dias label{margin:0}.pv-dias input{display:none}
+.pv-res{text-align:center}.pv-opcoes{display:grid;gap:10px;grid-template-columns:1fr;margin-top:6px}@media(min-width:700px){.pv-opcoes{grid-template-columns:1fr 1fr}}.pv-opcoes .pv-btn{margin-top:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:74px}.pv-opcoes small{font-size:12px;font-weight:600;opacity:.85;letter-spacing:0;margin-top:3px}.pv-imprimir{border:2px solid var(--ink)}.pv-mini{padding:10px 14px;font-size:14px;line-height:1.4}@media(min-width:900px){[data-a=provaMapa]{display:none}}.pv-dias{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 12px}.pv-dias label{margin:0}.pv-dias input{display:none}
 .pv-dias span{display:inline-block;padding:7px 11px;border:1.5px solid var(--line);border-radius:20px;font-weight:800;cursor:pointer}.pv-dias input:checked+span{background:var(--ink);color:#fff;border-color:var(--ink)}
 </style>""")
 troca("const A=await api('atividades');const f=p.f||'todas';", "const A=(await api('atividades')).filter(a=>a.tipo!=='desafio');const f=p.f||'todas';")

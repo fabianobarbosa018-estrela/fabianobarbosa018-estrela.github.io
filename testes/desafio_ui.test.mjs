@@ -70,6 +70,7 @@ t('lista antiga continua funcionando', A.$$('#main .list .it').length > 0 && !A.
 A.click('#nav [data-go="a_atividades"]'); await A.espera(() => A.$('.pv-capa [data-go="a_prova"]'));
 A.click('.pv-capa [data-go="a_prova"]'); await A.espera(() => A.$('[data-a="provaIniciar"]'));
 t('folha de rosto: cabeçalho de prova', ['ALUNO', 'TURMA', 'SÉRIE', 'DATA DA PROVA', 'PRAZO PARA FINALIZAR'].every(k => A.txt('.pv-cab').toUpperCase().includes(k)) && /Instruções/.test(A.txt('#main')));
+t('antes de iniciar: INICIAR PROVA e IMPRIMIR PROVA', !!A.$('[data-a="provaIniciar"]') && !!A.$('[data-a="provaImprimir"]') && /não inicia nem envia/.test(A.txt('#main')));
 t('tabela das disciplinas com a numeração', /Português\s*1 a 7/.test(A.txt('.pv-tab')) && /Biologia\s*45 a 50/.test(A.txt('.pv-tab')), A.txt('.pv-tab'));
 A.click('[data-a="provaIniciar"]'); await A.espera(() => A.$('#pvQ .q'));
 t('uma questão por vez, numerada', A.$$('#pvQ .q').length === 1 && /Questão 1 de 50/.test(A.txt('#pvN')));
