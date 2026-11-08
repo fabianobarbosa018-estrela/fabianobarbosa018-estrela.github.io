@@ -921,6 +921,7 @@ table.folha.vt .edit-click{cursor:pointer}
     var h = (func && func.vt && func.vt.hist) || [], r = null;
     for (var i = 0; i < h.length; i++) if (h[i].desde <= dataISO && (!r || h[i].desde >= r.desde)) r = h[i];
     if (!r) return null;
+    if (r.fixo) return { fixo: true, q1: +r.q1 || 0, q2: +r.q2 || 0, valor: 0, qtd: 0, total: 0, desde: r.desde };
     var v = +r.valor || 0, q = r.qtd == null || r.qtd === '' ? 1 : +r.qtd;
     return { valor: v, qtd: q, total: Math.round(v * q * 100) / 100, desde: r.desde };
   }
@@ -946,7 +947,7 @@ table.folha.vt .edit-click{cursor:pointer}
     (o.funcionarios || []).forEach(function (f) {
       var naEscala = sems.some(function (s) { return escalas[s] && escalas[s].atribuicoes && escalas[s].atribuicoes[f.id]; });
       var temAj = aj[f.id] && Object.keys(aj[f.id]).some(function (d) { return d.slice(0, 7) === o.mes; });
-      var temValor = dias.some(function (d) { var v = vtValorEm(f, d); return v && v.total > 0; });
+      var temValor = dias.some(function (d) { var v = vtValorEm(f, d); return v && (v.total > 0 || (v.fixo && (v.q1 > 0 || v.q2 > 0))); });
       if (!temAj && !(temValor && (f.ativo || naEscala))) return;
       if (f.dataEntrada && f.dataEntrada > dias[dim - 1] && !temAj) return;
       var cel = dias.map(function (d) {
@@ -955,20 +956,28 @@ table.folha.vt .edit-click{cursor:pointer}
         var base = (st === 'T' || st === 'X') ? 'trab' : st === 'F' ? 'folga' : st === 'V' ? 'ferias' : (!e && f.ativo && !(f.dataEntrada && d < f.dataEntrada)) ? 'semEscala' : 'fora';
         var a = aj[f.id] && aj[f.id][d], tipo = a && VT_TIPOS[a.t] ? a.t : base;
         var vd = vtValorEm(f, d), valor = 0;
-        if (tipo === 'trab') valor = a && a.t === 'trab' && a.v != null && a.v !== '' ? +a.v : (vd ? vd.total : 0);
+        if (tipo === 'trab') valor = a && a.t === 'trab' && a.v != null && a.v !== '' ? +a.v : (vd && !vd.fixo ? vd.total : 0);
         var cod = tipo === 'trab' ? '' : tipo === 'ferias' ? 'FÉR' : tipo === 'semEscala' ? '?' : tipo === 'fora' ? '' : VT_TIPOS[tipo].cod;
-        return { d: d, base: base, tipo: tipo, valor: r2(valor), cod: cod, ajuste: a || null };
+        return { d: d, base: base, tipo: tipo, valor: r2(valor), cod: cod, ajuste: a || null, fixoDia: !!(vd && vd.fixo) };
       });
-      var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate && c.tipo === 'trab' && c.valor > 0) { n++; v += c.valor; } }); return { dias: n, valor: r2(v) }; };
+      // valor fixo por quinzena: lançado no último dia da quinzena (dia 15 e último dia do mês), se trabalhou ao menos 1 dia nela
+      [[1, 15, 'q1'], [16, dim, 'q2']].forEach(function (q) {
+        var vq = vtValorEm(f, dias[q[1] - 1]); if (!vq || !vq.fixo || !(vq[q[2]] > 0)) return;
+        var trabalhou = cel.some(function (c, i) { return i + 1 >= q[0] && i + 1 <= q[1] && c.tipo === 'trab'; });
+        if (!trabalhou) return;
+        var c = cel[q[1] - 1]; c.fixoQ = vq[q[2]]; c.valor = r2(c.valor + vq[q[2]]);
+      });
+      var conta = function (c) { return c.tipo === 'trab' || c.fixoQ; };
+      var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate) { if (c.tipo === 'trab' && (c.valor > 0 || c.fixoDia)) n++; if (conta(c)) v += c.valor; } }); return { dias: n, valor: r2(v) }; };
       var q1 = soma(1, 15), q2 = soma(16, dim), mes = soma(1, dim);
       var p = pg[f.id] || {}, pago = { q1: r2(+((p.q1 || {}).valor) || 0), q2: r2(+((p.q2 || {}).valor) || 0) };
       var vfim = vtValorEm(f, dias[dim - 1]) || vtValorEm(f, dias[0]);
-      linhas.push({ id: f.id, nome: f.nome, setorId: f.setorId, ativo: f.ativo, valorDia: vfim ? vfim.total : 0, passagem: vfim ? vfim.valor : 0, qtd: vfim ? vfim.qtd : 0, cel: cel, q1: q1, q2: q2, mes: mes, pago: pago,
+      linhas.push({ id: f.id, nome: f.nome, setorId: f.setorId, ativo: f.ativo, fixo: vfim && vfim.fixo ? { q1: vfim.q1, q2: vfim.q2 } : null, valorDia: vfim ? vfim.total : 0, passagem: vfim ? vfim.valor : 0, qtd: vfim ? vfim.qtd : 0, cel: cel, q1: q1, q2: q2, mes: mes, pago: pago,
         saldo: { q1: r2(q1.valor - pago.q1), q2: r2(q2.valor - pago.q2), mes: r2(mes.valor - pago.q1 - pago.q2) },
         semEscala: cel.filter(function (c) { return c.tipo === 'semEscala'; }).length });
     });
     var tot = function (k) { return r2(linhas.reduce(function (a, l) { return a + l[k].valor; }, 0)); };
-    var porDia = dias.map(function (d, i) { return r2(linhas.reduce(function (a, l) { return a + (l.cel[i].tipo === 'trab' ? l.cel[i].valor : 0); }, 0)); });
+    var porDia = dias.map(function (d, i) { return r2(linhas.reduce(function (a, l) { return a + (l.cel[i].tipo === 'trab' || l.cel[i].fixoQ ? l.cel[i].valor : 0); }, 0)); });
     return { mes: o.mes, dias: dias, dim: dim, linhas: linhas, porDia: porDia, semEscala: semEscala,
       totais: { q1: tot('q1'), q2: tot('q2'), mes: tot('mes'), pago: r2(linhas.reduce(function (a, l) { return a + l.pago.q1 + l.pago.q2; }, 0)) } };
   }
@@ -1626,7 +1635,7 @@ function formFunc(f) {
   <div class="fld"><label class="f">Data de entrada <span class="muted small">(deixe em branco se já trabalha no hotel)</span></label><input type="date" name="dataEntrada" value="${esc(f.dataEntrada || '')}"></div></div>
   <div class="fld"><label class="f">Férias</label><div id="ferLista">${(f.ferias || []).map(feriasRow).join('')}</div><button type="button" class="btn sm" data-x="addFer">${ic('plus')} Adicionar período de férias</button>
   <div class="small muted" style="margin-top:4px">Na semana em que houver férias, o funcionário não recebe folgas; os dias de férias aparecem em vermelho na folha.</div></div>
-  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Vale-transporte: valor da passagem (R$)</label><input type="text" inputmode="decimal" name="vtValor" value="${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v ? brl(v.valor) : ''; })()}" placeholder="não recebe"></div>
+  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Vale-transporte: valor da passagem (R$)</label><input type="text" inputmode="decimal" name="vtValor" value="${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v && !v.fixo ? brl(v.valor) : ''; })()}" placeholder="${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v && v.fixo ? 'fixo por quinzena (edite na aba VT)' : 'não recebe'; })()}" ${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v && v.fixo ? 'disabled' : ''; })()}></div>
   <div class="fld"><label class="f">Passagens por dia</label><input type="text" inputmode="numeric" name="vtQtd" value="${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v ? v.qtd : 1; })()}"></div></div>
   <div class="fld"><label class="f">Observações</label><textarea name="obs" maxlength="1000">${esc(f.obs || '')}</textarea></div>
   ${!S.setores.length ? '<div class="alert w"><span class="ic">!</span><div>Cadastre um setor antes.</div></div>' : ''}
@@ -1652,7 +1661,7 @@ function abrirFormFunc(f) {
     const novo = { nome, setorId, funcao: (fd.get('funcao') || '').trim(), ativo: fd.get('ativo') === '1', dataEntrada: fd.get('dataEntrada') || '', obs: (fd.get('obs') || '').trim(), ferias, criadoEm: (f && f.criadoEm) || agoraISO(), atualizadoEm: agoraISO() };
     const id = (f && f.id) || uid('f');
     // vale-transporte: um novo valor passa a valer a partir do mês atual (os meses anteriores mantêm o valor antigo)
-    const vAnt = C.vtValorEm(f, C.hojeISO()), vS = (fd.get('vtValor') || '').trim(), vV = numBR(vS), vQ = numBR(fd.get('vtQtd') || '1');
+    const vAnt = C.vtValorEm(f, C.hojeISO()), vS = vAnt && vAnt.fixo ? '' : (fd.get('vtValor') || '').trim(), vV = numBR(vS), vQ = numBR(fd.get('vtQtd') || '1');
     let vt = (f && f.vt) || undefined;
     if (vS && !(vV >= 0)) return toast('Valor da passagem inválido.');
     if (vS && !(vQ >= 0 && vQ === Math.round(vQ))) return toast('Passagens por dia: use um número inteiro.');
@@ -2167,9 +2176,10 @@ function vtModelo(ym) { return C.calcularVT({ mes: ym, funcionarios: vtOrdenados
 function vtFaixa(per, dim) { return per === 'q1' ? [1, 15] : per === 'q2' ? [16, dim] : [1, dim]; }
 function vtTituloPer(m, per) { const [a, b] = vtFaixa(per, m.dim); return String(a).padStart(2, '0') + ' A ' + String(b).padStart(2, '0') + '/' + m.mes.slice(5, 7) + '/' + m.mes.slice(0, 4); }
 function vtValorPer(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[vtFaixa(per, m.dim)[1] - 1]); return v ? v.total : l.valorDia; }
+function vtValorTxt(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[vtFaixa(per, m.dim)[1] - 1]); if (v && v.fixo) return 'FIXO ' + (per === 'mes' ? brl(v.q1) + ' + ' + brl(v.q2) : brl(v[per])); const t = v ? v.total : l.valorDia; return t ? 'R$ ' + brl(t) : ''; }
 function vtTot(l, per) { return per === 'mes' ? l.mes : l[per]; }
 function vtPago(l, per) { return per === 'mes' ? l.pago.q1 + l.pago.q2 : l.pago[per]; }
-const vtCelTxt = c => c.tipo === 'trab' ? (c.valor > 0 ? brl(c.valor) : '0,00') : c.cod;
+const vtCelTxt = c => c.fixoQ ? brl(c.valor) + (c.tipo === 'trab' ? '' : ' ' + c.cod) : c.tipo === 'trab' ? (c.valor > 0 ? brl(c.valor) : c.fixoDia ? '•' : '0,00') : c.cod;
 const vtCelTitulo = (l, c) => {
   const base = { trab: 'trabalho', folga: 'folga', ferias: 'férias', semEscala: 'semana sem escala gerada', fora: 'fora do período de trabalho' }[c.base];
   let t = l.nome + ' — ' + C.dataBR(c.d) + ': ' + (c.ajuste ? C.VT_TIPOS[c.ajuste.t].nome + ' (ajuste manual; pela escala: ' + base + ')' : 'pela escala: ' + base);
@@ -2203,7 +2213,7 @@ function vVT() {
   </div>
   <div class="tabs">${[['controle', 'Controle diário'], ['resumo', 'Resumo e fechamento'], ['cadastro', 'Valores por funcionário']].map(([k, t]) => `<button class="${UI.vtTab === k ? 'on' : ''}" data-act="vtTab" data-t="${k}">${t}</button>`).join('')}</div>`;
   // avisos
-  const semValor = S.funcionarios.filter(f => f.ativo && !(C.vtValorEm(f, m.dias[m.dim - 1]) || {}).total && !(f.vt && f.vt.nao));
+  const semValor = S.funcionarios.filter(f => { const v = C.vtValorEm(f, m.dias[m.dim - 1]) || {}; return f.ativo && !v.total && !v.fixo && !(f.vt && f.vt.nao); });
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste mês ainda <b>sem escala</b> (${m.semEscala.map(semanaLabel).join('; ')}). Esses dias aparecem com <b>?</b> e não entram no cálculo. Gere a escala em <a href="#mensal">Escala mensal</a>.</div></div>`;
   if (semValor.length && UI.vtTab !== 'cadastro') h += `<div class="alert w"><span class="ic">!</span><div>Sem valor de vale-transporte cadastrado: <b>${semValor.map(f => esc(f.nome)).join(', ')}</b>. <a href="#" data-act="vtTab" data-t="cadastro">Cadastrar valores</a> (ou marque “não recebe VT”).</div></div>`;
   ['q1', 'q2'].forEach(q => {
@@ -2213,7 +2223,7 @@ function vVT() {
   if (!m.linhas.length && UI.vtTab !== 'cadastro') return h + `<div class="card empty"><b>Ninguém com vale-transporte neste mês</b>Cadastre o valor da passagem de cada funcionário na aba <a href="#" data-act="vtTab" data-t="cadastro">Valores por funcionário</a>.</div>`;
   if (UI.vtTab === 'resumo') return h + vtResumoHTML(m);
   if (UI.vtTab === 'cadastro') return h + vtCadastroHTML(m);
-  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AF</b> afastamento</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><i style="background:#fff;border-color:#e9a23b;border-width:2px"></i>dia ajustado à mão</span></div>
+  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AF</b> afastamento</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><b>•</b> dia trabalhado de quem tem VT fixo por quinzena</span><span><i style="background:#fff;border-color:#e9a23b;border-width:2px"></i>dia ajustado à mão</span></div>
   <p class="small muted edit-only">Toque em um dia para corrigir (falta, afastamento, não precisou de transporte, valor diferente). Toque em <b>PAGO</b> para registrar o pagamento.</p>`;
 }
 
@@ -2225,7 +2235,7 @@ function vtTabelaHTML(m, per) {
   <tr><th colspan="${n + 2}" class="ft2" style="background:#C4D79B;color:#000"><span>${vtTituloPer(m, per)}</span></th></tr>
   <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(l.nome.toUpperCase()))).join('')}<th rowspan="3" class="vtt">TOTAL DO DIA</th></tr>
   <tr>${L.map((l, i) => thN(l, i, `<span class="vts">${esc(nomeSetor(l.setorId).toUpperCase())}</span>`)).join('')}</tr>
-  <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorPer(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorPer(m, l, per) ? rs(vtValorPer(m, l, per)) : 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(l.nome)}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
+  <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorTxt(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorTxt(m, l, per) || 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(l.nome)}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
   </thead><tbody>`;
   const sub = (q, rot) => `<tr class="vtsub"><td class="fnm">${rot}</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${l[q].valor ? brl(l[q].valor) : '-'}</td>`).join('')}<td class="vtt">${brl(L.reduce((a, l) => a + l[q].valor, 0))}</td></tr>`;
   for (let k = ini; k <= fim; k++) {
@@ -2269,7 +2279,7 @@ function vtResumoHTML(m) {
   <div class="tw"><table class="list vtres"><thead><tr><th>Funcionário</th><th>Setor</th><th class="r">Passagem</th><th class="r">Qtd/dia</th><th class="r">Valor diário</th><th class="r">Dias 1ª</th><th class="r">1ª quinzena</th><th class="r">Dias 2ª</th><th class="r">2ª quinzena</th><th class="r">Dias no mês</th><th class="r">Total do mês</th><th class="r">Pago</th><th class="r">Saldo</th></tr></thead><tbody>`;
   m.linhas.forEach(l => {
     const s = l.saldo.mes;
-    h += `<tr><td><b>${esc(l.nome)}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td><td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>
+    h += `<tr><td><b>${esc(l.nome)}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td>${l.fixo ? `<td class="r" colspan="3">fixo: ${rs(l.fixo.q1)} (1ª) + ${rs(l.fixo.q2)} (2ª)</td>` : `<td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>`}
     <td class="r">${l.q1.dias}</td><td class="r">${rs(l.q1.valor)}</td><td class="r">${l.q2.dias}</td><td class="r">${rs(l.q2.valor)}</td><td class="r">${l.mes.dias}</td><td class="r"><b>${rs(l.mes.valor)}</b></td><td class="r">${rs(l.pago.q1 + l.pago.q2)}</td><td class="r" style="color:${s > 0.004 ? 'var(--err)' : s < -0.004 ? 'var(--off)' : 'inherit'};font-weight:700">${rs(s)}</td></tr>`;
   });
   const sm = k => m.linhas.reduce((a, l) => a + k(l), 0);
@@ -2287,7 +2297,7 @@ function vtCadastroHTML(m) {
   fs.forEach(f => {
     const v = C.vtValorEm(f, ref), nao = f.vt && f.vt.nao;
     h += `<tr><td><b>${esc(f.nome)}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td>
-    <td class="r">${v ? rs(v.valor) : '—'}</td><td class="r">${v ? v.qtd : '—'}</td><td class="r"><b>${v ? rs(v.total) : nao ? '<span class="badge b-off">não recebe</span>' : '<span class="badge b-err">não cadastrado</span>'}</b></td>
+    ${v && v.fixo ? `<td class="r" colspan="2">fixo por quinzena</td><td class="r"><b>${rs(v.q1)} + ${rs(v.q2)}</b></td>` : `<td class="r">${v ? rs(v.valor) : '—'}</td><td class="r">${v ? v.qtd : '—'}</td>`}${v && v.fixo ? '' : `<td class="r"><b>${v ? rs(v.total) : nao ? '<span class="badge b-off">não recebe</span>' : '<span class="badge b-err">não cadastrado</span>'}</b></td>`}
     <td>${v ? (v.desde <= '2000-12-31' ? 'sempre' : C.dataBR(v.desde)) : ''}</td><td class="r"><button class="btn sm edit-only" data-act="vtValor" data-id="${f.id}">${ic('edit')} Editar</button></td></tr>`;
   });
   return h + '</tbody></table></div>';
@@ -2335,34 +2345,47 @@ function vtEditarValor(fid) {
   const hist = ((f.vt && f.vt.hist) || []).slice().sort((a, b) => a.desde.localeCompare(b.desde));
   const atual = C.vtValorEm(f, C.hojeISO()) || C.vtValorEm(f, UI.vtMes + '-28') || {};
   const desdePad = hist.length ? UI.vtMes + '-01' : '';
+  const desc = x => (x.desde <= '2000-12-31' ? 'Desde sempre' : 'A partir de ' + C.dataBR(x.desde)) + ': ' + (x.fixo ? 'fixo ' + rs(x.q1) + ' na 1ª quinzena e ' + rs(x.q2) + ' na 2ª' : rs(x.valor) + ' × ' + x.qtd + ' = ' + rs(x.valor * x.qtd) + '/dia');
   const w = abrirModal(`<div class="mh">Vale-transporte — ${esc(f.nome)}</div><div class="mbd">
-  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Valor da passagem (R$)</label><input type="text" inputmode="decimal" id="vtPv" value="${atual.valor != null ? brl(atual.valor) : ''}" placeholder="0,00"></div>
-  <div class="fld"><label class="f">Passagens por dia</label><input type="text" inputmode="numeric" id="vtPq" value="${atual.qtd != null ? atual.qtd : 1}"></div></div>
-  <p>Valor diário: <b id="vtPt">—</b></p>
+  <div class="fld"><label class="f">Forma de cálculo</label><select id="vtModo" style="width:100%"><option value="dia">Por dia trabalhado (pela escala)</option><option value="fixo" ${atual.fixo ? 'selected' : ''}>Valor fixo por quinzena</option></select></div>
+  <div id="bxDia"><div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Valor da passagem (R$)</label><input type="text" inputmode="decimal" id="vtPv" value="${atual.valor ? brl(atual.valor) : ''}" placeholder="0,00"></div>
+  <div class="fld"><label class="f">Passagens por dia</label><input type="text" inputmode="numeric" id="vtPq" value="${atual.qtd || 1}"></div></div>
+  <p>Valor diário: <b id="vtPt">—</b></p></div>
+  <div id="bxFixo"><div class="grid g2" style="gap:12px"><div class="fld"><label class="f">1ª quinzena (R$)</label><input type="text" inputmode="decimal" id="vtF1" value="${atual.fixo ? brl(atual.q1) : ''}" placeholder="0,00"></div>
+  <div class="fld"><label class="f">2ª quinzena (R$)</label><input type="text" inputmode="decimal" id="vtF2" value="${atual.fixo ? brl(atual.q2) : ''}" placeholder="0,00"></div></div>
+  <p class="small muted">Pago inteiro na quinzena em que ele trabalhar pelo menos 1 dia (aparece no dia 15 e no último dia do mês).</p></div>
   <div class="fld"><label class="f">Vale a partir de <span class="muted small">(em branco = desde sempre)</span></label><input type="date" id="vtPd" value="${desdePad}"></div>
   <label class="row" style="gap:8px;margin-bottom:10px"><input type="checkbox" id="vtNao" ${f.vt && f.vt.nao ? 'checked' : ''}> Não recebe vale-transporte</label>
-  ${hist.length ? `<div class="fld"><label class="f">Histórico de valores</label><ul class="list-sm">${hist.map((x, i) => `<li><span>${x.desde <= '2000-12-31' ? 'Desde sempre' : 'A partir de ' + C.dataBR(x.desde)}: ${rs(x.valor)} × ${x.qtd} = <b>${rs(x.valor * x.qtd)}</b>/dia</span><button class="btn icon sm danger" data-x="del" data-i="${i}" title="Remover">${ic('trash')}</button></li>`).join('')}</ul></div>` : ''}
+  ${hist.length ? `<div class="fld"><label class="f">Histórico de valores</label><ul class="list-sm">${hist.map((x, i) => `<li><span>${desc(x)}</span><button class="btn icon sm danger" data-x="del" data-i="${i}" title="Remover">${ic('trash')}</button></li>`).join('')}</ul></div>` : ''}
   </div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
-  const pv = w.querySelector('#vtPv'), pq = w.querySelector('#vtPq'), pt = w.querySelector('#vtPt');
+  const pv = w.querySelector('#vtPv'), pq = w.querySelector('#vtPq'), pt = w.querySelector('#vtPt'), md = w.querySelector('#vtModo');
   const calc = () => { const v = numBR(pv.value), q = numBR(pq.value); pt.textContent = v >= 0 && q >= 0 ? rs(v * q) : '—'; }; calc(); pv.oninput = calc; pq.oninput = calc;
+  const modo = () => { w.querySelector('#bxDia').style.display = md.value === 'dia' ? '' : 'none'; w.querySelector('#bxFixo').style.display = md.value === 'fixo' ? '' : 'none'; }; modo(); md.onchange = modo;
   w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
   w.querySelectorAll('[data-x=del]').forEach(b => b.onclick = async () => {
-    const x = hist[+b.dataset.i]; if (!await confirmar('Remover valor?', `<p>Remover o valor de ${rs(x.valor)} × ${x.qtd} (${x.desde <= '2000-12-31' ? 'desde sempre' : 'a partir de ' + C.dataBR(x.desde)})? Os meses que usavam esse valor serão recalculados.</p>`, 'Remover', true)) return;
+    const x = hist[+b.dataset.i]; if (!await confirmar('Remover valor?', `<p>Remover “${esc(desc(x))}”? Os meses que usavam esse valor serão recalculados.</p>`, 'Remover', true)) return;
     const nh = hist.filter((y, i) => i !== +b.dataset.i);
     try { await Store.set('funcionarios', f.id, Object.assign({}, f, { vt: Object.assign({}, f.vt, { hist: nh }), atualizadoEm: agoraISO() })); log('vt', 'Valor de VT removido: ' + f.nome); fecharModal(w); } catch (e) { }
   });
   w.querySelector('[data-x=s]').onclick = async () => {
-    const nao = w.querySelector('#vtNao').checked;
-    const v = numBR(pv.value), q = numBR(pq.value), desde = w.querySelector('#vtPd').value || '2000-01-01';
-    let nh = hist;
-    if (!nao || pv.value.trim()) {
-      if (!(v >= 0)) return toast('Informe o valor da passagem.');
-      if (!(q >= 0) || q !== Math.round(q)) return toast('Passagens por dia: use um número inteiro.');
-      nh = hist.filter(x => x.desde !== desde).concat([{ desde, valor: Math.round(v * 100) / 100, qtd: q }]).sort((a, b) => a.desde.localeCompare(b.desde));
+    const nao = w.querySelector('#vtNao').checked, desde = w.querySelector('#vtPd').value || '2000-01-01';
+    let nh = hist, ent = null;
+    if (!nao) {
+      if (md.value === 'fixo') {
+        const a = numBR(w.querySelector('#vtF1').value), b = numBR(w.querySelector('#vtF2').value);
+        if (!(a >= 0) || !(b >= 0)) return toast('Informe o valor das duas quinzenas.');
+        ent = { desde, fixo: true, q1: Math.round(a * 100) / 100, q2: Math.round(b * 100) / 100 };
+      } else {
+        const v = numBR(pv.value), q = numBR(pq.value);
+        if (!(v >= 0)) return toast('Informe o valor da passagem.');
+        if (!(q >= 0) || q !== Math.round(q)) return toast('Passagens por dia: use um número inteiro.');
+        ent = { desde, valor: Math.round(v * 100) / 100, qtd: q };
+      }
+      nh = hist.filter(x => x.desde !== desde).concat([ent]).sort((a, b) => a.desde.localeCompare(b.desde));
     }
     try {
       await Store.set('funcionarios', f.id, Object.assign({}, f, { vt: { hist: nh, nao }, atualizadoEm: agoraISO() }));
-      log('vt', 'Vale-transporte de ' + f.nome + ': ' + (nao ? 'não recebe' : rs(v) + ' × ' + q + ' = ' + rs(v * q) + '/dia' + (desde > '2000-12-31' ? ' a partir de ' + C.dataBR(desde) : '')));
+      log('vt', 'Vale-transporte de ' + f.nome + ': ' + (nao ? 'não recebe' : desc(ent)));
       fecharModal(w); toast('Valor salvo.');
     } catch (e) { }
   };
@@ -2428,7 +2451,7 @@ async function vtPDF(per, imprimir) {
     [{ content: 'VALE TRANSPORTE  ' + vtTituloPer(m, per), colSpan: n + 2, styles: { fontSize: 13, fillColor: verde } }],
     [{ content: 'DATA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }].concat(L.map((l, i) => hc(l.nome.toUpperCase(), i))).concat([{ content: 'TOTAL DO DIA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }]),
     L.map((l, i) => hc(nomeSetor(l.setorId).toUpperCase(), i, { textColor: azul, fontStyle: 'normal', fontSize: 5.5 })),
-    L.map((l, i) => hc(vtValorPer(m, l, per) ? 'R$ ' + brl(vtValorPer(m, l, per)) : '-', i, { textColor: azul, fontStyle: 'normal' }))
+    L.map((l, i) => hc(vtValorTxt(m, l, per) || '-', i, { textColor: azul, fontStyle: 'normal' }))
   ];
   const body = [], linhaSub = (q, rot) => [{ content: rot, styles: { fillColor: verde } }].concat(L.map((l, i) => hc(l[q].valor ? brl(l[q].valor) : '-', i))).concat([{ content: brl(L.reduce((a, l) => a + l[q].valor, 0)), styles: { fillColor: verde } }]);
   for (let k = ini; k <= fim; k++) {
@@ -2480,13 +2503,13 @@ async function vtExcel() {
     const c = i + 2, f = fill(VT_COR[i % 2]);
     cel(2, c, l.nome.toUpperCase(), { fill: f, font: { name: 'Calibri', bold: true, size: 10 }, alignment: Object.assign({ wrapText: true }, center) });
     cel(3, c, nomeSetor(l.setorId).toUpperCase(), { fill: f, font: { name: 'Calibri', size: 8, color: { argb: 'FF1F4EA0' } } });
-    cel(4, c, l.valorDia, { fill: f, numFmt: '"R$" #,##0.00', font: { name: 'Calibri', size: 9, color: { argb: 'FF1F4EA0' } } });
+    cel(4, c, l.fixo ? 'FIXO ' + brl(l.fixo.q1) + ' + ' + brl(l.fixo.q2) : l.valorDia, { fill: f, numFmt: '"R$" #,##0.00', font: { name: 'Calibri', size: 9, color: { argb: 'FF1F4EA0' } } });
   });
   const r0 = 5; let r = r0; const linhaQ = {};
   m.dias.forEach((d, k) => {
     const fer = feriadoEm(d);
     cel(r, 1, (k + 1) + ' ' + C.DIAS_CURTO[C.diaSemana(d)].toUpperCase(), { alignment: { horizontal: 'left', vertical: 'middle' }, fill: fer ? fill(COR_FERIADO) : undefined, font: { name: 'Calibri', bold: true, size: 10 } });
-    L.forEach((l, i) => { const c = l.cel[k]; cel(r, i + 2, c.tipo === 'trab' ? (c.valor > 0 ? c.valor : null) : (c.cod || null), { fill: fill(c.tipo === 'ferias' ? COR_FERIAS : VT_COR[i % 2]), numFmt: moeda, font: { name: 'Calibri', size: 10, bold: c.tipo !== 'trab', color: { argb: c.tipo === 'trab' ? 'FF000000' : 'FF6E6E6E' } } }); });
+    L.forEach((l, i) => { const c = l.cel[k]; cel(r, i + 2, c.fixoQ || c.tipo === 'trab' ? (c.valor > 0 ? c.valor : null) : (c.cod || null), { fill: fill(c.tipo === 'ferias' ? COR_FERIAS : VT_COR[i % 2]), numFmt: moeda, font: { name: 'Calibri', size: 10, bold: c.tipo !== 'trab', color: { argb: c.tipo === 'trab' ? 'FF000000' : 'FF6E6E6E' } } }); });
     cel(r, nc, { formula: `SUM(B${r}:${colL(nc - 1)}${r})`, result: m.porDia[k] }, { numFmt: moeda, font: { name: 'Calibri', bold: true, size: 10 } });
     if (k === 14) linhaQ.q1f = r;
     r++;

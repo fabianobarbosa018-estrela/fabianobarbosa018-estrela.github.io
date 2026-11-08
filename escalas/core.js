@@ -680,6 +680,7 @@
     var h = (func && func.vt && func.vt.hist) || [], r = null;
     for (var i = 0; i < h.length; i++) if (h[i].desde <= dataISO && (!r || h[i].desde >= r.desde)) r = h[i];
     if (!r) return null;
+    if (r.fixo) return { fixo: true, q1: +r.q1 || 0, q2: +r.q2 || 0, valor: 0, qtd: 0, total: 0, desde: r.desde };
     var v = +r.valor || 0, q = r.qtd == null || r.qtd === '' ? 1 : +r.qtd;
     return { valor: v, qtd: q, total: Math.round(v * q * 100) / 100, desde: r.desde };
   }
@@ -705,7 +706,7 @@
     (o.funcionarios || []).forEach(function (f) {
       var naEscala = sems.some(function (s) { return escalas[s] && escalas[s].atribuicoes && escalas[s].atribuicoes[f.id]; });
       var temAj = aj[f.id] && Object.keys(aj[f.id]).some(function (d) { return d.slice(0, 7) === o.mes; });
-      var temValor = dias.some(function (d) { var v = vtValorEm(f, d); return v && v.total > 0; });
+      var temValor = dias.some(function (d) { var v = vtValorEm(f, d); return v && (v.total > 0 || (v.fixo && (v.q1 > 0 || v.q2 > 0))); });
       if (!temAj && !(temValor && (f.ativo || naEscala))) return;
       if (f.dataEntrada && f.dataEntrada > dias[dim - 1] && !temAj) return;
       var cel = dias.map(function (d) {
@@ -714,20 +715,28 @@
         var base = (st === 'T' || st === 'X') ? 'trab' : st === 'F' ? 'folga' : st === 'V' ? 'ferias' : (!e && f.ativo && !(f.dataEntrada && d < f.dataEntrada)) ? 'semEscala' : 'fora';
         var a = aj[f.id] && aj[f.id][d], tipo = a && VT_TIPOS[a.t] ? a.t : base;
         var vd = vtValorEm(f, d), valor = 0;
-        if (tipo === 'trab') valor = a && a.t === 'trab' && a.v != null && a.v !== '' ? +a.v : (vd ? vd.total : 0);
+        if (tipo === 'trab') valor = a && a.t === 'trab' && a.v != null && a.v !== '' ? +a.v : (vd && !vd.fixo ? vd.total : 0);
         var cod = tipo === 'trab' ? '' : tipo === 'ferias' ? 'FÉR' : tipo === 'semEscala' ? '?' : tipo === 'fora' ? '' : VT_TIPOS[tipo].cod;
-        return { d: d, base: base, tipo: tipo, valor: r2(valor), cod: cod, ajuste: a || null };
+        return { d: d, base: base, tipo: tipo, valor: r2(valor), cod: cod, ajuste: a || null, fixoDia: !!(vd && vd.fixo) };
       });
-      var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate && c.tipo === 'trab' && c.valor > 0) { n++; v += c.valor; } }); return { dias: n, valor: r2(v) }; };
+      // valor fixo por quinzena: lançado no último dia da quinzena (dia 15 e último dia do mês), se trabalhou ao menos 1 dia nela
+      [[1, 15, 'q1'], [16, dim, 'q2']].forEach(function (q) {
+        var vq = vtValorEm(f, dias[q[1] - 1]); if (!vq || !vq.fixo || !(vq[q[2]] > 0)) return;
+        var trabalhou = cel.some(function (c, i) { return i + 1 >= q[0] && i + 1 <= q[1] && c.tipo === 'trab'; });
+        if (!trabalhou) return;
+        var c = cel[q[1] - 1]; c.fixoQ = vq[q[2]]; c.valor = r2(c.valor + vq[q[2]]);
+      });
+      var conta = function (c) { return c.tipo === 'trab' || c.fixoQ; };
+      var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate) { if (c.tipo === 'trab' && (c.valor > 0 || c.fixoDia)) n++; if (conta(c)) v += c.valor; } }); return { dias: n, valor: r2(v) }; };
       var q1 = soma(1, 15), q2 = soma(16, dim), mes = soma(1, dim);
       var p = pg[f.id] || {}, pago = { q1: r2(+((p.q1 || {}).valor) || 0), q2: r2(+((p.q2 || {}).valor) || 0) };
       var vfim = vtValorEm(f, dias[dim - 1]) || vtValorEm(f, dias[0]);
-      linhas.push({ id: f.id, nome: f.nome, setorId: f.setorId, ativo: f.ativo, valorDia: vfim ? vfim.total : 0, passagem: vfim ? vfim.valor : 0, qtd: vfim ? vfim.qtd : 0, cel: cel, q1: q1, q2: q2, mes: mes, pago: pago,
+      linhas.push({ id: f.id, nome: f.nome, setorId: f.setorId, ativo: f.ativo, fixo: vfim && vfim.fixo ? { q1: vfim.q1, q2: vfim.q2 } : null, valorDia: vfim ? vfim.total : 0, passagem: vfim ? vfim.valor : 0, qtd: vfim ? vfim.qtd : 0, cel: cel, q1: q1, q2: q2, mes: mes, pago: pago,
         saldo: { q1: r2(q1.valor - pago.q1), q2: r2(q2.valor - pago.q2), mes: r2(mes.valor - pago.q1 - pago.q2) },
         semEscala: cel.filter(function (c) { return c.tipo === 'semEscala'; }).length });
     });
     var tot = function (k) { return r2(linhas.reduce(function (a, l) { return a + l[k].valor; }, 0)); };
-    var porDia = dias.map(function (d, i) { return r2(linhas.reduce(function (a, l) { return a + (l.cel[i].tipo === 'trab' ? l.cel[i].valor : 0); }, 0)); });
+    var porDia = dias.map(function (d, i) { return r2(linhas.reduce(function (a, l) { return a + (l.cel[i].tipo === 'trab' || l.cel[i].fixoQ ? l.cel[i].valor : 0); }, 0)); });
     return { mes: o.mes, dias: dias, dim: dim, linhas: linhas, porDia: porDia, semEscala: semEscala,
       totais: { q1: tot('q1'), q2: tot('q2'), mes: tot('mes'), pago: r2(linhas.reduce(function (a, l) { return a + l.pago.q1 + l.pago.q2; }, 0)) } };
   }
