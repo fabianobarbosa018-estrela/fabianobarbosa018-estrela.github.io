@@ -202,11 +202,20 @@ export function criarServidor(io) {
   // ---------- Desafio diário ----------
   const ACOES_DESAFIO = ['alunoDados', 'desafioHoje', 'desafioHistorico', 'profPainel', 'desafioPainel', 'atividades'];
   const DISC_BANCO = { portugues: 'Português', matematica: 'Matemática', historia: 'História', geografia: 'Geografia', educacao_fisica: 'Educação Física', fisica: 'Física', quimica: 'Química', ciencias_biologia: 'Biologia' };
-  const COTAS = { 'Português': 7, 'Matemática': 7, 'História': 6, 'Geografia': 6, 'Educação Física': 6, 'Física': 6, 'Química': 6, 'Biologia': 6 };
+  const COTAS_50 = { 'Português': 7, 'Matemática': 7, 'História': 6, 'Geografia': 6, 'Educação Física': 6, 'Física': 6, 'Química': 6, 'Biologia': 6 };
+  // anos iniciais (1º ao 3º ano): prova menor, só com assuntos e questões mais fáceis
+  const COTAS_20 = { 'Português': 4, 'Matemática': 4, 'História': 2, 'Geografia': 2, 'Educação Física': 2, 'Física': 2, 'Química': 2, 'Biologia': 2 };
+  const cotasDe = nv => nv === 'F1I' ? COTAS_20 : COTAS_50;
+  const totalDe = nv => nv === 'F1I' ? 20 : 50;
+  const ASSUNTOS_INICIAIS = ['Interpretação de texto: fábula', 'Gramática: substantivo e adjetivo', 'Quatro operações', 'Raciocínio lógico: sequências e padrões', 'Cultura e sociedade: povos indígenas e matriz africana',
+    'Minha história: família, comunidade e tempo', 'Regiões brasileiras', 'Continentes e países', 'Meio ambiente e sustentabilidade', 'Jogos e brincadeiras populares', 'Danças', 'Ciências: luz, sombra e som',
+    'Ciências: misturas e transformações no dia a dia', 'Cadeia e teia alimentar', 'Seres vivos, ambiente e cuidados com o corpo'];
+  const COTAS = COTAS_50;
   const ORDEM_DISC = Object.keys(COTAS);
   const ORDEM_DISCURSIVA = ['Português', 'História', 'Biologia', 'Geografia', 'Matemática', 'Física', 'Química', 'Educação Física'];
-  const ELEGIVEIS = { F1: ['F1'], F2: ['F2', 'F1'], EM: ['EM', 'F2'] };
-  const NIVEL_DESC = { F1: 'Ensino Fundamental I (crianças de 6 a 10 anos, 1º ao 5º ano): linguagem simples, frases curtas, números pequenos; em Física e Química use Ciências do cotidiano (luz, som, água, misturas)',
+  const ELEGIVEIS = { F1I: ['F1'], F1: ['F1'], F2: ['F2', 'F1'], EM: ['EM', 'F2'] };
+  const NIVEL_DESC = { F1I: 'anos iniciais do Ensino Fundamental (crianças de 6 a 8 anos, 1º ao 3º ano, em alfabetização): frases bem curtas, palavras simples, números até 100 (somar e subtrair), nada de frações, tabuada difícil ou textos longos; em Física e Química use Ciências do cotidiano',
+    F1: 'Ensino Fundamental I (crianças de 6 a 10 anos, 1º ao 5º ano): linguagem simples, frases curtas, números pequenos; em Física e Química use Ciências do cotidiano (luz, som, água, misturas)',
     F2: 'Ensino Fundamental II (11 a 14 anos, 6º ao 9º ano): conteúdos do Fundamental II segundo a BNCC; nada de conteúdo exclusivo do Ensino Médio; em Física e Química use Ciências introdutórias',
     EM: 'Ensino Médio (15 a 17 anos): conteúdos do Ensino Médio e do ENEM' };
   function hashQ(txt) {
@@ -216,7 +225,7 @@ export function criarServidor(io) {
   }
   const normaliza = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   function discCanonica(d) { const n = normaliza(d); return ORDEM_DISC.find(x => n.indexOf(normaliza(x).slice(0, 6)) === 0 || (n.indexOf('ciencia') === 0 && x === 'Biologia')) || ''; }
-  function cotasDiscursivas(total) { const o = {}; ORDEM_DISCURSIVA.slice(0, total).forEach(d => { o[d] = 1; }); return o; }
+  function cotasDiscursivas(total, nv) { const o = {}; ORDEM_DISCURSIVA.slice(0, nv === 'F1I' ? Math.min(total, 1) : total).forEach(d => { o[d] = 1; }); return o; }
   async function comPrazo(p, ms) { let t; const lim = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('tempo esgotado')), ms); }); try { return await Promise.race([p, lim]); } finally { clearTimeout(t); } }
   // chamada genérica à IA que devolve JSON
   async function iaJson(provedor, sistema, texto, maxTokens, modo) {
@@ -268,6 +277,7 @@ export function criarServidor(io) {
     return o;
   }
   async function gerarLoteIA(est, nivel, discs, discursivas, sugestoes) {
+    const COTAS = cotasDe(nivel);
     const total = discs.reduce((s, d) => s + COTAS[d], 0);
     const evitarAssuntos = (est.assuntos[nivel] || []).slice(0, 60);
     const txt = 'Crie EXATAMENTE ' + total + ' questões NOVAS e ORIGINAIS para o desafio diário de estudantes de ' + NIVEL_DESC[nivel] + '.\n' +
@@ -297,10 +307,11 @@ export function criarServidor(io) {
     const fora = new Set(j.reprovadas.map(x => Number(x && x.i)));
     return qs.filter((q, i) => !fora.has(i));
   }
+  const assuntoServe = (nivel, a) => ELEGIVEIS[nivel].indexOf(a.n) >= 0 && (nivel !== 'F1I' || ASSUNTOS_INICIAIS.indexOf(a.a) >= 0);
   function sugestoesAssuntos(B, nivel, evitar) {
     const o = {};
     B.disciplinas.forEach(d => { const nome = DISC_BANCO[d.id]; if (!nome) return;
-      o[nome] = embaralhar(d.assuntos.filter(a => ELEGIVEIS[nivel].indexOf(a.n) >= 0 && evitar.indexOf(a.a) < 0).map(a => a.a.split(':')[0])).slice(0, 3); });
+      o[nome] = embaralhar(d.assuntos.filter(a => assuntoServe(nivel, a) && evitar.indexOf(a.a) < 0).map(a => a.a.split(':')[0])).slice(0, 3); });
     return o;
   }
   // reserva: questões do Banco de Atividades, priorizando as que não foram usadas há mais tempo
@@ -309,8 +320,8 @@ export function criarServidor(io) {
     ORDEM_DISC.forEach(disc => {
       const D = B.disciplinas.find(x => DISC_BANCO[x.id] === disc); if (!D) return;
       const cand = [];
-      D.assuntos.forEach(a => { const pri = ELEGIVEIS[nivel].indexOf(a.n); if (pri < 0) return;
-        a.q.forEach(q => { const h = hashQ(q[2]); if (jaUsadas.has(h)) return; cand.push({ q: q, a: a, h: h, uso: uso[h] || '', pri: pri, r: Math.random() }); }); });
+      D.assuntos.forEach(a => { const pri = ELEGIVEIS[nivel].indexOf(a.n); if (pri < 0 || !assuntoServe(nivel, a)) return;
+        a.q.forEach(q => { const h = hashQ(q[2]); if (jaUsadas.has(h)) return; if (nivel === 'F1I' && (q[1] > 2 || /fra[çc][ãa]o|×\s*[6-9]|[6-9]\s*×/.test(q[2]))) return; cand.push({ q: q, a: a, h: h, uso: uso[h] || '', pri: pri, r: Math.random() }); }); });
       cand.sort((x, y) => (x.uso < y.uso ? -1 : x.uso > y.uso ? 1 : 0) || (x.pri - y.pri) || (x.r - y.r));
       const pegar = (filtro, n) => { const sel = []; for (const c of cand) { if (sel.length >= n) break; if (!c.usado && filtro(c.q)) { c.usado = 1; sel.push(c); } } return sel; };
       const nd = faltaDisc[disc] || 0; const no = Math.max(0, (falta[disc] || 0) - nd);
@@ -324,7 +335,8 @@ export function criarServidor(io) {
     return out;
   }
   async function montarNivel(est, nivel, B, usarIA) {
-    const discTot = cotasDiscursivas(est.discursivas);
+    const COTAS = cotasDe(nivel), DESAFIO_TOTAL = totalDe(nivel);
+    const discTot = cotasDiscursivas(est.discursivas, nivel);
     const evitar = new Set(Object.keys(est.uso[nivel] || {}).filter(h => (est.uso[nivel][h] || '') >= new Date(Date.now() - 3 * 3600e3 - 30 * 864e5).toISOString().slice(0, 10)));
     let ia = []; let motivo = '';
     if (usarIA) {
@@ -360,7 +372,7 @@ export function criarServidor(io) {
     todas.sort((x, y) => (ORDEM_DISC.indexOf(x.disciplina) - ORDEM_DISC.indexOf(y.disciplina)) || (ordemT[x.tipo] - ordemT[y.tipo]));
     const assuntos = [...new Set(todas.map(q => q.assunto).filter(Boolean))];
     todas.forEach(q => { delete q._h; delete q.assunto; delete q.dificuldade; });
-    return { questoes: todas.slice(0, DESAFIO_TOTAL), origem: deIA >= 45 ? 'ia' : deIA > 0 ? 'ia+banco' : 'banco', deIA: deIA, assuntos: assuntos, motivo: motivo };
+    return { questoes: todas.slice(0, DESAFIO_TOTAL), origem: deIA >= DESAFIO_TOTAL * 0.9 ? 'ia' : deIA > 0 ? 'ia+banco' : 'banco', deIA: deIA, assuntos: assuntos, motivo: motivo };
   }
   const DESAFIO_TOTAL = 50;
   // prepara os desafios pendentes de hoje; usarIA=false usa só a reserva (instantâneo)

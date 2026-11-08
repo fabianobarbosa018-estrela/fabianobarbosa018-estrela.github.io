@@ -97,20 +97,21 @@ t('desafio antigo não pesa no carregamento', !(await q("select sd_carregar() d"
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");
 const novaTurma = async (nome, serie) => { const x = (await api(P, 'turmaSalvar', { nome, serie })).d; await q("insert into sd_matriculas(id, data) values ($1, jsonb_build_object('id',$1::text,'turmaId',$2::text,'alunoId',$3::text,'status','aprovado','criadoEm',1))", ['m' + x.id, x.id, (await api(A, 'eu')).d.usuario.id]); return x; };
 const tF1 = await novaTurma('3º ano B', '3º ano'); const tEM = await novaTurma('2º ano Médio', '2º ano do Ensino Médio'); const tInf = await novaTurma('Infantil', 'Educação Infantil');
-r = await api(P, 'desafioPainel'); t('níveis por série: F1, EM e Infantil sem desafio', r.d.turmas.find(x => x.id === tF1.id).nivel === 'F1' && r.d.turmas.find(x => x.id === tEM.id).nivel === 'EM' && r.d.turmas.find(x => x.id === tInf.id).nivel === 'INF', r.d.turmas);
+r = await api(P, 'desafioPainel'); t('níveis por série: anos iniciais, EM e Infantil sem desafio', r.d.turmas.find(x => x.id === tF1.id).nivel === 'F1I' && r.d.turmas.find(x => x.id === tEM.id).nivel === 'EM' && r.d.turmas.find(x => x.id === tInf.id).nivel === 'INF', r.d.turmas);
 const E2iaAntes = E.ia.chamadas.length;
 E.ia.resposta = () => ({ status: 429, corpo: { error: { status: 'RESOURCE_EXHAUSTED', message: 'quota' } } });
-r = await api(P, 'desafioGerarAgora'); t('IA falhou: usa a reserva do banco e ninguém fica sem desafio', r.ok && r.d.preparados.length === 3 && r.d.preparados.every(p => p.questoes === 50 && p.origem === 'banco'), r.d);
+r = await api(P, 'desafioGerarAgora'); t('IA falhou: usa a reserva do banco e ninguém fica sem desafio', r.ok && r.d.preparados.length === 3 && r.d.preparados.every(p => p.questoes === (p.nivel === 'F1I' ? 20 : 50) && p.origem === 'banco'), r.d);
 const ds = (await q("select data from sd_atividades where data->>'tipo' = 'desafio'")).map(x => x.data);
-const F1 = ds.find(a => a.desafio.nivel === 'F1'), F2 = ds.find(a => a.desafio.nivel === 'F2'), EM = ds.find(a => a.desafio.nivel === 'EM');
+const F1 = ds.find(a => a.desafio.nivel === 'F1I'), F2 = ds.find(a => a.desafio.nivel === 'F2'), EM = ds.find(a => a.desafio.nivel === 'EM');
 t('um desafio para cada nível', F1 && F2 && EM && F1.turmas.includes(tF1.id) && EM.turmas.includes(tEM.id));
 const fs = await import('fs'); const crypto = await import('crypto');
 // confere os níveis das questões da reserva com o banco original
 const banco = {}; for (const f of fs.readdirSync('/home/claude/supa/banco')) { const L = JSON.parse(fs.readFileSync('/home/claude/supa/banco/' + f, 'utf8')); L.forEach(a => a.q.forEach(x => { banco[x[2]] = a.n; })); }
-t('Fund. I recebe só questões do Fund. I', F1.questoes.every(x => banco[x.enunciado] === 'F1'), F1.questoes.map(x => banco[x.enunciado]));
+t('Anos iniciais: só questões do Fund. I', F1.questoes.every(x => banco[x.enunciado] === 'F1'), F1.questoes.map(x => banco[x.enunciado]));
+t('Anos iniciais: prova de 20, fácil, sem frações e com 1 discursiva', F1.questoes.length === 20 && !F1.questoes.some(x => /fração|frações/i.test(x.enunciado)) && F1.questoes.filter(x => x.tipo === 'disc').length === 1, F1.questoes.map(x => x.enunciado));
 t('Fund. II não recebe questões do Ensino Médio', F2.questoes.every(x => banco[x.enunciado] !== 'EM'));
 t('Ensino Médio não recebe questões do Fund. I', EM.questoes.every(x => banco[x.enunciado] !== 'F1'));
-t('reserva também tem as 8 disciplinas', ['F1', 'F2', 'EM'].every(n => new Set(ds.find(a => a.desafio.nivel === n).questoes.map(x => x.disciplina)).size === 8));
+t('reserva também tem as 8 disciplinas', ['F1I', 'F2', 'EM'].every(n => new Set(ds.find(a => a.desafio.nivel === n).questoes.map(x => x.disciplina)).size === 8));
 t('reserva com discursivas', F2.questoes.filter(x => x.tipo === 'disc').length === 3);
 // não repete: simula o dia seguinte
 const usadosOntem = new Set(F2.questoes.map(x => x.enunciado));

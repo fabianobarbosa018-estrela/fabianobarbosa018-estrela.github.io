@@ -7,8 +7,8 @@ TAB.DesafioHist = ['id', 'alunoId', 'professorId', 'atividadeId', 'dia', 'nivel'
 Object.assign(CFG_PADRAO, { desafioAtivo: true, desafioIA: true, desafioAbertura: '06:00', desafioEncerramento: '23:00', desafioDiasPrazo: 0,
   desafioLiberar: 'encerramento', desafioDiscursivas: 3, desafioNivelPadrao: 'F2', desafioPlacar: true, desafioDuracaoMin: 0, desafioDiasSemana: [0, 1, 2, 3, 4, 5, 6] });
 const DESAFIO_N = 50;
-const DESAFIO_NIVEIS = { F1: 'Ensino Fundamental I', F2: 'Ensino Fundamental II', EM: 'Ensino Médio' };
-const DESAFIO_CURTO = { F1: 'Fund. I', F2: 'Fund. II', EM: 'Médio' };
+const DESAFIO_NIVEIS = { F1I: 'Anos iniciais (1º ao 3º ano)', F1: 'Ensino Fundamental I', F2: 'Ensino Fundamental II', EM: 'Ensino Médio' };
+const DESAFIO_CURTO = { F1I: 'Anos iniciais', F1: 'Fund. I', F2: 'Fund. II', EM: 'Médio' };
 const DESAFIO_DISC = ['Português', 'Matemática', 'História', 'Geografia', 'Educação Física', 'Física', 'Química', 'Biologia'];
 
 function diaLocal_(t) { return new Date((t || agora_()) - 3 * 3600e3).toISOString().slice(0, 10); }
@@ -25,8 +25,9 @@ function nivelSerie_(serie) {
   if (/medio|\bem\b|\be\.m\b/.test(s)) return 'EM';
   const n = Number((/(\d{1,2})/.exec(s) || [])[1]);
   if (!n) return '';
-  if (/serie/.test(s)) return n <= 4 ? 'F1' : n <= 8 ? 'F2' : '';
-  if (n >= 1 && n <= 5) return 'F1';
+  if (/serie/.test(s)) return n <= 2 ? 'F1I' : n <= 4 ? 'F1' : n <= 8 ? 'F2' : '';
+  if (n >= 1 && n <= 3) return 'F1I';
+  if (n >= 4 && n <= 5) return 'F1';
   if (n >= 6 && n <= 9) return 'F2';
   return '';
 }
