@@ -1064,6 +1064,9 @@ rota_('bancoMontar', PROF, true, (u, d) => {
   log_(u, 'banco_montar', disc + ': ' + assuntos.length + ' assunto(s), ' + qtd + ' questões');
   return { __banco: { acao: 'montar', chave: chave, disciplina: disc, assuntos: assuntos, tipos: tipos, quantidade: qtd, dificuldade: dif, incluirTexto: d.incluirTexto !== false } };
 });
+// Biblioteca de estudos do aluno: só os textos de apoio (sem questões, sem gabarito)
+rota_('bibliotecaIndice', ALU, false, () => ({ __banco: { acao: 'indice', chave: bancoChave_() } }));
+rota_('bibliotecaTexto', ALU, false, (u, d) => ({ __banco: { acao: 'texto', chave: bancoChave_(), disciplina: txt_(d.disciplina, 40), assunto: Number(d.assunto) } }));
 
 /* =================== DESAFIO DIÁRIO =================== */
 // Todos os dias o servidor prepara um desafio de 50 questões para cada nível de ensino (Fundamental I,

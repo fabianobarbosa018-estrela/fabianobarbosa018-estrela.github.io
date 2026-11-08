@@ -75,5 +75,10 @@ const pedido = JSON.stringify(E.ia.chamadas[E.ia.chamadas.length - 1]);
 t('pedido leva assunto, nível e regra de texto original', /Frações/.test(pedido) && /Fundamental I/.test(pedido) && /ORIGINAL/.test(pedido), pedido.slice(0, 300));
 r = await api(P, 'iaGerarQuestoes', { assunto: 'Cores e formas', nivelEnsino: 'infantil', quantidade: 5, tipos: ['mc'] });
 t('IA atende Educação Infantil', r.ok && /Educação Infantil/.test(JSON.stringify(E.ia.chamadas[E.ia.chamadas.length - 1])), r);
+// Biblioteca de estudos do aluno: só textos, nunca questões nem gabarito
+r = await api(A, 'bibliotecaIndice'); t('aluno abre a biblioteca', r.ok && r.d.disciplinas.length === 8, r);
+t('biblioteca sem questões nem gabarito', !/correta|explicacao|"q"/.test(JSON.stringify(r.d)));
+r = await api(A, 'bibliotecaTexto', { disciplina: 'geografia', assunto: 2 }); t('aluno lê um texto', r.ok && r.d.texto.length > 150 && !('q' in r.d), r);
+r = await api(P, 'bibliotecaTexto', { disciplina: 'geografia', assunto: 2 }); t('rota da biblioteca é do aluno', !r.ok);
 console.log(`Banco: ${ok} ok, ${falhas} falhas — ${totalQ} questões conferidas`);
 E.restaurarConsole(); process.exit(falhas ? 1 : 0);
