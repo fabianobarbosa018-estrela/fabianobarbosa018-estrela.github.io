@@ -13,7 +13,7 @@ async def main():
             await p.click('#nav [data-go=perfil]'); await p.click('[data-a=sair]'); await p.wait_for_selector('#fLogin')
         await p.goto(U); await p.wait_for_selector('#fLogin'); await p.screenshot(path='/tmp/t1.png')
         await login('aluno','Aluno@2026'); print('aluno:', (await p.inner_text('#main h1')))
-        await p.click('#nav [data-go=a_atividades]'); await p.wait_for_selector('#main .it')
+        await p.click('#nav [data-go=a_atividades]'); await p.click('[data-go=a_lista]'); await p.wait_for_selector('#main .list .it')
         await p.click('#main .it >> text=Mesopotâmia'); await p.wait_for_selector('.savebar')
         for i,v in enumerate([1,2,0,1]): await p.check(f'input[name="r{i}"][value="{v}"]')
         await p.fill('textarea[data-q="4"]','Davam água para plantar, irrigação e transporte.')

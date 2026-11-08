@@ -122,7 +122,7 @@ async function navegarTudo(B, nome) {
   t('atividade publicada e tela de entregas', /Prova de Ciências/.test(P.txt('#main')) && /0\/2/.test(P.txt('#main')), P.txt('#main').slice(0, 300) + P.txt('#edErr'));
 
   // ---------- ALUNO RESPONDE ----------
-  B.click('#nav [data-go="a_atividades"]'); await B.espera(() => /Prova de Ciências/.test(B.txt('#main')));
+  B.click('#nav [data-go="a_atividades"]'); await B.espera(() => B.$('[data-go="a_lista"]')); B.click('[data-go="a_lista"]'); await B.espera(() => /Prova de Ciências/.test(B.txt('#main')));
   t('aluno vê a nova prova', /Prova de Ciências/.test(B.txt('#main')));
   B.click(B.byText('#main .it', /Prova de Ciências/)); await B.espera(() => B.$('.savebar'));
   t('texto de apoio exibido', /a água evapora/.test(B.txt('#main')));
@@ -137,8 +137,10 @@ async function navegarTudo(B, nome) {
   await B.espera(() => B.$('#fotos2 [data-a="rmFoto"]'));
   t('foto enviada e com pré-visualização', !!B.$('#fotos2 img') && !!B.$('#fotos2 [data-a="rmFoto"]'));
   // reabrir mantém rascunho
-  B.click('#nav [data-go="a_inicio"]'); await B.espera(() => /Próximas entregas/.test(B.txt('#main')));
-  t('início mostra em andamento', /Em andamento/.test(B.txt('#main')));
+  B.click('#nav [data-go="a_inicio"]'); await B.espera(() => B.$('[data-go="a_lista"]'));
+  t('início mostra as pendências do professor num único link', /Atividades do professor/.test(B.txt('#main')) && !B.$$('#main .list .it').length);
+  B.click('[data-go="a_lista"]'); await B.espera(() => /Em andamento/.test(B.txt('#main')));
+  t('lista do professor mostra em andamento', /Em andamento/.test(B.txt('#main')));
   B.click(B.byText('#main .it', /Prova de Ciências/)); await B.espera(() => B.$('.savebar'));
   t('respostas recuperadas', B.$('input[name="r0"][value="1"]').checked && /Evaporação/.test(B.$('textarea[data-q="2"]').value) && B.$$('#fotos2 .ft').length === 1);
   B.click('[data-a="enviarAtiv"]'); await B.espera(() => B.$('#cOk'));
@@ -195,7 +197,7 @@ async function navegarTudo(B, nome) {
   C.set('#fTs [name=atual]', senhaCaio); C.set('#fTs [name=nova]', 'caio123'); C.set('#fTs [name=nova2]', 'caio123'); C.submit('#fTs');
   await C.espera(() => /Olá, Caio/.test(C.txt('#main')));
   t('após trocar senha entra no painel', /Olá, Caio/.test(C.txt('#main')));
-  t('caio vê a prova da turma (e o desafio do dia)', Number(C.txt('#main .stat b')) >= 1);
+  await C.espera(() => /pendente/.test(C.txt('#main [data-go="a_lista"]'))); t('caio vê a prova da turma', /1 pendente/.test(C.txt('#main [data-go="a_lista"]')), C.txt('#main'));
 
   // ---------- ADMIN ----------
   const A = abrir(); await login(A, 'admin', 'Admin@2026');

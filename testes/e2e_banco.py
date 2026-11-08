@@ -25,7 +25,7 @@ async def main():
         if ok: await p.click('#cOk'); await p.wait_for_timeout(1000)
         print('publicada:', 'Banco' not in (await p.inner_text('#main h1')))
         await p.click('#nav [data-go=perfil]'); await p.click('[data-a=sair]'); await login('aluno','Aluno@2026')
-        await p.click('#nav [data-go=a_atividades]'); await p.wait_for_selector('#main .it')
+        await p.click('#nav [data-go=a_atividades]'); await p.click('[data-go=a_lista]'); await p.wait_for_selector('#main .list .it')
         await p.click('#main .it >> text=Matemática — 2 assuntos'); await p.wait_for_selector('.savebar')
         await p.screenshot(path='/tmp/banco4.png')
         n=await p.locator('input[name^="r"]').evaluate_all("els=>[...new Set(els.map(e=>e.name))].length")

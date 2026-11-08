@@ -170,6 +170,35 @@ tr:last-child td{border-bottom:0}
 .dz-placar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;font-weight:800}.dz-placar span{background:rgba(255,255,255,.18);padding:5px 10px;border-radius:20px}
 .card .dz-placar span,.modal .dz-placar span{background:#eef1f7}.ok{color:var(--ok)}.bad{color:var(--bad)}.desafio .ok,.desafio .bad{color:#fff}
 .dz-barra{position:sticky;top:0;z-index:5;background:var(--warnb);color:var(--warn);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-weight:800;box-shadow:var(--sh)}.dz-barra .cd.urg{color:var(--bad)}
+.pv-folha{background:#fff;border:1px solid #d9dde8;border-radius:14px;padding:22px;margin-bottom:16px;box-shadow:0 2px 0 #e9ecf3,0 8px 24px rgba(20,30,60,.06)}
+.pv-capa{border-top:6px solid var(--pri);text-align:left}.pv-tit{font-size:24px;font-weight:900;letter-spacing:.5px;color:var(--ink)}.pv-sub{color:var(--mut);font-weight:700;margin-top:2px}
+.pv-cab{background:#fff;border:2px solid var(--ink);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.pv-topo{display:flex;gap:12px;align-items:center;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:10px}
+.pv-logo{width:46px;height:46px;border-radius:12px;background:var(--pri);display:grid;place-items:center;font-size:24px;flex:none}
+.pv-escola{font-size:12px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:1px}
+.pv-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;margin-top:12px}
+.pv-campos div{border-bottom:1px dashed #cdd3e0;padding-bottom:4px;min-width:0}.pv-campos span{display:block;font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+.pv-campos b{font-size:15px;overflow-wrap:anywhere}
+.pv-est{font-weight:800;margin-top:14px}.pv-cd{font-size:18px;font-weight:900;margin-top:8px;color:var(--pri)}.pv-btn{width:100%;margin-top:16px;min-height:54px;font-size:16px;letter-spacing:.5px}
+.pv-vazio{text-align:center;background:#fff;border:1px dashed #cdd3e0;border-radius:14px;padding:30px 18px;margin-bottom:16px}
+.pv-resumo{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;color:var(--mut)}.pv-resumo b{color:var(--ink);font-size:18px}
+.pv-outras{display:block;width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:18px;font-weight:700;color:var(--mut);cursor:pointer}
+.pv-instr{padding-left:20px;line-height:1.6}.pv-instr li{margin-bottom:6px}
+.pv-tab{width:100%;border-collapse:collapse;margin:10px 0}.pv-tab th,.pv-tab td{border:1px solid #d9dde8;padding:8px 10px;text-align:left}.pv-tab th{background:#f3f5fa;font-size:13px}
+.pv-barra{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:12px;box-shadow:var(--sh)}
+.pv-relogio{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums}.pv-relogio .cd.urg,.pv-relogio [data-cd].urg{color:#ffd166}.pv-cont{flex:1;font-size:14px}.pv-barra .btn{background:#fff;color:var(--ink);margin:0}
+.pv-grade{display:grid;grid-template-columns:1fr;gap:14px}@media(min-width:900px){.pv-grade{grid-template-columns:1fr 290px}.pv-dir{display:block!important;position:sticky;top:76px;align-self:start}}
+.pv-dir{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}.pv-dir.aberto{display:block}
+.pv-disc{background:#eef2ff;color:var(--pri);font-weight:900;letter-spacing:.5px;border-radius:10px;padding:10px 14px;margin:14px 0 10px}.pv-disc span{float:right;font-size:12px;color:var(--mut);font-weight:700;letter-spacing:0}
+.pv-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0}.pv-nav .btn{margin:0;min-height:48px;min-width:120px}.pv-num{font-weight:800;color:var(--mut);text-align:center}
+.pv-mapa-t{font-weight:900;margin-bottom:6px}.pv-mapa-d{font-size:12px;font-weight:800;color:var(--mut);margin:10px 0 4px}
+.pv-mapa-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:6px}
+.pv-mapa-g button{height:38px;border-radius:8px;border:1.5px solid #cdd3e0;background:#fff;font-weight:800;cursor:pointer}
+.pv-mapa-g button.ok{background:var(--ok);border-color:var(--ok);color:#fff}.pv-mapa-g button.at{outline:3px solid var(--pri);outline-offset:1px}
+.pv-leg{font-size:12px;color:var(--mut);margin-top:10px}.pv-leg .ok{color:var(--ok)}
+.pv-final{display:block;width:100%;min-height:56px;font-size:17px;font-weight:900;letter-spacing:.5px;background:var(--ok);color:#fff;border:0;margin-top:16px}
+.pv-res{text-align:center}.pv-mini{padding:10px 14px;font-size:14px;line-height:1.4}@media(min-width:900px){[data-a=provaMapa]{display:none}}.pv-dias{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 12px}.pv-dias label{margin:0}.pv-dias input{display:none}
+.pv-dias span{display:inline-block;padding:7px 11px;border:1.5px solid var(--line);border-radius:20px;font-weight:800;cursor:pointer}.pv-dias input:checked+span{background:var(--ink);color:#fff;border-color:var(--ink)}
 </style>
 </head>
 <body>
@@ -967,12 +996,12 @@ ACOES.banIA=()=>{
 };
 
 /* =================== DESAFIO DIÁRIO + ÁREA ÚNICA DE ATIVIDADES =================== */
-TIPO.desafio='Desafio diário';DISC_IC['Desafio diário']='🏆';
+TIPO.desafio='Prova do dia';DISC_IC['Desafio diário']='📝';
 // Professor e admin: Banco, IA e Desafio ficam dentro de "Atividades" (abas internas)
 ['professor','admin'].forEach(p=>{MENUS[p]=MENUS[p].filter(([k])=>k!=='p_banco'&&k!=='p_ia')});
 Object.assign(MENU_DE,{p_banco:'p_atividades',p_ia:'p_atividades',p_desafio:'p_atividades'});
 function hubAtiv(atual){
-  const abas=[['p_atividades','📝','Minhas atividades'],['p_desafio','🏆','Desafio diário'],['p_banco','📚','Banco de Atividades']].concat(S.iaAtiva?[['p_ia','✨','Criar com IA']]:[]);
+  const abas=[['p_atividades','📝','Minhas atividades'],['p_desafio','🗓️','Prova do dia'],['p_banco','📚','Banco de Atividades']].concat(S.iaAtiva?[['p_ia','✨','Criar com IA']]:[]);
   return `<div class="hub">${abas.map(([k,i,l])=>`<button class="${atual===k?'on':''}" data-go="${k}">${i} ${l}</button>`).join('')}<button class="novo" data-go="p_editor">＋ Nova atividade</button></div>`;
 }
 function comHub(nome){const orig=VIEWS[nome];VIEWS[nome]=async function(p){const r=await orig(p);if(typeof r==='string')return hubAtiv(nome)+r;return Object.assign({},r,{html:hubAtiv(nome)+r.html})}}
@@ -981,78 +1010,153 @@ function comHub(nome){const orig=VIEWS[nome];VIEWS[nome]=async function(p){const
 /* ---- contagem regressiva (todas as telas) ---- */
 function dur(ms){if(ms<0)ms=0;const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;const p=n=>String(n).padStart(2,'0');return (d?d+'d ':'')+p(h)+':'+p(m)+':'+p(x)}
 function cd(ts,prefixo){return `<span class="cd" data-cd="${ts}">${prefixo||''}${dur(ts-Date.now())}</span>`}
-let CD_REND=0;
+let CD_REND=0;let PROVA=null;
 setInterval(()=>{const els=document.querySelectorAll('[data-cd]');let fim=false;els.forEach(el=>{const ts=+el.dataset.cd;const r=ts-Date.now();el.textContent=dur(r);if(r<=0&&r>-1500)fim=true;el.classList.toggle('urg',r>0&&r<15*60e3)});
-  if(fim&&Date.now()-CD_REND>3000){CD_REND=Date.now();if(PL&&S.view==='a_fazer'&&!PL.envi)salvarRasc();setTimeout(()=>render(),800)}},1000);
+  if(fim&&Date.now()-CD_REND>3000&&!(PROVA&&PROVA.ativa)){CD_REND=Date.now();setTimeout(()=>render(),800)}},1000);
 function hora(ts){return new Date(ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
 function quando(ts){const d=new Date(ts),h=new Date();const am=new Date(Date.now()+864e5);const mesmo=(a,b)=>a.toDateString()===b.toDateString();return (mesmo(d,h)?'hoje':mesmo(d,am)?'amanhã':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}))+' às '+hora(ts)}
 
-/* ---- ALUNO ---- */
-// as listas normais não misturam os desafios diários (eles têm o seu cartão e o seu histórico)
+/* ---- ALUNO: PROVA DO DIA (uma única prova com todas as disciplinas) ---- */
+MENUS.aluno=MENUS.aluno.map(m=>m[0]==='a_atividades'?['a_atividades','📝','Prova do dia']:m);
+MENU_DE.a_lista='a_atividades';MENU_DE.a_prova='a_atividades';
+// as listas de atividades do professor não misturam a prova do dia
 const _alunoDados=alunoDados;
 alunoDados=async function(){const d=await _alunoDados();const c=Object.assign({},d,{atividades:d.atividades.filter(a=>a.tipo!=='desafio')});
-  const pend=c.atividades.filter(a=>a.situacao==='pendente'||a.situacao==='atrasada'&&a.podeEnviar).length+d.atividades.filter(a=>a.tipo==='desafio'&&a.situacao==='pendente').length;S.badge={a_atividades:pend||0};return c};
-function cartaoDesafio(h){
-  if(!h||(!h.desafios.length&&!h.temDesafio))return '';
-  if(!h.desafios.length)return `<div class="desafio"><div class="dz-t">🏆 Desafio do dia</div><p>O próximo desafio de 50 questões abre ${h.proximo?quando(h.proximo):'em breve'}.</p>${h.proximo?`<div class="dz-cd">Abre em ${cd(h.proximo)}</div>`:''}</div>`;
-  return h.desafios.map(x=>{
-    let corpo='',botao='';
-    if(x.situacao==='agendada'){corpo=`<p>${x.qtd} questões • abre ${quando(x.abertura)} • termina ${quando(x.encerramento)}</p><div class="dz-cd">Abre em ${cd(x.abertura)}</div>`}
-    else if(x.situacao==='pendente'){const p=Math.round(100*x.respondidas/x.qtd);
-      corpo=`<p>${x.qtd} questões de 8 disciplinas • envie até ${quando(x.encerramento)}</p><div class="dz-cd">⏳ Tempo restante ${cd(x.encerramento)}</div><div class="bar" style="margin:10px 0 4px"><i style="width:${p}%"></i></div><div class="small">${x.respondidas} de ${x.qtd} respondidas</div>`;
-      botao=`<button class="btn pri" data-go="a_fazer" data-p="${P({id:x.id})}">${x.rascunho?'Continuar ▶':'Começar desafio ▶'}</button>`}
-    else if(x.situacao==='enviada'||x.situacao==='corrigida'){
-      corpo=`<p>✅ Enviado ${quando(x.enviadoEm)}.</p>${x.acertos!==undefined?`<div class="dz-placar"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span>${x.discPendentes?`<span>✍️ ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} com o professor</span>`:''}</div>`:''}
-        ${x.liberado?(x.nota!==undefined?`<p><b>Nota: ${nota(x.nota,x.notaMax)}</b></p>`:''):`<p class="small">Gabarito e explicações ${x.encerramento>Date.now()?'liberados após o encerramento ('+quando(x.encerramento)+')':'serão liberados pelo professor'}.</p>`}`;
-      botao=`<button class="btn" data-go="a_fazer" data-p="${P({id:x.id})}">${x.liberado?'Ver correção e explicações':'Ver minhas respostas'}</button>`}
-    else{corpo=`<p>⏰ Este desafio encerrou ${quando(x.encerramento)} sem envio.</p>`;botao=x.liberado?`<button class="btn" data-go="a_fazer" data-p="${P({id:x.id})}">Ver as questões</button>`:''}
-    return `<div class="desafio"><div class="dz-t">🏆 Desafio do dia <span class="pill">${esc(x.nivelNome||'')}</span></div>${corpo}${botao}</div>`}).join('');
-}
-const _aInicio=VIEWS.a_inicio;
-VIEWS.a_inicio=async function(p){const [r,h]=await Promise.all([_aInicio(p),api('desafioHoje').catch(()=>null)]);const html=typeof r==='string'?r:r.html;
-  const i=html.indexOf('<div class="grid g4"');const c=cartaoDesafio(h);return i>=0?html.slice(0,i)+c+html.slice(i):c+html};
+  const pend=d.atividades.filter(a=>a.tipo==='desafio'&&a.situacao==='pendente'&&!a.enviadoEm).length;S.badge={a_atividades:pend||0};return c};
 const _aAtiv=VIEWS.a_atividades;
-VIEWS.a_atividades=async function(p){
-  if(p.f==='desafios')return viewHistDesafio();
-  const [r,h]=await Promise.all([_aAtiv(p),api('desafioHoje').catch(()=>null)]);let html=typeof r==='string'?r:r.html;
-  html=html.replace('<h1>Atividades</h1><p>Exercícios, provas e simulados das suas turmas</p>','<h1>Atividades</h1><p>Desafio do dia, exercícios, provas e simulados — tudo num só lugar</p>');
-  const i=html.indexOf('<div class="tabs">');
-  const abaDesafio=`<button data-go="a_atividades" data-p="${P({f:'desafios'})}">🏆 Desafios</button>`;
-  if(i>=0)html=html.slice(0,i)+cartaoDesafio(h)+html.slice(i).replace('</div>',abaDesafio+'</div>');
-  return html;
+// lista antiga preservada (atividades individuais publicadas pelo professor)
+VIEWS.a_lista=async function(p){const r=await _aAtiv(p);let h=typeof r==='string'?r:r.html;
+  h=h.replace('<h1>Atividades</h1><p>Exercícios, provas e simulados das suas turmas</p>','<h1>Atividades do professor</h1><p>Exercícios publicados pelos seus professores</p>').replace(/data-go="a_atividades"/g,'data-go="a_lista"');
+  return `<button class="back" data-go="a_atividades">← Prova do dia</button>`+h};
+const DISC_ORDEM=['Português','Matemática','História','Geografia','Educação Física','Física','Química','Biologia'];
+function respondida(q,i){const r=PL.resp[i];if(q.tipo==='disc')return !!String(r||'').trim()||(PL.fotos[i]||[]).length>0;return r!==null&&r!==undefined}
+function blocosDisc(qs){const B=[];qs.forEach((q,i)=>{const d=q.disciplina||'Geral';const u=B[B.length-1];if(u&&u.d===d)u.fim=i;else B.push({d,ini:i,fim:i})});return B}
+function dataExt(ts){return new Date(ts).toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+function tempoTxt(min){if(!min)return 'até o horário de encerramento';const h=Math.floor(min/60),m=min%60;return (h?h+'h':'')+(m?(h?' ':'')+m+' min':'')}
+async function turmaDoAluno(a){if(!alunoCache)await alunoDados();const T=(alunoCache&&alunoCache.turmas)||[];const t=T.find(x=>(a.turmas||[]).includes(x.id)&&x.status==='aprovado')||T[0];return t?{nome:t.nome,serie:t.serie||''}:{nome:'—',serie:''}}
+function cabecalhoProva(a,t,extra){const tot=a.questoes.reduce((s,q)=>s+(Number(q.pontos)||0),0);const niv={F1:'Ensino Fundamental I',F2:'Ensino Fundamental II',EM:'Ensino Médio'}[(a.desafio||{}).nivel]||'';
+  return `<div class="pv-cab"><div class="pv-topo"><div class="pv-logo">🎓</div><div><div class="pv-escola">${esc(S.info.nome||'Sala Digital')}</div><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">Avaliação diária multidisciplinar${niv?' · '+niv:''}</div></div></div>
+  <div class="pv-campos"><div><span>Aluno(a)</span><b>${esc(S.u.nome)}</b></div><div><span>Turma</span><b>${esc(t.nome)}</b></div><div><span>Série</span><b>${esc(t.serie||'—')}</b></div>
+  <div><span>Data da prova</span><b>${(a.desafio&&a.desafio.dia?a.desafio.dia.split('-').reverse().join('/'):fdh(a.abertura).slice(0,10))}</b></div><div><span>Prazo para finalizar</span><b>${a.encerramento?quando(a.encerramento):'—'}</b></div>
+  <div><span>Tempo para responder</span><b>${tempoTxt((a.desafio||{}).duracaoMin)}</b></div><div><span>Questões</span><b>${a.questoes.length} · ${pts(tot)} pontos</b></div>${extra||''}</div></div>`}
+VIEWS.a_atividades=async function(){
+  const [h,H]=await Promise.all([api('desafioHoje'),api('desafioHistorico').catch(()=>({lista:[],sequencia:0,feitos:0,aproveitamento:null}))]);
+  const outras=(alunoCache?alunoCache.atividades:(await alunoDados()).atividades).filter(a=>a.tipo!=='desafio');const outrasPend=outras.filter(a=>a.situacao==='pendente'||a.situacao==='atrasada'&&a.podeEnviar).length;
+  let corpo='';
+  if(!h.desafios.length){corpo=`<div class="pv-vazio"><div style="font-size:46px">📝</div><h2>Nenhuma prova aberta agora</h2>${h.temDesafio&&h.proximo?`<p>A próxima Prova do dia abre ${quando(h.proximo)}.</p><div class="pv-cd">Abre em ${cd(h.proximo)}</div>`:'<p class="muted">Quando o professor ativar a Prova do dia para a sua turma, ela aparece aqui.</p>'}</div>`}
+  else corpo=h.desafios.map(x=>{const tur=x.turmas&&x.turmas[0]||{};
+    let estado='',botao='';
+    if(x.situacao==='agendada'){estado=`<div class="pv-est">🔒 A prova abre ${quando(x.abertura)}</div><div class="pv-cd">Abre em ${cd(x.abertura)}</div>`}
+    else if(!x.enviadoEm&&x.podeEnviar){estado=x.rascunho?`<div class="pv-est">✍️ Prova em andamento · ${x.respondidas} de ${x.qtd} respondidas</div>`:`<div class="pv-est">🟢 Prova aberta</div>`;
+      estado+=`<div class="pv-cd">⏳ ${x.rascunho&&x.duracaoMin?'Seu tempo termina em':'Encerra em'} ${cd(x.rascunho?x.fim:x.encerramento)}</div>`;
+      botao=`<button class="btn pri pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">${x.rascunho?'CONTINUAR A PROVA ▶':'ABRIR A PROVA ▶'}</button>`}
+    else if(x.enviadoEm){estado=`<div class="pv-est">✅ Prova entregue ${quando(x.enviadoEm)}</div>${x.acertos!==undefined?`<div class="dz-placar"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span>${x.discPendentes?`<span>✍️ ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} em correção</span>`:''}</div>`:''}${x.liberado&&x.nota!==undefined?`<div class="pv-est">Nota: <b>${nota(x.nota,x.notaMax)}</b></div>`:''}`;
+      botao=`<button class="btn pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">${x.liberado?'VER RESULTADO E GABARITO':'VER MINHA PROVA'}</button>`}
+    else{estado=`<div class="pv-est">⏰ Prova encerrada sem entrega.</div>`;botao=x.liberado?`<button class="btn pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">VER GABARITO</button>`:''}
+    return `<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">${esc(x.nivelNome||'')} · ${x.dia.split('-').reverse().join('/')}</div>
+      <div class="pv-campos"><div><span>Aluno(a)</span><b>${esc(S.u.nome)}</b></div><div><span>Turma</span><b>${esc(tur.nome||'—')}</b></div><div><span>Série</span><b>${esc(tur.serie||'—')}</b></div><div><span>Questões</span><b>${x.qtd} · 8 disciplinas</b></div><div><span>Início</span><b>${quando(x.abertura)}</b></div><div><span>Encerramento</span><b>${quando(x.encerramento)}</b></div></div>
+      ${estado}${botao}</div>`}).join('');
+  const hist=H.lista.filter(x=>!h.desafios.some(d=>d.id===x.id));
+  return `<div class="ph"><div><h1>📝 Prova do dia</h1><p>Uma prova por dia com 50 questões de todas as disciplinas.</p></div></div>${corpo}
+  ${hist.length||H.feitos?`<h3 style="margin:22px 0 8px">📈 Meu histórico</h3><div class="pv-resumo"><span><b>${H.sequencia}🔥</b> dias seguidos</span><span><b>${H.feitos}</b> provas entregues</span><span><b>${H.aproveitamento===null?'—':H.aproveitamento.toLocaleString('pt-BR')+'%'}</b> de acertos</span></div>
+   <div class="tbl"><table><tr><th>Data</th><th>Acertos</th><th>Erros</th><th>Nota</th><th></th></tr>${hist.map(x=>`<tr><td>${String(x.dia).split('-').reverse().join('/')}</td><td>${x.acertos??'—'}</td><td>${x.erros??'—'}</td><td>${x.nota!==undefined&&x.nota!==null?nota(x.nota,x.notaMax):x.enviadoEm?'Em correção':'Não entregue'}</td><td>${x.antigo?'':`<button class="btn sm" data-go="a_prova" data-p="${P({id:x.id})}">Ver</button>`}</td></tr>`).join('')}</table></div>`:''}
+  <button class="pv-outras" data-go="a_lista">📂 Atividades do professor${outrasPend?` · <b>${outrasPend} pendente${outrasPend>1?'s':''}</b>`:''} →</button>`;
 };
-async function viewHistDesafio(){
-  const [h,H]=await Promise.all([api('desafioHoje'),api('desafioHistorico')]);
-  const tabs=`<div class="tabs"><button data-go="a_atividades" data-p="${P({f:'pendentes'})}">← Atividades</button><button class="on">🏆 Desafios</button></div>`;
-  const linha=x=>{const tot=(x.acertos||0)+(x.erros||0);const p=tot?Math.round(100*x.acertos/tot):0;const dt=String(x.dia).split('-').reverse().slice(0,2).join('/');
-    const sit=x.enviadoEm||x.situacao==='enviada'||x.situacao==='corrigida'?(x.acertos!==undefined?`<span class="ok">✔ ${x.acertos}</span> <span class="bad">✘ ${x.erros}</span>`:'Enviado'):x.situacao==='pendente'?'<b>Em aberto</b>':x.situacao==='agendada'?'Em breve':'<span class="muted">Não enviado</span>';
-    return `<button class="it" ${x.antigo?'disabled style="opacity:.9"':`data-go="a_fazer" data-p="${P({id:x.id})}"`}><div class="ic">🏆</div><div class="mid"><div class="t">Desafio de ${dt}</div><div class="s">${esc(x.nivelNome||'')}${x.nota!==undefined&&x.nota!==null?' · Nota '+nota(x.nota,x.notaMax):''}</div>${tot?`<div class="bar" style="margin-top:6px"><i style="width:${p}%"></i></div>`:''}</div><div class="end">${sit}</div></button>`};
-  return `<div class="ph"><div><h1>🏆 Meus desafios</h1><p>Histórico de desempenho nos desafios diários</p></div></div>${tabs}${cartaoDesafio(h)}
-  <div class="grid g4" style="margin-bottom:16px"><div class="stat"><b>${H.sequencia}🔥</b><span>Dias seguidos</span></div><div class="stat"><b>${H.feitos}</b><span>Desafios enviados</span></div><div class="stat"><b>${H.aproveitamento===null?'—':H.aproveitamento.toLocaleString('pt-BR')+'%'}</b><span>Acertos nas objetivas</span></div></div>
-  <div class="list">${H.lista.length?H.lista.map(linha).join(''):empty('🏆','Nenhum desafio ainda','Todos os dias um novo desafio de 50 questões aparece aqui.')}</div>`;
-}
-// tela de resolver: barra com o tempo restante e o resultado no envio
+// início: só a prova do dia e um resumo
+VIEWS.a_inicio=async function(){const [h,d]=await Promise.all([api('desafioHoje').catch(()=>null),alunoDados()]);
+  const pend=d.atividades.filter(a=>a.situacao==='pendente'||a.situacao==='atrasada'&&a.podeEnviar).length;const x=h&&h.desafios[0];
+  let card='';
+  if(x){const aberta=x.situacao!=='agendada'&&!x.enviadoEm&&x.podeEnviar;
+    card=`<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">${esc(x.nivelNome||'')} · ${x.qtd} questões</div>
+    ${x.situacao==='agendada'?`<div class="pv-cd">Abre em ${cd(x.abertura)}</div>`:aberta?`<div class="pv-cd">⏳ Encerra em ${cd(x.rascunho?x.fim:x.encerramento)}</div>`:x.enviadoEm?`<div class="pv-est">✅ Entregue${x.acertos!==undefined?` · ✔ ${x.acertos} acertos · ✘ ${x.erros} erros`:''}</div>`:'<div class="pv-est">⏰ Encerrada</div>'}
+    <button class="btn pri pv-btn" data-go="${aberta?'a_prova':'a_atividades'}" data-p="${P(aberta?{id:x.id}:{})}">${aberta?(x.rascunho?'CONTINUAR A PROVA ▶':'ABRIR A PROVA ▶'):'IR PARA A PROVA DO DIA'}</button></div>`}
+  else if(h&&h.temDesafio&&h.proximo)card=`<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">Próxima prova ${quando(h.proximo)}</div><div class="pv-cd">Abre em ${cd(h.proximo)}</div></div>`;
+  return `<div class="ph"><div><h1>Olá, ${esc(S.u.nome.split(' ')[0])}! 👋</h1><p>${d.turmas.filter(t=>t.status==='aprovado').length?'Bons estudos!':'Entre em uma turma para começar.'}</p></div></div>${card}
+  ${!d.turmas.some(t=>t.status==='aprovado')?`<div class="card"><h3>Entre na sua turma</h3><p class="muted">Peça o código ao professor.</p><button class="btn pri" data-go="a_turmas">Usar código da turma</button></div>`:''}
+  <button class="pv-outras" data-go="a_lista">📂 Atividades do professor${pend?` · <b>${pend} pendente${pend>1?'s':''}</b>`:''} →</button>`};
+// abrir uma prova do dia (pela lista, pelas notas ou por um link antigo) sempre leva à tela da prova
 const _aFazer=VIEWS.a_fazer;
-VIEWS.a_fazer=async function(p){const r=await _aFazer(p);if(!PL||PL.a.tipo!=='desafio')return r;const a=PL.a;
-  let barra='';if(!PL.envi&&PL.pode&&a.encerramento)barra=`<div class="dz-barra">⏳ Tempo restante: ${cd(a.encerramento)} <span class="small">• termina ${quando(a.encerramento)}</span></div>`;
-  return Object.assign({},r,{html:barra+r.html})};
-function resultadoDesafioHtml(x){if(!x)return '';return `<div class="dz-placar" style="justify-content:center;margin:10px 0"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span></div><p class="small muted">nas ${x.objetivas} questões objetivas${x.discPendentes?` • ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} serão corrigidas pelo professor`:''}. O gabarito com as explicações aparece depois da liberação.</p>`}
+VIEWS.a_fazer=async function(p){const r=await _aFazer(p);if(PL&&PL.a.tipo==='desafio'){S.view='a_prova';return VIEWS.a_prova(p)}
+  const html=(typeof r==='string'?r:r.html).replace('<button class="back" data-go="a_atividades">← Atividades</button>','<button class="back" data-go="a_lista">← Atividades do professor</button>');return typeof r==='string'?html:Object.assign({},r,{html})};
+VIEWS.a_prova=async function(p){
+  const r=await api('abrirAtividade',{id:p.id});const a=r.atividade,e=r.entrega;const t=await turmaDoAluno(a);
+  const enviado=e&&(e.status==='enviada'||e.status==='corrigida');
+  PL={a,e,resp:(e&&e.respostas)||[],fotos:(e&&e.fotos)||{},dirty:false,timer:null,salvoEm:e&&e.atualizadoEm,pode:r.podeEnviar,envi:enviado,sit:r.situacao};
+  a.questoes.forEach((q,i)=>{if(PL.resp[i]===undefined)PL.resp[i]=null});
+  const durMin=(a.desafio||{}).duracaoMin||0;const fim=Math.min(a.encerramento||9e15,durMin&&e&&e.iniciadoEm?e.iniciadoEm+durMin*60000:9e15);
+  PROVA={i:PROVA&&PROVA.id===a.id?PROVA.i:0,id:a.id,fim,ativa:false,enviando:false};
+  const voltar=`<button class="back" data-go="a_atividades">← Prova do dia</button>`;
+  // 1) entregue ou encerrada: resultado e (se liberado) gabarito comentado
+  if(enviado||!r.podeEnviar){const lib=enviado&&e.correcao&&(e.status==='corrigida'||a.tipo==='desafio');
+    let res='';
+    let placar='';if(enviado&&!lib){try{const H=await api('desafioHistorico');const x=H.lista.find(y=>y.id===a.id);if(x&&x.acertos!==undefined)placar=`<div class="dz-placar" style="justify-content:center"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span>${x.discPendentes?`<span>✍️ ${x.discPendentes} em correção</span>`:''}</div>`}catch(er){}}
+    if(enviado){const qs=a.questoes;let ac=0,er=0,dp=0;if(e.correcao){qs.forEach((q,i)=>{const pt=e.correcao.pontos[i];if(q.tipo==='disc'){if(pt==null)dp++}else if(Number(pt)>0)ac++;else er++})}
+      res=`<div class="pv-folha pv-res"><div class="pv-tit" style="font-size:20px">${lib?'RESULTADO':'PROVA ENTREGUE'}</div><p class="muted">Entregue em ${fdh(e.enviadoEm)}${e.autoEnviada?' (enviada automaticamente no fim do tempo)':''} · Protocolo ${esc(e.id.toUpperCase())}</p>
+       ${lib?`<div class="score">${nota(e.nota,e.notaMax)}</div><div class="muted">${pts(e.nota)} de ${pts(e.notaMax)} pontos${dp?' (sem as discursivas ainda em correção)':''}</div><div class="dz-placar" style="justify-content:center"><span class="ok">✔ ${ac} acertos</span><span class="bad">✘ ${er} erros</span>${dp?`<span>✍️ ${dp} em correção</span>`:''}</div>${e.comentario?`<div class="fb" style="text-align:left">💬 ${esc(e.comentario)}</div>`:''}`
+        :`${placar}<p>O resultado com a nota, o gabarito e as explicações será mostrado ${a.encerramento>Date.now()?'depois do encerramento ('+quando(a.encerramento)+')':'quando o professor liberar'}.</p>`}</div>`}
+    else res=`<div class="pv-folha pv-res"><div class="pv-tit" style="font-size:20px">PROVA ENCERRADA</div><p>O prazo terminou e esta prova não recebe mais respostas.</p></div>`;
+    let corpo='';if(lib||(!enviado&&a.questoes.every(q=>q.tipo==='disc'||q.correta!==undefined))){blocosDisc(a.questoes).forEach(b=>{corpo+=`<div class="pv-disc">${ic(b.d)} ${esc(b.d.toUpperCase())} <span>questões ${b.ini+1} a ${b.fim+1}</span></div>`;for(let i=b.ini;i<=b.fim;i++)corpo+=htmlQuestaoAluno(a.questoes[i],i,lib?e:null,true)})}
+    return {html:voltar+cabecalhoProva(a,t)+res+(corpo?`<h3 style="margin:18px 0 8px">${lib?'Gabarito comentado':'Questões'}</h3>`+corpo:''),depois:()=>{}}}
+  // 2) ainda não começou: folha de rosto com as instruções
+  if(!e||e.status!=='rascunho'){const B=blocosDisc(a.questoes);
+    return {html:voltar+cabecalhoProva(a,t)+`<div class="pv-folha"><h3>Instruções</h3><ol class="pv-instr"><li>A prova tem <b>${a.questoes.length} questões</b> numeradas de 1 a ${a.questoes.length}, agrupadas por disciplina.</li><li>Marque uma alternativa nas questões objetivas e escreva com suas palavras nas discursivas.</li><li>Use <b>Anterior</b> e <b>Próxima</b> ou o quadro de questões para navegar. Suas respostas são salvas automaticamente.</li><li>${durMin?`Você terá <b>${tempoTxt(durMin)}</b> a partir do início, até no máximo ${quando(a.encerramento)}.`:`A prova pode ser feita até <b>${quando(a.encerramento)}</b>.`} No fim do tempo, a prova é enviada automaticamente.</li><li>Ao terminar, clique em <b>FINALIZAR E ENVIAR PROVA</b>. Depois do envio não é possível alterar.</li></ol>
+      <table class="pv-tab"><tr><th>Disciplina</th><th>Questões</th></tr>${B.map(b=>`<tr><td>${ic(b.d)} ${esc(b.d)}</td><td>${b.ini+1} a ${b.fim+1}</td></tr>`).join('')}</table>
+      <button class="btn pri pv-btn" data-a="provaIniciar">INICIAR A PROVA</button></div>`,depois:()=>{}}}
+  // 3) prova em andamento
+  PROVA.ativa=true;
+  return {html:`<div class="pv-barra"><div class="pv-relogio">⏳ <span data-cd="${fim}">${dur(fim-Date.now())}</span></div><div class="pv-cont" id="pvCont"></div><button class="btn sm" data-a="provaMapa">☰ Questões</button></div>
+   <div class="pv-cab pv-mini"><b>PROVA DO DIA</b> · ${esc(S.u.nome)} · ${esc(t.nome)}${t.serie?' ('+esc(t.serie)+')':''} · ${(a.desafio&&a.desafio.dia||'').split('-').reverse().join('/')} · entrega até ${quando(fim)}</div><div class="pv-grade"><div class="pv-esq"><div id="pvDisc" class="pv-disc"></div><div id="pvQ"></div>
+   <div class="pv-nav"><button class="btn" data-a="provaAnt">◀ Anterior</button><span id="pvN" class="pv-num"></span><button class="btn pri" data-a="provaProx">Próxima ▶</button></div>
+   <div class="small muted center" id="svst">${PL.salvoEm?'Salvo às '+hora(PL.salvoEm):'Suas respostas são salvas automaticamente'}</div></div>
+   <div class="pv-dir" id="pvMapa"></div></div>
+   <button class="btn pv-final" data-a="provaFinalizar">FINALIZAR E ENVIAR PROVA</button>`,depois:()=>provaMostrar(PROVA.i)};
+};
+function provaMapaHtml(){const qs=PL.a.questoes;return `<div class="pv-mapa-t">Quadro de questões</div>${blocosDisc(qs).map(b=>{let h=`<div class="pv-mapa-d">${ic(b.d)} ${esc(b.d)}</div><div class="pv-mapa-g">`;for(let i=b.ini;i<=b.fim;i++)h+=`<button class="${respondida(qs[i],i)?'ok':''} ${i===PROVA.i?'at':''}" data-a="provaIr" data-i="${i}">${i+1}</button>`;return h+'</div>'}).join('')}<div class="pv-leg"><span class="ok">■</span> respondida <span>■</span> pendente</div>`}
+function provaAtualizar(){const qs=PL.a.questoes;const n=qs.filter((q,i)=>respondida(q,i)).length;const c=$('#pvCont');if(c)c.innerHTML=`<b>${n}</b> respondidas · <b>${qs.length-n}</b> pendentes`;const m=$('#pvMapa');if(m)m.innerHTML=provaMapaHtml()}
+function provaMostrar(i){const qs=PL.a.questoes;if(PL.dirty&&!PL.envi){clearTimeout(PL.timer);salvarRasc()}i=Math.max(0,Math.min(qs.length-1,i));PROVA.i=i;const q=qs[i];
+  const b=blocosDisc(qs).find(x=>i>=x.ini&&i<=x.fim);$('#pvDisc').innerHTML=`${ic(q.disciplina||'Geral')} ${esc((q.disciplina||'Geral').toUpperCase())} <span>questões ${b.ini+1} a ${b.fim+1}</span>`;
+  $('#pvQ').innerHTML=htmlQuestaoAluno(q,i,null,false);$('#pvN').textContent=`Questão ${i+1} de ${qs.length}`;
+  $$('[data-a="provaAnt"]').forEach(x=>x.disabled=i===0);$$('[data-a="provaProx"]').forEach(x=>{x.disabled=i===qs.length-1});
+  bindPlayer();const box=$('#pvQ');['change','input'].forEach(ev=>box.addEventListener(ev,()=>setTimeout(provaAtualizar,0)));provaAtualizar();
+  const top=$('#pvDisc');if(top&&top.getBoundingClientRect&&top.getBoundingClientRect().top<70)try{window.scrollBy(0,top.getBoundingClientRect().top-80)}catch(e){}}
+ACOES.provaAnt=()=>provaMostrar(PROVA.i-1);ACOES.provaProx=()=>provaMostrar(PROVA.i+1);
+ACOES.provaIr=d=>{provaMostrar(+d.i);const m=$('#pvMapa');if(m)m.classList.remove('aberto')};
+ACOES.provaMapa=()=>{const m=$('#pvMapa');if(m){m.classList.toggle('aberto');if(m.classList.contains('aberto'))try{m.scrollIntoView({block:'start'})}catch(e){}}};
+ACOES.provaIniciar=async(d,b)=>{await busy(b,async()=>{try{await api('desafioIniciar',{id:PL.a.id});PROVA.i=0;render()}catch(e){toast(e.message)}})};
+async function provaEnviar(auto){if(PROVA.enviando)return;PROVA.enviando=true;clearTimeout(PL.timer);
+  try{const r=await api('enviarAtividade',{id:PL.a.id,respostas:PL.resp});PL.envi=true;PROVA.ativa=false;S.badge.a_atividades=0;alunoCache=null;try{shell()}catch(x){}
+    modal(`<div class="center"><div style="font-size:54px">✅</div><h2>Prova enviada!</h2>${auto?'<p><b>O tempo terminou e sua prova foi enviada automaticamente.</b></p>':''}<p class="muted">Recebemos sua prova em <b>${fdh(r.enviadoEm)}</b>.</p>${resultadoDesafioHtml(r.resultado)}<div class="card"><div class="small muted">Protocolo</div><div class="code" style="font-size:20px">${esc(r.protocolo)}</div></div><button class="btn pri full" data-a="fecharEnvio">Ver minha prova</button></div>`)}
+  catch(e){PROVA.enviando=false;toast(e.message);if(auto)render()}}
+ACOES.provaFinalizar=async()=>{const qs=PL.a.questoes;const pend=qs.map((q,i)=>respondida(q,i)?0:i+1).filter(Boolean);
+  const ok=await confirmar('Finalizar e enviar prova',(pend.length?`<b>Atenção:</b> ${pend.length} questão${pend.length>1?'ões':''} sem resposta (${pend.slice(0,15).join(', ')}${pend.length>15?'…':''}).<br><br>`:'Todas as questões foram respondidas. ')+'Depois de enviar, não será possível alterar as respostas. Deseja finalizar e enviar a prova?','Finalizar e enviar');
+  if(ok)provaEnviar(false)};
+function resultadoDesafioHtml(x){if(!x)return '';return `<div class="dz-placar" style="justify-content:center;margin:10px 0"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span></div><p class="small muted">nas ${x.objetivas} questões objetivas${x.discPendentes?` · ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} serão corrigidas pelo professor`:''}. A nota e o gabarito comentado aparecem depois da liberação.</p>`}
+// ao trocar de aplicativo ou bloquear o celular, salva na hora
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&PL&&PL.dirty&&!PL.envi){clearTimeout(PL.timer);salvarRasc()}});
+// no fim do tempo, a prova em andamento é enviada sozinha
+setInterval(()=>{if(PROVA&&PROVA.ativa&&!PROVA.enviando&&S.view==='a_prova'&&PL&&!PL.envi&&Date.now()>=PROVA.fim)provaEnviar(true)},1000);
 
 /* ---- PROFESSOR / ADMIN: painel do desafio ---- */
+const DIAS_S=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+function diasHtml(id,sel){sel=sel||[0,1,2,3,4,5,6];return `<div class="pv-dias">${DIAS_S.map((n,k)=>`<label><input type="checkbox" class="${id}" value="${k}" ${sel.includes(k)?'checked':''}><span>${n}</span></label>`).join('')}</div>`}
+function diasLer(id){return $$('.'+id).filter(x=>x.checked).map(x=>+x.value)}
+function durOpcoes(v){return [[0,'Até o horário de encerramento'],[30,'30 minutos'],[60,'1 hora'],[90,'1h30'],[120,'2 horas'],[150,'2h30'],[180,'3 horas'],[240,'4 horas']].map(([k,t])=>`<option value="${k}" ${Number(v||0)===k?'selected':''}>${t}</option>`).join('')}
 const ORIGEM={ia:'✨ IA (revisada)','ia+banco':'✨ IA + 📚 Banco',banco:'📚 Banco (reserva)',copia:'Cópia'};
 VIEWS.p_desafio=async function(){
   const d=await api('desafioPainel');const g=d.global,m=d.meu,pr=d.proprio||{};
   const hoje=d.recentes.filter(x=>x.dia===d.dia);
   const nivSel=(t)=>`<select data-tniv="${t.id}"><option value="" ${!t.fixo?'selected':''}>Automático (${t.nivelAuto?{F1:'Fund. I',F2:'Fund. II',EM:'Médio',INF:'Infantil'}[t.nivelAuto]:'padrão: '+({F1:'Fund. I',F2:'Fund. II',EM:'Médio'}[g.nivelPadrao]||'Fund. II')})</option>${[['F1','Fund. I'],['F2','Fund. II'],['EM','Ensino Médio'],['INF','Sem desafio']].map(([k,v])=>`<option value="${k}" ${t.fixo===k?'selected':''}>${v}</option>`).join('')}</select>`;
   const hh=(id,v)=>`<input type="time" id="${id}" value="${esc(v||'')}">`;
-  let h=`${hubAtiv('p_desafio')}<div class="ph"><div><h1>🏆 Desafio diário</h1><p>Todos os dias, 50 questões novas de 8 disciplinas para cada turma, no nível certo de cada série.</p></div></div>
-  ${!g.ativo?'<div class="note">O desafio diário está <b>desligado</b> nas configurações gerais.</div>':''}
-  ${!d.iaChave||!g.ia?`<div class="note">${!d.iaChave?'🔑 A IA ainda não está conectada (falta a chave do Google Gemini no servidor).':'A geração com IA está desligada.'} Enquanto isso, os desafios são montados automaticamente com o <b>Banco de Atividades</b>, sem repetir as questões dos dias anteriores até o banco se esgotar.</div>`:''}
+  let h=`${hubAtiv('p_desafio')}<div class="ph"><div><h1>🗓️ Prova do dia</h1><p>Uma prova por dia com 50 questões de 8 disciplinas para cada turma, no nível certo de cada série.</p></div></div>
+  ${!g.ativo?'<div class="note">A Prova do dia está <b>desligada</b> nas configurações gerais.</div>':''}
+  ${!d.iaChave||!g.ia?`<div class="note">${!d.iaChave?'🔑 A IA ainda não está conectada (falta a chave do Google Gemini no servidor).':'A geração com IA está desligada.'} Enquanto isso, as provas são montadas automaticamente com o <b>Banco de Atividades</b>, sem repetir as questões dos dias anteriores até o banco se esgotar.</div>`:''}
   <div class="card"><h3 style="margin-bottom:10px">Hoje (${d.dia.split('-').reverse().join('/')})</h3>
-   ${hoje.length?`<div class="list">${hoje.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||esc(x.origem||'')} · abre ${quando(x.abertura)} · termina ${quando(x.encerramento)}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end"><span class="pill">${x.entregues}/${x.alunos} enviaram</span></div></div>`).join('')}</div>`:'<p class="muted">Os desafios de hoje ainda não foram preparados.</p>'}
+   ${hoje.length?`<div class="list">${hoje.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||esc(x.origem||'')} · abre ${quando(x.abertura)} · termina ${quando(x.encerramento)}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end"><span class="pill">${x.entregues}/${x.alunos} enviaram</span></div></div>`).join('')}</div>`:'<p class="muted">As provas de hoje ainda não foram preparadas.</p>'}
    ${d.pendentes.length?`<p class="small muted">Falta preparar: ${d.pendentes.map(n=>({F1:'Fund. I',F2:'Fund. II',EM:'Médio'}[n])).join(', ')}. O sistema prepara sozinho todas as madrugadas; se quiser, prepare agora.</p><button class="btn pri" data-a="dzGerar">✨ Preparar agora</button>`:''}</div>
   <div class="card"><h3 style="margin-bottom:6px">⏰ Meu prazo</h3><p class="small muted" style="margin-top:0">Vale para as suas turmas. Mudanças valem também para o desafio de hoje, se ainda estiver aberto.</p>
-   <label class="chk"><input type="checkbox" id="dzMAtivo" ${pr.ativo===false?'':'checked'}><span>Enviar o desafio diário para as minhas turmas</span></label>
+   <label class="chk"><input type="checkbox" id="dzMAtivo" ${pr.ativo===false?'':'checked'}><span>Aplicar a Prova do dia nas minhas turmas</span></label>
+   <label>Dias da prova</label>${diasHtml('dzMDia',m.diasSemana)}
+   <label>Tempo para responder<select id="dzMDur">${durOpcoes(m.duracaoMin)}</select></label>
    <div class="row2"><label>Abre às${hh('dzMAb',m.abertura)}</label><label>Encerra às${hh('dzMEn',m.encerramento)}</label></div>
    <div class="row2"><label>Encerramento<select id="dzMDias">${[0,1,2,3].map(n=>`<option value="${n}" ${m.diasPrazo===n?'selected':''}>${n===0?'No mesmo dia':n===1?'No dia seguinte':n+' dias depois'}</option>`).join('')}</select></label>
    <label>Gabarito e explicações<select id="dzMLib"><option value="encerramento" ${m.liberar!=='manual'?'selected':''}>Liberar sozinho no encerramento</option><option value="manual" ${m.liberar==='manual'?'selected':''}>Eu libero manualmente</option></select></label></div>
@@ -1060,21 +1164,23 @@ VIEWS.p_desafio=async function(){
   <div class="card"><h3 style="margin-bottom:6px">🎓 Nível de cada turma</h3><p class="small muted" style="margin-top:0">O nível vem da série da turma (ex.: “6º ano” → Fundamental II). Ajuste se precisar. Turmas sem alunos não recebem desafio.</p>
    ${d.turmas.length?`<div class="tbl"><table><tr><th>Turma</th><th>Série</th><th>Alunos</th><th>Nível do desafio</th></tr>${d.turmas.map(t=>`<tr><td class="wrap"><b>${esc(t.nome)}</b>${t.professor?`<br><span class="small muted">${esc(t.professor)}</span>`:''}</td><td>${esc(t.serie||'—')}</td><td>${t.alunos}</td><td>${nivSel(t)}</td></tr>`).join('')}</table></div>`:'<p class="muted">Nenhuma turma ativa.</p>'}</div>`;
   if(d.admin)h+=`<div class="card"><h3 style="margin-bottom:6px">⚙️ Configuração geral (administrador)</h3>
-   <label class="chk"><input type="checkbox" id="dzGAtivo" ${g.ativo?'checked':''}><span>Desafio diário ligado na plataforma</span></label>
+   <label class="chk"><input type="checkbox" id="dzGAtivo" ${g.ativo?'checked':''}><span>Prova do dia ligada na plataforma</span></label>
+   <label>Dias da prova (padrão)</label>${diasHtml('dzGDia',g.diasSemana)}
+   <label>Tempo para responder (padrão)<select id="dzGDur">${durOpcoes(g.duracaoMin)}</select></label>
    <label class="chk"><input type="checkbox" id="dzGIa" ${g.ia?'checked':''}><span>Gerar questões novas com IA (com revisão automática; se falhar, usa o banco)</span></label>
    <label class="chk"><input type="checkbox" id="dzGPlacar" ${g.placar?'checked':''}><span>Mostrar acertos e erros logo após o envio</span></label>
    <div class="row2"><label>Abertura padrão${hh('dzGAb',g.abertura)}</label><label>Encerramento padrão${hh('dzGEn',g.encerramento)}</label></div>
    <div class="row2"><label>Encerramento<select id="dzGDias">${[0,1,2,3].map(n=>`<option value="${n}" ${g.diasPrazo===n?'selected':''}>${n===0?'No mesmo dia':n===1?'No dia seguinte':n+' dias depois'}</option>`).join('')}</select></label>
    <label>Gabarito<select id="dzGLib"><option value="encerramento" ${g.liberar!=='manual'?'selected':''}>Liberar no encerramento</option><option value="manual" ${g.liberar==='manual'?'selected':''}>Professor libera</option></select></label></div>
-   <div class="row2"><label>Discursivas por desafio (de 50)<input type="number" id="dzGDisc" min="0" max="10" value="${g.discursivas}"></label>
+   <div class="row2"><label>Discursivas por prova (de 50)<input type="number" id="dzGDisc" min="0" max="10" value="${g.discursivas}"></label>
    <label>Nível quando a série não informa<select id="dzGNiv">${[['F1','Fundamental I'],['F2','Fundamental II'],['EM','Ensino Médio']].map(([k,v])=>`<option value="${k}" ${g.nivelPadrao===k?'selected':''}>${v}</option>`).join('')}</select></label></div>
    <button class="btn" data-a="dzSalvarGeral">Salvar configuração geral</button></div>`;
-  h+=`<h3 style="margin:16px 0 8px">📅 Desafios recentes</h3><div class="list">${d.recentes.length?d.recentes.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||''} · ${x.entregues}/${x.alunos} enviaram${x.aproveitamento!==null?' · '+x.aproveitamento.toLocaleString('pt-BR')+'% de acertos':''}${x.aCorrigir?` · <b>${x.aCorrigir} para corrigir</b>`:''}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm" data-go="p_entregas" data-p="${P({id:x.id})}">Entregas</button>${!x.liberado?`<button class="btn sm" data-a="liberar" data-id="${x.id}" data-v="1">Liberar gabarito</button>`:'<span class="pill corrigida">Gabarito liberado</span>'}</div></div>`).join(''):empty('🏆','Nenhum desafio ainda','O primeiro desafio é preparado automaticamente.')}</div>`;
+  h+=`<h3 style="margin:16px 0 8px">📅 Provas recentes</h3><div class="list">${d.recentes.length?d.recentes.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||''} · ${x.entregues}/${x.alunos} enviaram${x.aproveitamento!==null?' · '+x.aproveitamento.toLocaleString('pt-BR')+'% de acertos':''}${x.aCorrigir?` · <b>${x.aCorrigir} para corrigir</b>`:''}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm" data-go="p_entregas" data-p="${P({id:x.id})}">Entregas</button>${!x.liberado?`<button class="btn sm" data-a="liberar" data-id="${x.id}" data-v="1">Liberar gabarito</button>`:'<span class="pill corrigida">Gabarito liberado</span>'}</div></div>`).join(''):empty('🗓️','Nenhuma prova ainda','A primeira prova é preparada automaticamente.')}</div>`;
   return {html:h,depois(){$$('[data-tniv]').forEach(s=>s.addEventListener('change',async()=>{try{await api('desafioTurmaNivel',{id:s.dataset.tniv,nivel:s.value});toast('Nível da turma salvo ✓')}catch(e){toast(e.message)}}))}};
 };
-ACOES.dzSalvarMeu=async(d,b)=>{await busy(b,async()=>{try{const r=await api('desafioConfigSalvar',{meu:{ativo:$('#dzMAtivo').checked,abertura:$('#dzMAb').value,encerramento:$('#dzMEn').value,diasPrazo:+$('#dzMDias').value,liberar:$('#dzMLib').value}});toast('Prazo salvo ✓'+(r.ajustados?' (desafio de hoje ajustado)':''));render()}catch(e){toast(e.message)}})};
-ACOES.dzSalvarGeral=async(d,b)=>{await busy(b,async()=>{try{await api('desafioConfigSalvar',{global:{ativo:$('#dzGAtivo').checked,ia:$('#dzGIa').checked,placar:$('#dzGPlacar').checked,abertura:$('#dzGAb').value,encerramento:$('#dzGEn').value,diasPrazo:+$('#dzGDias').value,liberar:$('#dzGLib').value,discursivas:+$('#dzGDisc').value,nivelPadrao:$('#dzGNiv').value}});toast('Configuração salva ✓');render()}catch(e){toast(e.message)}})};
-ACOES.dzGerar=async(d,b)=>{modal(`<div class="center"><div class="spin" style="margin:20px auto"></div><h2>Preparando os desafios…</h2><p class="muted">Com a IA isso leva de 30 segundos a 2 minutos. Não feche esta tela.</p></div>`);
+ACOES.dzSalvarMeu=async(d,b)=>{await busy(b,async()=>{try{const r=await api('desafioConfigSalvar',{meu:{ativo:$('#dzMAtivo').checked,abertura:$('#dzMAb').value,encerramento:$('#dzMEn').value,diasPrazo:+$('#dzMDias').value,liberar:$('#dzMLib').value,duracaoMin:+$('#dzMDur').value,diasSemana:diasLer('dzMDia')}});toast('Prazo salvo ✓'+(r.ajustados?' (desafio de hoje ajustado)':''));render()}catch(e){toast(e.message)}})};
+ACOES.dzSalvarGeral=async(d,b)=>{await busy(b,async()=>{try{await api('desafioConfigSalvar',{global:{ativo:$('#dzGAtivo').checked,ia:$('#dzGIa').checked,placar:$('#dzGPlacar').checked,abertura:$('#dzGAb').value,encerramento:$('#dzGEn').value,diasPrazo:+$('#dzGDias').value,liberar:$('#dzGLib').value,discursivas:+$('#dzGDisc').value,nivelPadrao:$('#dzGNiv').value,duracaoMin:+$('#dzGDur').value,diasSemana:diasLer('dzGDia')}});toast('Configuração salva ✓');render()}catch(e){toast(e.message)}})};
+ACOES.dzGerar=async(d,b)=>{modal(`<div class="center"><div class="spin" style="margin:20px auto"></div><h2>Preparando as provas…</h2><p class="muted">Com a IA isso leva de 30 segundos a 2 minutos. Não feche esta tela.</p></div>`);
   try{const r=await api('desafioGerarAgora');fechar();toast(r.preparados.map(p=>p.questoes+' questões ('+(ORIGEM[p.origem]||p.origem)+')').join(' • ')||'Pronto ✓');render()}catch(e){fechar();toast(e.message)}};
 
 /* =================== INÍCIO =================== */

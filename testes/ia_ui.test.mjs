@@ -48,7 +48,7 @@ t('publica a atividade gerada (com edição)', /Rochas \(IA\)/.test(P.txt('#main
 // aluno
 const A = abrir(); await A.login('aluno', 'Aluno@2026'); await A.espera(() => A.$('#nav [data-go="a_tutor"]'));
 t('menu do aluno tem "Tutor IA"', !!A.$('#nav [data-go="a_tutor"]') && !A.$('#nav [data-go="p_ia"]'));
-A.click('#nav [data-go="a_atividades"]'); await A.espera(() => /Rochas \(IA\)/.test(A.txt('#main')));
+A.click('#nav [data-go="a_atividades"]'); await A.espera(() => A.$('[data-go="a_lista"]')); A.click('[data-go="a_lista"]'); await A.espera(() => /Rochas \(IA\)/.test(A.txt('#main')));
 t('aluno vê a atividade gerada', /Rochas \(IA\)/.test(A.txt('#main')));
 A.click(A.$$('#main .it').find(x => /Rochas \(IA\)/.test(x.textContent))); await A.espera(() => A.$('#main [data-go="a_tutor"]'), 3000);
 t('atividade tem botão do tutor', !!A.$('#main [data-go="a_tutor"]'));
@@ -69,7 +69,7 @@ t('admin vê uso e custos da IA', /Custo no mês/.test(D.txt('#main')) && /Gerad
 const tkD = D.w.localStorage.getItem('sd_token'); await E.api(tkD, 'iaConfigSalvar', { iaAtiva: false, iaLimiteProfDia: 20, iaLimiteAlunoDia: 40 });
 const A2 = abrir(); await A2.login('aluno', 'Aluno@2026'); await sleep(200);
 t('IA desligada: aluno não vê Tutor', !A2.$('#nav [data-go="a_tutor"]'));
-A2.click('#nav [data-go="a_atividades"]'); await A2.espera(() => A2.$('#main .it')); A2.click(A2.$$('#main .it')[0]); await A2.espera(() => A2.$('.savebar'));
+A2.click('#nav [data-go="a_atividades"]'); await A2.espera(() => A2.$('[data-go="a_lista"]')); A2.click('[data-go="a_lista"]'); await A2.espera(() => A2.$('#main .list .it')); A2.click(A2.$$('#main .list .it')[0]); await A2.espera(() => A2.$('.savebar'));
 t('IA desligada: sem botão do tutor na atividade', !A2.$('#main [data-go="a_tutor"]'));
 const P2 = abrir(); await P2.login('professor', 'Prof@2026'); await sleep(200);
 P2.click('#nav [data-go="p_atividades"]'); await P2.espera(() => P2.$('.hub')); t('IA desligada: professor não vê Gerar com IA', !P2.$('[data-go="p_ia"]'));

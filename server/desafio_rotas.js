@@ -5,7 +5,7 @@
 // todo o fluxo que já existe: rascunho, envio, correção automática, correção das discursivas e notas.
 TAB.DesafioHist = ['id', 'alunoId', 'professorId', 'atividadeId', 'dia', 'nivel', 'status', 'nota', 'notaMax', 'acertos', 'erros', 'objetivas', 'discursivas', 'enviadoEm'];
 Object.assign(CFG_PADRAO, { desafioAtivo: true, desafioIA: true, desafioAbertura: '06:00', desafioEncerramento: '23:00', desafioDiasPrazo: 0,
-  desafioLiberar: 'encerramento', desafioDiscursivas: 3, desafioNivelPadrao: 'F2', desafioPlacar: true });
+  desafioLiberar: 'encerramento', desafioDiscursivas: 3, desafioNivelPadrao: 'F2', desafioPlacar: true, desafioDuracaoMin: 0, desafioDiasSemana: [0, 1, 2, 3, 4, 5, 6] });
 const DESAFIO_N = 50;
 const DESAFIO_NIVEIS = { F1: 'Ensino Fundamental I', F2: 'Ensino Fundamental II', EM: 'Ensino Médio' };
 const DESAFIO_CURTO = { F1: 'Fund. I', F2: 'Fund. II', EM: 'Médio' };
@@ -34,7 +34,8 @@ function turmaNivel_(t) { return t.nivelDesafio || nivelSerie_(t.serie) || cfg_(
 function desafioCfgProf_(profId) {
   const c = cfg_();
   const o = { ativo: !!c.desafioAtivo, abertura: hhmm_(c.desafioAbertura, '06:00'), encerramento: hhmm_(c.desafioEncerramento, '23:00'),
-    diasPrazo: Math.max(0, Math.min(6, Number(c.desafioDiasPrazo) || 0)), liberar: c.desafioLiberar === 'manual' ? 'manual' : 'encerramento' };
+    diasPrazo: Math.max(0, Math.min(6, Number(c.desafioDiasPrazo) || 0)), liberar: c.desafioLiberar === 'manual' ? 'manual' : 'encerramento',
+    duracaoMin: duracao_(c.desafioDuracaoMin), diasSemana: diasSemana_(c.desafioDiasSemana) };
   const p = profId ? c['desafioProf_' + profId] : null;
   if (p && typeof p === 'object') {
     if (p.ativo === false) o.ativo = false;
@@ -42,8 +43,19 @@ function desafioCfgProf_(profId) {
     if (p.encerramento) o.encerramento = hhmm_(p.encerramento, o.encerramento);
     if (p.diasPrazo !== undefined && p.diasPrazo !== null && p.diasPrazo !== '') o.diasPrazo = Math.max(0, Math.min(6, Number(p.diasPrazo) || 0));
     if (p.liberar) o.liberar = p.liberar === 'manual' ? 'manual' : 'encerramento';
+    if (p.duracaoMin !== undefined && p.duracaoMin !== null && p.duracaoMin !== '') o.duracaoMin = duracao_(p.duracaoMin);
+    if (Array.isArray(p.diasSemana)) o.diasSemana = diasSemana_(p.diasSemana);
   }
   return o;
+}
+function duracao_(x) { return Math.max(0, Math.min(1440, Math.round(Number(x) || 0))); }
+function diasSemana_(x) { const L = (Array.isArray(x) ? x : [0, 1, 2, 3, 4, 5, 6]).map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6); return L.filter((n, i) => L.indexOf(n) === i).sort(); }
+function diaSemana_(dia) { return new Date(String(dia) + 'T12:00:00Z').getUTCDay(); }
+// fim do tempo da prova para este aluno: o encerramento ou o tempo disponível desde o início, o que vier primeiro
+function provaFim_(a, e) {
+  let fim = a.encerramento || 9e15; const dur = a.desafio && Number(a.desafio.duracaoMin);
+  if (dur && e && e.iniciadoEm) fim = Math.min(fim, e.iniciadoEm + dur * 60000);
+  return fim;
 }
 function desafioPrazo_(dia, cf) {
   const ab = tsLocal_(dia, cf.abertura); let en = tsLocal_(dia, cf.encerramento, cf.diasPrazo);
@@ -51,12 +63,13 @@ function desafioPrazo_(dia, cf) {
   return { abertura: ab, encerramento: en };
 }
 // turmas que recebem desafio, agrupadas por professor e nível
-function desafioAlvos_() {
+function desafioAlvos_(dia) {
+  const ds = dia ? diaSemana_(dia) : null;
   const grupos = {};
   all_('Turmas').filter(t => !t.arquivada).forEach(t => {
     const nv = turmaNivel_(t); if (!DESAFIO_NIVEIS[nv]) return;
     if (!all_('Matriculas').some(m => m.turmaId === t.id && m.status === 'aprovado')) return;
-    if (!desafioCfgProf_(t.professorId).ativo) return;
+    const cfp = desafioCfgProf_(t.professorId); if (!cfp.ativo || (ds !== null && cfp.diasSemana.indexOf(ds) < 0)) return;
     const k = t.professorId + '|' + nv;
     (grupos[k] = grupos[k] || { professorId: t.professorId, nivel: nv, turmas: [] }).turmas.push(t.id);
   });
@@ -65,7 +78,7 @@ function desafioAlvos_() {
 function desafiosDoDia_(dia) { return all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio && a.desafio.dia === dia); }
 function desafioPendentes_(dia) {
   const feitos = desafiosDoDia_(dia); const out = [];
-  desafioAlvos_().forEach(x => {
+  desafioAlvos_(dia).forEach(x => {
     const ja = feitos.find(a => a.professorId === x.professorId && a.desafio.nivel === x.nivel);
     if ((!ja || x.turmas.some(t => ja.turmas.indexOf(t) < 0)) && out.indexOf(x.nivel) < 0) out.push(x.nivel);
   });
@@ -85,7 +98,7 @@ function desafioCriar_(dia, nivel, questoes, origem, assuntos) {
   const qs = limpaQuestoes_(questoes).map((q, i) => { q.disciplina = txt_(questoes[i].disciplina, 40); return q; });
   const feitos = desafiosDoDia_(dia).filter(a => a.desafio.nivel === nivel);
   let n = 0;
-  desafioAlvos_().filter(x => x.nivel === nivel).forEach(x => {
+  desafioAlvos_(dia).filter(x => x.nivel === nivel).forEach(x => {
     const ja = feitos.find(a => a.professorId === x.professorId);
     if (ja) {
       const novas = x.turmas.filter(t => ja.turmas.indexOf(t) < 0);
@@ -93,12 +106,12 @@ function desafioCriar_(dia, nivel, questoes, origem, assuntos) {
       return;
     }
     const cf = desafioCfgProf_(x.professorId); const pz = desafioPrazo_(dia, cf);
-    ins_('Atividades', { id: uid_('a'), professorId: x.professorId, titulo: '🏆 Desafio do dia — ' + dataBR_(dia) + ' · ' + DESAFIO_CURTO[nivel],
+    ins_('Atividades', { id: uid_('a'), professorId: x.professorId, titulo: 'Prova do dia — ' + dataBR_(dia) + ' · ' + DESAFIO_CURTO[nivel],
       tipo: 'desafio', disciplina: 'Multidisciplinar',
-      instrucoes: 'Desafio diário com ' + qs.length + ' questões de Português, Matemática, História, Geografia, Educação Física, Física, Química e Biologia. Suas respostas são salvas automaticamente. Envie antes do horário limite!',
+      instrucoes: 'Prova com ' + qs.length + ' questões de Português, Matemática, História, Geografia, Educação Física, Física, Química e Biologia. Leia com atenção, responda todas as questões e clique em FINALIZAR E ENVIAR PROVA antes do horário limite. Suas respostas são salvas automaticamente.',
       turmas: x.turmas.slice(), alunos: [], abertura: pz.abertura, encerramento: pz.encerramento, aceitaAtraso: false,
       questoes: JSON.parse(JSON.stringify(qs)), status: 'publicada', notasLiberadas: false, criadoEm: agora_(), atualizadoEm: agora_(),
-      desafio: { dia: dia, nivel: nivel, origem: origem, liberar: cf.liberar } });
+      desafio: { dia: dia, nivel: nivel, origem: origem, liberar: cf.liberar, duracaoMin: cf.duracaoMin } });
     n++;
   });
   if (n && !feitos.length) {
@@ -124,9 +137,15 @@ function desafioResultado_(a, e) {
 }
 // tarefas periódicas: liberar gabaritos no encerramento e guardar o histórico resumido
 function desafioManutencao_() {
-  const t = agora_(); let lib = 0, hist = 0;
+  const t = agora_(); let lib = 0, hist = 0, auto = 0;
   all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio).forEach(a => {
     if (!a.notasLiberadas && a.desafio.liberar !== 'manual' && a.encerramento && a.encerramento < t) { a.notasLiberadas = true; upd_('Atividades', a); lib++; }
+    all_('Entregas').filter(e => e.atividadeId === a.id && e.status === 'rascunho' && t > provaFim_(a, e) + 120000).forEach(e => {
+      const pend = autoCorrige_(a, e); const fim = provaFim_(a, e);
+      e.status = pend ? 'enviada' : 'corrigida'; e.enviadoEm = Math.min(t, fim); e.atualizadoEm = t; e.atrasada = false; e.autoEnviada = true;
+      if (!pend) e.corrigidoEm = t;
+      upd_('Entregas', e); auto++;
+    });
     all_('Entregas').filter(e => e.atividadeId === a.id && (e.status === 'enviada' || e.status === 'corrigida')).forEach(e => {
       const r = desafioResultado_(a, e);
       const o = { id: 'h' + e.id, alunoId: e.alunoId, professorId: a.professorId, atividadeId: a.id, dia: a.desafio.dia, nivel: a.desafio.nivel, status: e.status,
@@ -137,11 +156,11 @@ function desafioManutencao_() {
       hist++;
     });
   });
-  return { liberados: lib, historico: hist };
+  return { liberados: lib, historico: hist, autoEnviadas: auto };
 }
 function desafioEstado_(dia) {
   const pend = desafioPendentes_(dia); const c = cfg_();
-  const prim = {}; desafioAlvos_().forEach(x => { const ab = desafioPrazo_(dia, desafioCfgProf_(x.professorId)).abertura; if (!prim[x.nivel] || ab < prim[x.nivel]) prim[x.nivel] = ab; });
+  const prim = {}; desafioAlvos_(dia).forEach(x => { const ab = desafioPrazo_(dia, desafioCfgProf_(x.professorId)).abertura; if (!prim[x.nivel] || ab < prim[x.nivel]) prim[x.nivel] = ab; });
   const existentes = {}; desafiosDoDia_(dia).forEach(a => { existentes[a.desafio.nivel] = a.questoes; });
   return { dia: dia, pendentes: pend, abertura: prim, existentes: existentes, ia: !!c.desafioIA, provedor: c.iaProvedor, discursivas: Math.max(0, Math.min(10, Number(c.desafioDiscursivas) || 0)),
     uso: pend.reduce((o, nv) => { o[nv] = desafioUso_(nv); return o; }, {}), assuntos: pend.reduce((o, nv) => { o[nv] = desafioAssuntosRecentes_(nv).slice(0, 80); return o; }, {}) };
@@ -152,7 +171,10 @@ function desafioVisao_(a, u, t) {
   const e = entregaDe_(a.id, u.id);
   const o = { id: a.id, titulo: a.titulo, nivel: a.desafio.nivel, nivelNome: DESAFIO_NIVEIS[a.desafio.nivel], dia: a.desafio.dia, qtd: (a.questoes || []).length,
     abertura: a.abertura, encerramento: a.encerramento, situacao: situacao_(a, e, t), podeEnviar: podeEnviar_(a, t), rascunho: !!(e && e.status === 'rascunho'),
-    respondidas: e ? (e.respostas || []).filter(x => x !== null && x !== undefined && x !== '').length : 0, liberado: !!a.notasLiberadas };
+    respondidas: e ? (e.respostas || []).filter(x => x !== null && x !== undefined && x !== '').length : 0, liberado: !!a.notasLiberadas,
+    duracaoMin: Number(a.desafio.duracaoMin) || 0, iniciadoEm: e && e.iniciadoEm || null, fim: provaFim_(a, e && e.status === 'rascunho' ? e : null),
+    turmas: (a.turmas || []).filter(id => turmasAluno_(u.id).indexOf(id) >= 0).map(id => { const tt = get_('Turmas', id); return tt ? { nome: tt.nome, serie: tt.serie || '' } : null; }).filter(Boolean) };
+  if (e && e.status === 'rascunho') { o.fim = provaFim_(a, e); if (t > o.fim + 120000) o.podeEnviar = false; }
   if (e && (e.status === 'enviada' || e.status === 'corrigida')) {
     o.enviadoEm = e.enviadoEm;
     if (cfg_().desafioPlacar || gabaritoLiberado_(a, e)) { const r = desafioResultado_(a, e); o.acertos = r.acertos; o.erros = r.erros; o.objetivas = r.objetivas; o.discPendentes = r.discPendentes; }
@@ -171,7 +193,8 @@ rota_('desafioHoje', ALU, false, u => {
   if (niveis.length) {
     const cf = desafioCfgProf_(niveis[0].t.professorId);
     const hojeAb = desafioPrazo_(dia, cf).abertura;
-    proximo = hojeAb > t ? hojeAb : desafioPrazo_(diaLocal_(t + 864e5), cf).abertura;
+    if (hojeAb > t && cf.diasSemana.indexOf(diaSemana_(dia)) >= 0) proximo = hojeAb;
+    else for (let k = 1; k <= 7 && !proximo; k++) { const dd = diaLocal_(t + k * 864e5); if (cf.diasSemana.indexOf(diaSemana_(dd)) >= 0) proximo = desafioPrazo_(dd, cf).abertura; }
   }
   return { agora: t, dia: dia, desafios: vis, proximo: proximo, temDesafio: niveis.length > 0, ativo: !!cfg_().desafioAtivo };
 });
@@ -203,7 +226,8 @@ rota_('desafioPainel', PROF, false, u => {
       liberado: !!a.notasLiberadas, professor: adm ? nomeU_(a.professorId) : '' };
   });
   return { dia: dia, agora: t, global: { ativo: !!c.desafioAtivo, ia: !!c.desafioIA, abertura: hhmm_(c.desafioAbertura, '06:00'), encerramento: hhmm_(c.desafioEncerramento, '23:00'),
-      diasPrazo: Number(c.desafioDiasPrazo) || 0, liberar: c.desafioLiberar, discursivas: Number(c.desafioDiscursivas), nivelPadrao: c.desafioNivelPadrao, placar: !!c.desafioPlacar },
+      diasPrazo: Number(c.desafioDiasPrazo) || 0, liberar: c.desafioLiberar, discursivas: Number(c.desafioDiscursivas), nivelPadrao: c.desafioNivelPadrao, placar: !!c.desafioPlacar,
+      duracaoMin: duracao_(c.desafioDuracaoMin), diasSemana: diasSemana_(c.desafioDiasSemana) },
     meu: desafioCfgProf_(u.id), proprio: c['desafioProf_' + u.id] || null, turmas: turmas, recentes: recentes, pendentes: desafioPendentes_(dia), niveis: DESAFIO_NIVEIS,
     iaChave: true, admin: adm };
 });
@@ -217,18 +241,22 @@ rota_('desafioConfigSalvar', PROF, true, (u, d) => {
     setCfg_('desafioDiasPrazo', Math.max(0, Math.min(6, Number(g.diasPrazo) || 0))); setCfg_('desafioLiberar', g.liberar === 'manual' ? 'manual' : 'encerramento');
     setCfg_('desafioDiscursivas', Math.max(0, Math.min(10, Math.round(Number(g.discursivas) || 0))));
     if (DESAFIO_NIVEIS[g.nivelPadrao]) setCfg_('desafioNivelPadrao', g.nivelPadrao);
+    if (g.duracaoMin !== undefined) setCfg_('desafioDuracaoMin', duracao_(g.duracaoMin));
+    if (Array.isArray(g.diasSemana)) { if (!diasSemana_(g.diasSemana).length) erro_('Escolha pelo menos um dia da semana para a prova.'); setCfg_('desafioDiasSemana', diasSemana_(g.diasSemana)); }
   }
   if (d.meu) {
     const m = d.meu;
     setCfg_('desafioProf_' + u.id, { ativo: m.ativo !== false, abertura: hhmm_(m.abertura, ''), encerramento: hhmm_(m.encerramento, ''),
-      diasPrazo: m.diasPrazo === '' || m.diasPrazo === undefined ? '' : Math.max(0, Math.min(6, Number(m.diasPrazo) || 0)), liberar: m.liberar === 'manual' ? 'manual' : m.liberar === 'encerramento' ? 'encerramento' : '' });
+      diasPrazo: m.diasPrazo === '' || m.diasPrazo === undefined ? '' : Math.max(0, Math.min(6, Number(m.diasPrazo) || 0)), liberar: m.liberar === 'manual' ? 'manual' : m.liberar === 'encerramento' ? 'encerramento' : '',
+      duracaoMin: m.duracaoMin === '' || m.duracaoMin === undefined ? '' : duracao_(m.duracaoMin), diasSemana: Array.isArray(m.diasSemana) ? diasSemana_(m.diasSemana) : undefined });
+    if (Array.isArray(m.diasSemana) && !diasSemana_(m.diasSemana).length) erro_('Escolha pelo menos um dia da semana para a prova.');
   }
   // aplica o novo prazo aos desafios de hoje e de amanhã que ainda não encerraram
   let ajustados = 0;
   all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio && a.desafio.dia >= dia && (a.professorId === u.id || (d.global && u.perfil === 'admin'))).forEach(a => {
     const cf = desafioCfgProf_(a.professorId); const pz = desafioPrazo_(a.desafio.dia, cf);
     if (a.encerramento < t) return;
-    a.abertura = pz.abertura; a.encerramento = pz.encerramento; a.desafio.liberar = cf.liberar; a.atualizadoEm = t; upd_('Atividades', a); ajustados++;
+    a.abertura = pz.abertura; a.encerramento = pz.encerramento; a.desafio.liberar = cf.liberar; a.desafio.duracaoMin = cf.duracaoMin; a.atualizadoEm = t; upd_('Atividades', a); ajustados++;
   });
   log_(u, 'desafio_config', JSON.stringify(d).slice(0, 250));
   return { ajustados: ajustados, meu: desafioCfgProf_(u.id) };
@@ -245,6 +273,12 @@ rota_('desafioGerarAgora', PROF, true, u => {
   if (!pend.length) erro_('Os desafios de hoje já estão prontos para todas as turmas.');
   log_(u, 'desafio_gerar', pend.join(','));
   return { __desafio: { acao: 'preparar', dia: dia, chave: PROPS().getProperty('BANCO_CHAVE') || '' } };
+});
+rota_('desafioIniciar', ALU, true, (u, d) => {
+  const a = ativAluno_(u, d.id); if (a.tipo !== 'desafio') erro_('Esta não é uma prova do dia.');
+  const e = rascunho_(u, a); if (!e.respostas || !e.respostas.length) { e.respostas = (a.questoes || []).map(() => null); }
+  e.atualizadoEm = agora_(); upd_('Entregas', e);
+  return { iniciadoEm: e.iniciadoEm, fim: provaFim_(a, e), agora: agora_() };
 });
 const DESAFIO_SIS = {
   estado: a => desafioEstado_(a.dia),

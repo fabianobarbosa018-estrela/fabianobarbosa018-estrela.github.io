@@ -76,6 +76,36 @@ troca('</style>', """.hub{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px;pa
 .card .dz-placar span,.modal .dz-placar span{background:#eef1f7}.ok{color:var(--ok)}.bad{color:var(--bad)}.desafio .ok,.desafio .bad{color:#fff}
 .dz-barra{position:sticky;top:0;z-index:5;background:var(--warnb);color:var(--warn);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-weight:800;box-shadow:var(--sh)}.dz-barra .cd.urg{color:var(--bad)}
 </style>""")
+troca('</style>', """.pv-folha{background:#fff;border:1px solid #d9dde8;border-radius:14px;padding:22px;margin-bottom:16px;box-shadow:0 2px 0 #e9ecf3,0 8px 24px rgba(20,30,60,.06)}
+.pv-capa{border-top:6px solid var(--pri);text-align:left}.pv-tit{font-size:24px;font-weight:900;letter-spacing:.5px;color:var(--ink)}.pv-sub{color:var(--mut);font-weight:700;margin-top:2px}
+.pv-cab{background:#fff;border:2px solid var(--ink);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.pv-topo{display:flex;gap:12px;align-items:center;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:10px}
+.pv-logo{width:46px;height:46px;border-radius:12px;background:var(--pri);display:grid;place-items:center;font-size:24px;flex:none}
+.pv-escola{font-size:12px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:1px}
+.pv-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;margin-top:12px}
+.pv-campos div{border-bottom:1px dashed #cdd3e0;padding-bottom:4px;min-width:0}.pv-campos span{display:block;font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+.pv-campos b{font-size:15px;overflow-wrap:anywhere}
+.pv-est{font-weight:800;margin-top:14px}.pv-cd{font-size:18px;font-weight:900;margin-top:8px;color:var(--pri)}.pv-btn{width:100%;margin-top:16px;min-height:54px;font-size:16px;letter-spacing:.5px}
+.pv-vazio{text-align:center;background:#fff;border:1px dashed #cdd3e0;border-radius:14px;padding:30px 18px;margin-bottom:16px}
+.pv-resumo{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;color:var(--mut)}.pv-resumo b{color:var(--ink);font-size:18px}
+.pv-outras{display:block;width:100%;text-align:left;background:transparent;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:18px;font-weight:700;color:var(--mut);cursor:pointer}
+.pv-instr{padding-left:20px;line-height:1.6}.pv-instr li{margin-bottom:6px}
+.pv-tab{width:100%;border-collapse:collapse;margin:10px 0}.pv-tab th,.pv-tab td{border:1px solid #d9dde8;padding:8px 10px;text-align:left}.pv-tab th{background:#f3f5fa;font-size:13px}
+.pv-barra{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:12px;box-shadow:var(--sh)}
+.pv-relogio{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums}.pv-relogio .cd.urg,.pv-relogio [data-cd].urg{color:#ffd166}.pv-cont{flex:1;font-size:14px}.pv-barra .btn{background:#fff;color:var(--ink);margin:0}
+.pv-grade{display:grid;grid-template-columns:1fr;gap:14px}@media(min-width:900px){.pv-grade{grid-template-columns:1fr 290px}.pv-dir{display:block!important;position:sticky;top:76px;align-self:start}}
+.pv-dir{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}.pv-dir.aberto{display:block}
+.pv-disc{background:#eef2ff;color:var(--pri);font-weight:900;letter-spacing:.5px;border-radius:10px;padding:10px 14px;margin:14px 0 10px}.pv-disc span{float:right;font-size:12px;color:var(--mut);font-weight:700;letter-spacing:0}
+.pv-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0}.pv-nav .btn{margin:0;min-height:48px;min-width:120px}.pv-num{font-weight:800;color:var(--mut);text-align:center}
+.pv-mapa-t{font-weight:900;margin-bottom:6px}.pv-mapa-d{font-size:12px;font-weight:800;color:var(--mut);margin:10px 0 4px}
+.pv-mapa-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:6px}
+.pv-mapa-g button{height:38px;border-radius:8px;border:1.5px solid #cdd3e0;background:#fff;font-weight:800;cursor:pointer}
+.pv-mapa-g button.ok{background:var(--ok);border-color:var(--ok);color:#fff}.pv-mapa-g button.at{outline:3px solid var(--pri);outline-offset:1px}
+.pv-leg{font-size:12px;color:var(--mut);margin-top:10px}.pv-leg .ok{color:var(--ok)}
+.pv-final{display:block;width:100%;min-height:56px;font-size:17px;font-weight:900;letter-spacing:.5px;background:var(--ok);color:#fff;border:0;margin-top:16px}
+.pv-res{text-align:center}.pv-mini{padding:10px 14px;font-size:14px;line-height:1.4}@media(min-width:900px){[data-a=provaMapa]{display:none}}.pv-dias{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 12px}.pv-dias label{margin:0}.pv-dias input{display:none}
+.pv-dias span{display:inline-block;padding:7px 11px;border:1.5px solid var(--line);border-radius:20px;font-weight:800;cursor:pointer}.pv-dias input:checked+span{background:var(--ink);color:#fff;border-color:var(--ink)}
+</style>""")
 troca("const A=await api('atividades');const f=p.f||'todas';", "const A=(await api('atividades')).filter(a=>a.tipo!=='desafio');const f=p.f||'todas';")
 troca("Object.entries(TIPO).map(([k,v])=>`<option value=\"${k}\" ${a.tipo===k?'selected':''}>${v}</option>`)", "Object.entries(TIPO).filter(([k])=>k!=='desafio'||a.tipo==='desafio').map(([k,v])=>`<option value=\"${k}\" ${a.tipo===k?'selected':''}>${v}</option>`)")
 troca('<span class="qtag">${TIPOQ[q.tipo]}</span>', '<span class="qtag">${TIPOQ[q.tipo]}</span>${q.disciplina?`<span class="qtag">${ic(q.disciplina)} ${esc(q.disciplina)}</span>`:\'\'}')

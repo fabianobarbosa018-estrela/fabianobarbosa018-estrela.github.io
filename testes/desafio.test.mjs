@@ -131,5 +131,27 @@ r = await api(A, 'desafioHoje'); t('acesso do aluno cria o desafio na hora, se f
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");
 await api(P, 'desafioConfigSalvar', { meu: { ativo: false } });
 r = await api(A, 'desafioHoje'); t('professor pode desligar o desafio', r.d.desafios.length === 0 && !r.d.temDesafio, r.d);
+// ---- tempo para responder (cronômetro) e envio automático ----
+await q("delete from sd_atividades where data->>'tipo' = 'desafio'"); await q("delete from sd_entregas");
+await api(P, 'desafioConfigSalvar', { meu: { ativo: true, abertura: '00:00', encerramento: '23:59', diasPrazo: 0, liberar: 'encerramento', duracaoMin: 60, diasSemana: [0, 1, 2, 3, 4, 5, 6] } });
+r = await api(A, 'desafioHoje'); const pv = r.d.desafios.find(x => x.nivel === 'F2') || r.d.desafios[0];
+t('prova traz o tempo para responder, turma e série', pv && pv.duracaoMin === 60 && pv.turmas.length && pv.turmas[0].serie, pv);
+r = await api(A, 'desafioIniciar', { id: pv.id }); t('aluno inicia a prova', r.ok && r.d.fim - r.d.iniciadoEm === 3600000, r);
+r = await api(A, 'desafioHoje'); t('cronômetro do aluno', r.d.desafios.find(x => x.id === pv.id).fim === (await api(A, 'desafioIniciar', { id: pv.id })).d.fim);
+r = await api(A, 'salvarRascunho', { id: pv.id, respostas: [0, 1] }); t('salva durante o tempo', r.ok);
+await q("update sd_entregas set data = jsonb_set(data, '{iniciadoEm}', to_jsonb((extract(epoch from now()) * 1000)::bigint - 65 * 60000)) where data->>'atividadeId' = $1", [pv.id]);
+r = await api(A, 'salvarRascunho', { id: pv.id, respostas: [0, 1, 0] }); t('depois do tempo não aceita mais respostas', !r.ok && /tempo da prova terminou/.test(r.erro), r);
+r = await api(A, 'enviarAtividade', { id: pv.id, respostas: [0] }); t('nem envio fora do tempo', !r.ok);
+r = JSON.parse(JSON.stringify(await E.processar({ acao: 'desafioCron', segredo: 'segredo-teste' })));
+t('o sistema entrega sozinho a prova quando o tempo acaba', r.ok && r.d.manutencao.autoEnviadas === 1, r.d);
+const [eAuto] = await q("select data from sd_entregas where data->>'atividadeId' = $1", [pv.id]);
+t('entrega automática corrigida com as respostas salvas', eAuto.data.autoEnviada && eAuto.data.status !== 'rascunho' && Array.isArray(eAuto.data.correcao.pontos));
+// ---- dias da prova ----
+const hojeS = new Date(Date.now() - 3 * 3600e3).getUTCDay();
+await q("delete from sd_atividades where data->>'tipo' = 'desafio'");
+r = await api(P, 'desafioConfigSalvar', { meu: { ativo: true, diasSemana: [] } }); t('exige pelo menos um dia', !r.ok);
+r = await api(P, 'desafioConfigSalvar', { meu: { ativo: true, abertura: '00:00', encerramento: '23:59', diasSemana: [(hojeS + 1) % 7] } }); t('professor escolhe os dias da prova', r.ok);
+r = await api(A, 'desafioHoje'); t('sem prova em dia não marcado; mostra a próxima', r.d.desafios.length === 0 && r.d.proximo > Date.now() && r.d.proximo - Date.now() < 2 * 864e5, r.d);
+r = await api(P, 'desafioPainel'); t('nada pendente em dia sem prova', r.d.pendentes.length === 0);
 console.log(`Desafio: ${ok} ok, ${falhas} falhas`);
 E.restaurarConsole(); process.exit(falhas ? 1 : 0);
