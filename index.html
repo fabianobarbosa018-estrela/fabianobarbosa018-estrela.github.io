@@ -1049,7 +1049,7 @@ VIEWS.a_atividades=async function(){
     if(x.situacao==='agendada'){estado=`<div class="pv-est">🔒 A prova abre ${quando(x.abertura)}</div><div class="pv-cd">Abre em ${cd(x.abertura)}</div>`}
     else if(!x.enviadoEm&&x.podeEnviar){estado=x.rascunho?`<div class="pv-est">✍️ Prova em andamento · ${x.respondidas} de ${x.qtd} respondidas</div>`:`<div class="pv-est">🟢 Prova aberta</div>`;
       estado+=`<div class="pv-cd">⏳ ${x.rascunho&&x.duracaoMin?'Seu tempo termina em':'Encerra em'} ${cd(x.rascunho?x.fim:x.encerramento)}</div>`;
-      botao=`<button class="btn pri pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">${x.rascunho?'CONTINUAR A PROVA ▶':'ABRIR A PROVA ▶'}</button>`}
+      botao=`<div class="pv-opcoes"><button class="btn pri pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">${x.rascunho?'▶ CONTINUAR A PROVA':'▶ INICIAR PROVA'}<small>Responder pelo celular ou computador</small></button><button class="btn pv-btn pv-imprimir" data-a="provaImprimir" data-id="${x.id}">🖨️ IMPRIMIR PROVA<small>Baixar em PDF para responder no papel</small></button></div>`}
     else if(x.enviadoEm){estado=`<div class="pv-est">✅ Prova entregue ${quando(x.enviadoEm)}</div>${x.acertos!==undefined?`<div class="dz-placar"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span>${x.discPendentes?`<span>✍️ ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} em correção</span>`:''}</div>`:''}${x.liberado&&x.nota!==undefined?`<div class="pv-est">Nota: <b>${nota(x.nota,x.notaMax)}</b></div>`:''}`;
       botao=`<button class="btn pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">${x.liberado?'VER RESULTADO E GABARITO':'VER MINHA PROVA'}</button>`}
     else{estado=`<div class="pv-est">⏰ Prova encerrada sem entrega.</div>`;botao=x.liberado?`<button class="btn pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">VER GABARITO</button>`:''}
@@ -1069,7 +1069,7 @@ VIEWS.a_inicio=async function(){const [h,d]=await Promise.all([api('desafioHoje'
   if(x){const aberta=x.situacao!=='agendada'&&!x.enviadoEm&&x.podeEnviar;
     card=`<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">${esc(x.nivelNome||'')} · ${x.qtd} questões</div>
     ${x.situacao==='agendada'?`<div class="pv-cd">Abre em ${cd(x.abertura)}</div>`:aberta?`<div class="pv-cd">⏳ Encerra em ${cd(x.rascunho?x.fim:x.encerramento)}</div>`:x.enviadoEm?`<div class="pv-est">✅ Entregue${x.acertos!==undefined?` · ✔ ${x.acertos} acertos · ✘ ${x.erros} erros`:''}</div>`:'<div class="pv-est">⏰ Encerrada</div>'}
-    <button class="btn pri pv-btn" data-go="${aberta?'a_prova':'a_atividades'}" data-p="${P(aberta?{id:x.id}:{})}">${aberta?(x.rascunho?'CONTINUAR A PROVA ▶':'ABRIR A PROVA ▶'):'IR PARA A PROVA DO DIA'}</button></div>`}
+    <button class="btn pri pv-btn" data-go="${aberta?'a_prova':'a_atividades'}" data-p="${P(aberta?{id:x.id}:{})}">${aberta?(x.rascunho?'CONTINUAR A PROVA ▶':'ABRIR A PROVA ▶'):'IR PARA A PROVA DO DIA'}</button>${aberta||x.enviadoEm?`<button class="btn pv-btn pv-imprimir" data-a="provaImprimir" data-id="${x.id}">🖨️ IMPRIMIR PROVA</button>`:''}</div>`}
   else if(h&&h.temDesafio&&h.proximo)card=`<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">Próxima prova ${quando(h.proximo)}</div><div class="pv-cd">Abre em ${cd(h.proximo)}</div></div>`;
   return `<div class="ph"><div><h1>Olá, ${esc(S.u.nome.split(' ')[0])}! 👋</h1><p>${d.turmas.filter(t=>t.status==='aprovado').length?'Bons estudos!':'Entre em uma turma para começar.'}</p></div></div>${card}
   ${!d.turmas.some(t=>t.status==='aprovado')?`<div class="card"><h3>Entre na sua turma</h3><p class="muted">Peça o código ao professor.</p><button class="btn pri" data-go="a_turmas">Usar código da turma</button></div>`:''}
@@ -1106,7 +1106,7 @@ VIEWS.a_prova=async function(p){
       <p class="small muted center">Imprimir não inicia nem envia a prova digital.</p></div>`,depois:()=>{}}}
   // 3) prova em andamento
   PROVA.ativa=true;
-  return {html:`<div class="pv-barra"><div class="pv-relogio">⏳ <span data-cd="${fim}">${dur(fim-Date.now())}</span></div><div class="pv-cont" id="pvCont"></div><button class="btn sm" data-a="provaMapa">☰ Questões</button></div>
+  return {html:`<div class="pv-barra"><div class="pv-relogio">⏳ <span data-cd="${fim}">${dur(fim-Date.now())}</span></div><div class="pv-cont" id="pvCont"></div><button class="btn sm" data-a="provaImprimir" title="Imprimir a prova em PDF">🖨️ Imprimir</button><button class="btn sm" data-a="provaMapa">☰ Questões</button></div>
    <div class="pv-cab pv-mini"><b>PROVA DO DIA</b> · ${esc(S.u.nome)} · ${esc(t.nome)}${t.serie?' ('+esc(t.serie)+')':''} · ${(a.desafio&&a.desafio.dia||'').split('-').reverse().join('/')} · entrega até ${quando(fim)}</div><div class="pv-grade"><div class="pv-esq"><div id="pvDisc" class="pv-disc"></div><div id="pvQ"></div>
    <div class="pv-nav"><button class="btn" data-a="provaAnt">◀ Anterior</button><span id="pvN" class="pv-num"></span><button class="btn pri" data-a="provaProx">Próxima ▶</button></div>
    <div class="small muted center" id="svst">${PL.salvoEm?'Salvo às '+hora(PL.salvoEm):'Suas respostas são salvas automaticamente'}</div></div>
@@ -1177,7 +1177,7 @@ VIEWS.p_desafio=async function(){
    <div class="row2"><label>Discursivas por prova (de 50)<input type="number" id="dzGDisc" min="0" max="10" value="${g.discursivas}"></label>
    <label>Nível quando a série não informa<select id="dzGNiv">${[['F1','Fundamental I'],['F2','Fundamental II'],['EM','Ensino Médio']].map(([k,v])=>`<option value="${k}" ${g.nivelPadrao===k?'selected':''}>${v}</option>`).join('')}</select></label></div>
    <button class="btn" data-a="dzSalvarGeral">Salvar configuração geral</button></div>`;
-  h+=`<h3 style="margin:16px 0 8px">📅 Provas recentes</h3><div class="list">${d.recentes.length?d.recentes.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||''} · ${x.entregues}/${x.alunos} enviaram${x.aproveitamento!==null?' · '+x.aproveitamento.toLocaleString('pt-BR')+'% de acertos':''}${x.aCorrigir?` · <b>${x.aCorrigir} para corrigir</b>`:''}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm" data-go="p_entregas" data-p="${P({id:x.id})}">Entregas</button>${!x.liberado?`<button class="btn sm" data-a="liberar" data-id="${x.id}" data-v="1">Liberar gabarito</button>`:'<span class="pill corrigida">Gabarito liberado</span>'}</div></div>`).join(''):empty('🗓️','Nenhuma prova ainda','A primeira prova é preparada automaticamente.')}</div>`;
+  h+=`<h3 style="margin:16px 0 8px">📅 Provas recentes</h3><div class="list">${d.recentes.length?d.recentes.map(x=>`<div class="it static"><div class="ic">🏆</div><div class="mid"><div class="t">${esc(x.titulo)}</div><div class="s">${ORIGEM[x.origem]||''} · ${x.entregues}/${x.alunos} enviaram${x.aproveitamento!==null?' · '+x.aproveitamento.toLocaleString('pt-BR')+'% de acertos':''}${x.aCorrigir?` · <b>${x.aCorrigir} para corrigir</b>`:''}${x.professor?' · '+esc(x.professor):''}</div></div><div class="end" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm" data-go="p_entregas" data-p="${P({id:x.id})}">Entregas</button><button class="btn sm" data-a="provaImprimir" data-id="${x.id}">🖨️ Imprimir</button>${!x.liberado?`<button class="btn sm" data-a="liberar" data-id="${x.id}" data-v="1">Liberar gabarito</button>`:'<span class="pill corrigida">Gabarito liberado</span>'}</div></div>`).join(''):empty('🗓️','Nenhuma prova ainda','A primeira prova é preparada automaticamente.')}</div>`;
   return {html:h,depois(){$$('[data-tniv]').forEach(s=>s.addEventListener('change',async()=>{try{await api('desafioTurmaNivel',{id:s.dataset.tniv,nivel:s.value});toast('Nível da turma salvo ✓')}catch(e){toast(e.message)}}))}};
 };
 ACOES.dzSalvarMeu=async(d,b)=>{await busy(b,async()=>{try{const r=await api('desafioConfigSalvar',{meu:{ativo:$('#dzMAtivo').checked,abertura:$('#dzMAb').value,encerramento:$('#dzMEn').value,diasPrazo:+$('#dzMDias').value,liberar:$('#dzMLib').value,duracaoMin:+$('#dzMDur').value,diasSemana:diasLer('dzMDia')}});toast('Prazo salvo ✓'+(r.ajustados?' (desafio de hoje ajustado)':''));render()}catch(e){toast(e.message)}})};
@@ -1210,7 +1210,7 @@ async function gerarPdfProva(a,t,aluno){
   const quebra=(txt,larg,sz,b)=>{fonte(sz,b);return doc.splitTextToSize(pdfTxt(txt),larg)};
   const cor=c=>doc.setTextColor(c[0],c[1],c[2]);
   const ESC=[22,28,45],CINZA=[100,108,125],AZUL=[47,91,234];
-  function topoPagina(){fonte(8,false);cor(CINZA);doc.text(pdfTxt('Sala Digital · Prova do dia · '+dia+' · '+aluno),M,M-4);doc.setDrawColor(210,214,224);doc.line(M,M-2.5,W-M,M-2.5);y=M+2}
+  function topoPagina(){fonte(8,false);cor(CINZA);doc.text(pdfTxt('Sala Digital · Prova do dia · '+dia+(aluno?' · '+aluno:'')),M,M-4);doc.setDrawColor(210,214,224);doc.line(M,M-2.5,W-M,M-2.5);y=M+2}
   function novaPagina(){doc.addPage();topoPagina()}
   function escreve(linhas,x,sz,b,c){fonte(sz,b);cor(c||ESC);for(const l of linhas){if(y+lh(sz)>BASE){novaPagina();fonte(sz,b);cor(c||ESC)}doc.text(l,x,y+lh(sz)*0.78);y+=lh(sz)}}
   // ---------- capa ----------
@@ -1219,7 +1219,7 @@ async function gerarPdfProva(a,t,aluno){
   fonte(8.5,true);cor(CINZA);doc.text('SALA DIGITAL',M+22,y+8.5);fonte(18,true);cor(ESC);doc.text('PROVA DO DIA',M+22,y+16);
   fonte(9.5,false);cor(CINZA);doc.text(pdfTxt('Avaliação diária multidisciplinar'+(niv?' · '+niv:'')),M+22,y+21.5);
   doc.setLineWidth(0.4);doc.line(M+5,y+25,W-M-5,y+25);
-  const campos=[['Aluno(a)',aluno],['Turma',t.nome||'—'],['Série',t.serie||'—'],['Data da avaliação',dia],['Prazo para finalizar',a.encerramento?new Date(a.encerramento).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'],['Questões',qs.length+' questões · '+String(Math.round(tot*100)/100).replace('.',',')+' pontos']];
+  const campos=[['Aluno(a)',aluno||'______________________________'],['Turma',t.nome||'—'],['Série',t.serie||'—'],['Data da avaliação',dia],['Prazo para finalizar',a.encerramento?new Date(a.encerramento).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'],['Questões',qs.length+' questões · '+String(Math.round(tot*100)/100).replace('.',',')+' pontos']];
   campos.forEach((c,i)=>{const col=i%2,lin=Math.floor(i/2);const x=M+5+col*(LW-10)/2,yy=y+30+lin*8.5;fonte(7,true);cor(CINZA);doc.text(c[0].toUpperCase(),x,yy);fonte(9.5,true);cor(ESC);doc.text(quebra(c[1],(LW-10)/2-4,9.5,true)[0]||'',x,yy+4.2)});
   y+=62;
   fonte(9.5,true);cor(ESC);doc.text('Nota: ______________',M,y+4);doc.text('Assinatura do(a) aluno(a): ______________________________',M+55,y+4);y+=10;
@@ -1251,7 +1251,7 @@ async function gerarPdfProva(a,t,aluno){
   });
   // ---------- folha de respostas ----------
   novaPagina();fonte(14,true);cor(ESC);doc.text('FOLHA DE RESPOSTAS',W/2,y+5,{align:'center'});y+=9;
-  fonte(9,false);cor(CINZA);doc.text(pdfTxt('Aluno(a): '+aluno+'   ·   Turma: '+(t.nome||'—')+'   ·   Data: '+dia),W/2,y+2,{align:'center',maxWidth:LW});y+=7;
+  fonte(9,false);cor(CINZA);doc.text(pdfTxt('Aluno(a): '+(aluno||'______________________')+'   ·   Turma: '+(t.nome||'—')+'   ·   Data: '+dia),W/2,y+2,{align:'center',maxWidth:LW});y+=7;
   fonte(8.5,false);doc.text('Pinte ou marque com X uma opção por questão. As discursivas são respondidas nas linhas da prova.',W/2,y+2,{align:'center'});y+=7;
   const colW=LW/3,rowH=7.2,porCol=Math.ceil(qs.length/3);const y0=y;
   qs.forEach((q,i)=>{const col=Math.floor(i/porCol),lin=i%porCol;const x=M+col*colW+2,yy=y0+lin*rowH+4;
@@ -1263,14 +1263,21 @@ async function gerarPdfProva(a,t,aluno){
   });
   // rodapé com numeração
   const n=doc.getNumberOfPages();for(let p=1;p<=n;p++){doc.setPage(p);fonte(8,false);cor(CINZA);doc.text(pdfTxt('Sala Digital'),M,H-8);doc.text('Página '+p+' de '+n,W-M,H-8,{align:'right'})}
-  return {blob:doc.output('blob'),nome:'Prova-do-dia-'+nomeArquivo(dia.split('/').reverse().join('-'))+'-'+nomeArquivo(aluno).slice(0,40)+'.pdf',paginas:n};
+  return {blob:doc.output('blob'),nome:'Prova-do-dia-'+nomeArquivo(dia.split('/').reverse().join('-'))+(aluno?'-'+nomeArquivo(aluno).slice(0,40):'-turma')+'.pdf',paginas:n};
 }
-ACOES.provaImprimir=async(d,b)=>{if(!PL||!PL.a)return;const a=PL.a;
+// imprime a prova aberta na tela, ou (pelo cartão/lista) busca a prova pelo id sem iniciá-la
+async function provaParaImprimir(d){
+  if(d&&d.id&&(!PL||!PL.a||PL.a.id!==d.id)){
+    if(S.u.perfil==='aluno'){const r=await api('abrirAtividade',{id:d.id});return {a:r.atividade,t:await turmaDoAluno(r.atividade),aluno:S.u.nome}}
+    const r=await api('atividadeObter',{id:d.id});const T=r.turmas||[];const a=r.atividade;
+    return {a,t:{nome:T.filter(x=>(a.turmas||[]).includes(x.id)).map(x=>x.nome).join(', ')||'—',serie:''},aluno:''}}
+  return {a:PL.a,t:await turmaDoAluno(PL.a),aluno:S.u.nome}}
+ACOES.provaImprimir=async(d,b)=>{
   await busy(b,async()=>{try{
-    const t=await turmaDoAluno(a);const r=await gerarPdfProva(a,t,S.u.nome);
+    const P0=await provaParaImprimir(d);const a=P0.a,t=P0.t;const r=await gerarPdfProva(a,t,P0.aluno);
     const url=URL.createObjectURL(r.blob);S.ultimoPdf=r;
     const lk=document.createElement('a');lk.href=url;lk.download=r.nome;document.body.appendChild(lk);try{lk.click()}catch(e){}lk.remove();
-    modal(`<div class="hd"><h2>🖨️ Prova em PDF pronta</h2><button class="x" data-a="fechar">✕</button></div><p>O arquivo <b>${esc(r.nome)}</b> (${r.paginas} páginas) tem as mesmas ${a.questoes.length} questões da prova digital, sem gabarito, com espaço para as respostas e uma folha de respostas no final.</p>
+    modal(`<div class="hd"><h2>🖨️ Prova em PDF pronta</h2><button class="x" data-a="fechar">✕</button></div><p>O arquivo <b>${esc(r.nome)}</b> (${r.paginas} páginas) tem as mesmas ${a.questoes.length} questões da prova digital, sem gabarito${P0.aluno?'':' e com o nome do aluno em branco para preencher'}, com espaço para as respostas e uma folha de respostas no final.</p>
       <div class="list"><a class="btn pri full" href="${url}" download="${esc(r.nome)}">⬇️ Baixar o PDF</a><a class="btn full" href="${url}" target="_blank" rel="noopener">📄 Abrir para imprimir</a></div>
       <p class="small muted">Imprimir não inicia nem envia a prova digital. Para que a nota seja registrada, entregue a folha ao professor ou responda na prova digital até o prazo.</p>`);
   }catch(e){toast(e.message||'Não foi possível gerar o PDF.')}})};

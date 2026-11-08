@@ -19,8 +19,10 @@ async def main():
             p=await c.new_page(); p.on('pageerror',lambda e:erros.append(str(e)))
             await p.goto(U); await p.wait_for_selector('#fLogin'); await p.fill('#fLogin [name=login]','aluno'); await p.fill('#fLogin [name=senha]','Aluno@2026'); await p.click('#fLogin button'); await p.wait_for_selector('#main h1')
             tok=await p.evaluate('S.token')
-            await p.click('#nav [data-go=a_atividades]'); await p.click('.pv-capa [data-go=a_prova]'); await p.wait_for_selector('[data-a=provaImprimir]')
-            t(nome+': as duas opções aparecem antes de iniciar', await p.locator('[data-a=provaIniciar]').count()==1 and await p.locator('[data-a=provaImprimir]').count()==1)
+            await p.click('#nav [data-go=a_atividades]'); await p.wait_for_selector('.pv-capa [data-a=provaImprimir]')
+            t(nome+': no cartão da prova: INICIAR e IMPRIMIR', await p.locator('.pv-capa [data-go=a_prova]').count()==1 and await p.locator('.pv-capa [data-a=provaImprimir]').count()==1)
+            await p.click('.pv-capa [data-go=a_prova]'); await p.wait_for_selector('[data-a=provaImprimir]')
+            if nome=='cel': t(nome+': as duas opções aparecem antes de iniciar', await p.locator('[data-a=provaIniciar]').count()==1 and await p.locator('[data-a=provaImprimir]').count()==1)
             await p.screenshot(path=f'/tmp/pdf_{nome}_opcoes.png', full_page=True)
             hoje=api(tok,'desafioHoje')['d']['desafios'][0]
             async with p.expect_download(timeout=60000) as dl:
@@ -38,10 +40,32 @@ async def main():
             alts=[(i+1,o) for i,q in enumerate(qs) if q['tipo']=='mc' for o in q['opcoes'] if norm(o)[:30] not in N]
             t(nome+': todas as alternativas', not alts, alts[:5])
             expl=[i+1 for i,q in enumerate(qs) if len(norm(q.get('explicacao','')))>25 and norm(q['explicacao'])[:40] in N]
-            t(nome+': sem gabarito nem explicações', not expl and 'Gabarito' not in txt and 'correta' not in txt.lower(), expl)
+            t(nome+': sem gabarito nem explicações', not expl and not re.search(r'gabarito', txt, re.I), expl)
             ordem=[N.index(norm(q['enunciado'])[:40]) for q in qs]
             depois=api(tok,'desafioHoje')['d']['desafios'][0]
             t(nome+': imprimir não iniciou a prova digital', depois['rascunho']==hoje['rascunho'] and depois.get('enviadoEm')==hoje.get('enviadoEm') and depois['situacao']==hoje['situacao'], [hoje,depois])
+            # durante a prova (já iniciada) o botão continua disponível
+            await p.click('#sheet [data-a=fechar]')
+            if await p.locator('[data-a=provaIniciar]').count(): await p.click('[data-a=provaIniciar]')
+            await p.wait_for_selector('#pvQ .q')
+            t(nome+': imprimir durante a prova', await p.locator('.pv-barra [data-a=provaImprimir]').count()==1)
+            async with p.expect_download(timeout=60000) as dl2: await p.click('.pv-barra [data-a=provaImprimir]')
+            d2=await dl2.value; await d2.save_as(f'/tmp/prova_{nome}_2.pdf'); t(nome+': PDF durante a prova', len(PdfReader(f'/tmp/prova_{nome}_2.pdf').pages)>=5)
+            await p.click('#sheet [data-a=fechar]'); await p.click('#nav [data-go=a_atividades]'); await p.wait_for_selector('.pv-capa [data-a=provaImprimir]')
+            t(nome+': imprimir no cartão da prova em andamento', 'CONTINUAR' in await p.inner_text('.pv-capa'))
+            async with p.expect_download(timeout=60000) as dl3: await p.click('.pv-capa [data-a=provaImprimir]')
+            d3=await dl3.value; await d3.save_as(f'/tmp/prova_{nome}_3.pdf'); t(nome+': PDF pelo cartão', len(PdfReader(f'/tmp/prova_{nome}_3.pdf').pages)>=5)
+            await p.click('#sheet [data-a=fechar]'); await p.click('#nav [data-go=a_inicio]'); await p.wait_for_selector('#main [data-a=provaImprimir]'); t(nome+': imprimir no Início', True)
+            await p.screenshot(path=f'/tmp/pdf_{nome}_cartao.png')
             await c.close()
+        # professor imprime para a turma (nome em branco)
+        c=await b.new_context(viewport={'width':1366,'height':860},accept_downloads=True); p=await c.new_page(); p.on('pageerror',lambda e:erros.append(str(e)))
+        await p.goto(U); await p.wait_for_selector('#fLogin'); await p.fill('#fLogin [name=login]','professor'); await p.fill('#fLogin [name=senha]','Prof@2026'); await p.click('#fLogin button'); await p.wait_for_selector('#main h1')
+        await p.click('#nav [data-go=p_atividades]'); await p.click('.hub [data-go=p_desafio]'); await p.wait_for_selector('[data-a=provaImprimir]')
+        async with p.expect_download(timeout=60000) as dl4: await p.click('[data-a=provaImprimir]')
+        d4=await dl4.value; await d4.save_as('/tmp/prova_prof.pdf'); R=PdfReader('/tmp/prova_prof.pdf'); txt='\n'.join(pg.extract_text() for pg in R.pages)
+        A=api(tp,'atividadeObter',{'id':hoje['id']})['d']['atividade']
+        t('professor imprime para a turma, sem gabarito', len(R.pages)>=5 and '____' in txt and not any(len(q.get('explicacao',''))>25 and norm(q['explicacao'])[:40] in norm(txt) for q in A['questoes']))
+        await c.close()
         print('ERROS JS:', erros); print(f'PDF: {ok} ok, {falhas} falhas')
 asyncio.run(main())
