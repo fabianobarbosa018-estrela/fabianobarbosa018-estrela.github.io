@@ -225,6 +225,7 @@ table.folha tr.sep td{height:22px}
    - No máximo 1 funcionário por setor de folga no domingo (combinação 4),
      e quem folga domingo folga a segunda e a quinta da mesma semana.
    - Cada funcionário folga no máximo 1 domingo por mês (mês do domingo).
+   - Ninguém trabalha mais de 6 dias seguidos (contando a virada de uma semana para a outra).
    - Cobertura (setor com 2 ou mais): SEMPRE pelo menos 1 trabalhando, todos os dias.
      Terça e quarta (hotel fechado): setor com mais de 2 funcionários tem no máximo 1 trabalhando.
    - Modelo:
@@ -284,6 +285,41 @@ table.folha tr.sep td{height:22px}
     if (a.devolucao) return 'Seg a qui (folga + 2 devolvidas)';
     if (Array.isArray(a.dias)) return a.dias.length === 1 ? 'Só ' + DIAS[a.dias[0]].toLowerCase() + ' (festas)' : a.dias.map(function (d) { return DIAS_CURTO[d]; }).join('+');
     return GRUPOS[a.g] ? GRUPOS[a.g].nome : '?';
+  }
+
+  var MAX_SEGUIDOS = 6;
+  /** dias de descanso de f na semana: folgas + férias (+ dias antes da admissão) */
+  function descansoSemana(f, a, sem) {
+    var v = a ? folgasDe(a) : [false, false, false, false, false, false, false];
+    for (var d = 0; d < 7; d++) { var dt = addDias(sem, d); if (emFerias(f, dt) || (f.dataEntrada && dt < f.dataEntrada)) v[d] = true; }
+    return v;
+  }
+  function semanaDe(historico, sem) { return (historico || []).find(function (e) { return e && e.semana === sem && e.atribuicoes; }); }
+  /** maior sequência de dias trabalhados de f, olhando a semana anterior, esta e a seguinte (quando existem) */
+  function maiorSequencia(f, aEsta, sem, historico) {
+    var ant = semanaDe(historico, addDias(sem, -7)), pos = semanaDe(historico, addDias(sem, 7));
+    var dias = [];
+    var temAnt = ant && (ant.atribuicoes[f.id] || feriasNoPeriodo(f, addDias(sem, -7), addDias(sem, -1)));
+    if (temAnt) dias = dias.concat(descansoSemana(f, ant.atribuicoes[f.id], addDias(sem, -7)).map(function (r, i) { return { r: r, dt: addDias(sem, i - 7) }; }));
+    dias = dias.concat(descansoSemana(f, aEsta, sem).map(function (r, i) { return { r: r, dt: addDias(sem, i) }; }));
+    var temPos = pos && (pos.atribuicoes[f.id] || feriasNoPeriodo(f, addDias(sem, 7), addDias(sem, 13)));
+    if (temPos) dias = dias.concat(descansoSemana(f, pos.atribuicoes[f.id], addDias(sem, 7)).map(function (r, i) { return { r: r, dt: addDias(sem, i + 7) }; }));
+    var melhor = { n: 0 }, cur = 0, ini = null;
+    dias.forEach(function (x) { if (x.r) { cur = 0; ini = null; } else { if (!cur) ini = x.dt; cur++; if (cur > melhor.n) melhor = { n: cur, ini: ini, fim: x.dt }; } });
+    // a sequência só conta se encostar nesta semana
+    return melhor;
+  }
+  /** a combinação/atribuição 'a' para f nesta semana respeita o limite de dias seguidos com as semanas vizinhas? */
+  function respeitaSeguidos(f, a, sem, historico) {
+    var ant = semanaDe(historico, addDias(sem, -7)), pos = semanaDe(historico, addDias(sem, 7));
+    var v = descansoSemana(f, a, sem);
+    var F = v.indexOf(true), L = v.lastIndexOf(true);
+    if (F < 0) return false; // semana inteira sem descanso
+    if (ant && ant.atribuicoes[f.id]) { var va = descansoSemana(f, ant.atribuicoes[f.id], addDias(sem, -7)); var La = va.lastIndexOf(true); if (La >= 0 && (6 - La) + F > MAX_SEGUIDOS) return false; }
+    if (pos && pos.atribuicoes[f.id]) { var vp = descansoSemana(f, pos.atribuicoes[f.id], addDias(sem, 7)); var Fp = vp.indexOf(true); if (Fp >= 0 && (6 - L) + Fp > MAX_SEGUIDOS) return false; }
+    // dentro da semana
+    var cur = 0, mx = 0; v.forEach(function (r) { cur = r ? 0 : cur + 1; mx = Math.max(mx, cur); });
+    return mx <= MAX_SEGUIDOS;
   }
 
   function hash(str) { var h = 0; for (var i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; } return Math.abs(h); }
@@ -356,6 +392,7 @@ table.folha tr.sep td{height:22px}
       var dt = addDias(sem, d);
       if (!cad.some(function (f) { return trabalhaNoDia(f, null, dt); })) motivos.push('Na ' + DIAS[d].toLowerCase() + ' ninguém do setor está disponível (férias ou ainda não admitido).');
     });
+    motivos.push('Também é preciso respeitar o máximo de 6 dias seguidos de trabalho com as semanas vizinhas.');
     if (bl.length) motivos.push('Desbloqueie ou altere as combinações bloqueadas e gere de novo.');
     return msg + (motivos.length ? ' Motivo: ' + motivos.join(' ') : '');
   }
@@ -512,7 +549,8 @@ table.folha tr.sep td{height:22px}
       // custo de dar a combinação g ao funcionário f
       var INF = 1e9;
       function custo(f, g) {
-        if (blq[f.id] !== undefined) return blq[f.id] === g ? 0 : INF;
+        if (blq[f.id] !== undefined) return blq[f.id] === g && respeitaSeguidos(f, { g: g }, sem, params.historico) ? 0 : INF;
+        if (!respeitaSeguidos(f, { g: g }, sem, params.historico)) return INF; // no máximo 6 dias seguidos de trabalho
         var c = 0;
         if (g === 4) {
           if (domNoMes[f.id]) return INF; // já folgou um domingo neste mês
@@ -655,6 +693,13 @@ table.folha tr.sep td{height:22px}
       folga.forEach(function (fo, d) { if (!fo) t[d]++; });
     });
 
+    // 5b) no máximo 6 dias seguidos de trabalho (com as semanas vizinhas já cadastradas)
+    if (historico) Object.keys(at).forEach(function (id) {
+      var f = funcPorId[id]; if (!f || !elegivel(f, sem) || !at[id]) return;
+      var m = maiorSequencia(f, at[id], sem, historico);
+      if (m.n > MAX_SEGUIDOS) erros.push({ setor: nomeSetor(f.setorId), funcId: id, msg: f.nome + ' trabalharia ' + m.n + ' dias seguidos (de ' + dataBR(m.ini).slice(0, 5) + ' a ' + dataBR(m.fim).slice(0, 5) + '). O máximo é ' + MAX_SEGUIDOS + ' dias seguidos.' });
+    });
+
     // 6) no máximo um de folga no domingo por setor
     Object.keys(domPorSetor).forEach(function (sid) {
       if (domPorSetor[sid].length > 1) erros.push({ setor: nomeSetor(sid), msg: 'Setor "' + nomeSetor(sid) + '": ' + domPorSetor[sid].length + ' pessoas de folga no mesmo domingo (' + domPorSetor[sid].join(', ') + '). Só é permitido 1 por setor.' });
@@ -747,10 +792,13 @@ table.folha tr.sep td{height:22px}
       function resolver(devolvendo) {
         var dv = {}; devolvendo.forEach(function (f) { dv[f.id] = 1; });
         var opcoes = lista.map(function (f) {
-          if (modo === 'festas') return [1, 2, 3, 4].map(function (d) { return { g: 0, dias: [d] }; });
-          if (dv[f.id]) return [{ g: 2, dias: [1, 2, 3, 4], devolucao: true }];
-          return PERMITIDAS.filter(function (g) { return !(g === 4 && (params.semDomingo || domNoMes[f.id])); }).map(function (g) { return { g: g }; });
+          var o;
+          if (modo === 'festas') o = [1, 2, 3, 4].map(function (d) { return { g: 0, dias: [d] }; });
+          else if (dv[f.id]) o = [{ g: 2, dias: [1, 2, 3, 4], devolucao: true }];
+          else o = PERMITIDAS.filter(function (g) { return !(g === 4 && (params.semDomingo || domNoMes[f.id])); }).map(function (g) { return { g: g }; });
+          return o.filter(function (x) { return respeitaSeguidos(f, x, sem, params.historico); });
         });
+        if (opcoes.some(function (o) { return !o.length; })) return null;
         var melhor = null, idx = lista.map(function () { return 0; });
         var total = opcoes.reduce(function (p, o) { return p * o.length; }, 1);
         for (var k = 0; k < total; k++) {
@@ -761,7 +809,7 @@ table.folha tr.sep td{height:22px}
           var c = 0;
           if (modo === 'festas') {
             var cont = [0, 0, 0, 0, 0];
-            lista.forEach(function (f) { var d = atr[f.id].dias[0]; cont[d]++; var ant = (hist.porFunc[f.id] || []).filter(function (h) { return h.k === 1; })[0]; if (ant && ant.dias && ant.dias[0] === d) c += 5; });
+            lista.forEach(function (f) { var d = atr[f.id].dias[0]; cont[d]++; c += 3 * (4 - d); });
             c += 10 * cont.reduce(function (s, q) { return s + q * q; }, 0);
           } else {
             var podeDom = !params.semDomingo && lista.some(function (f) { return !dv[f.id] && !domNoMes[f.id]; });
@@ -850,6 +898,7 @@ table.folha tr.sep td{height:22px}
     statusDia: statusDia, indexarHistorico: indexarHistorico, hungaro: hungaro,
     cadastradosSetor: cadastradosSetor, regraCobertura: regraCobertura, trabalhandoTerQua: trabalhandoTerQua, trabalhandoPorDia: trabalhandoPorDia, IDX_TER: IDX_TER, IDX_QUA: IDX_QUA,
     PERMITIDAS: PERMITIDAS, DIAS_FUNCIONAMENTO: DIAS_FUNCIONAMENTO,
+    respeitaSeguidos: respeitaSeguidos, maiorSequencia: maiorSequencia, MAX_SEGUIDOS: MAX_SEGUIDOS,
     emFerias: emFerias, feriasNoPeriodo: feriasNoPeriodo, motivoFora: motivoFora, feriadosNacionais: feriadosNacionais, pascoa: pascoa,
     IDX_DOMINGO: IDX_DOMINGO, IDX_QUINTA: IDX_QUINTA
   };
