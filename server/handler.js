@@ -321,7 +321,7 @@ export function criarServidor(io) {
       const D = B.disciplinas.find(x => DISC_BANCO[x.id] === disc); if (!D) return;
       const cand = [];
       D.assuntos.forEach(a => { const pri = ELEGIVEIS[nivel].indexOf(a.n); if (pri < 0 || !assuntoServe(nivel, a)) return;
-        a.q.forEach(q => { const h = hashQ(q[2]); if (jaUsadas.has(h)) return; if (nivel === 'F1I' && (q[1] > 2 || /fra[çc][ãa]o|×\s*[6-9]|[6-9]\s*×/.test(q[2]))) return; cand.push({ q: q, a: a, h: h, uso: uso[h] || '', pri: pri, r: Math.random() }); }); });
+        a.q.forEach(q => { const h = hashQ(q[2]); if (jaUsadas.has(h)) return; if (nivel === 'F1I' && (q[1] > 2 || /fra[çc][ãa]o|÷|divis|resto|quadrad|1, 4, 9|1, 2, 4, 8|^Nessa mesma|[6-9]\s*×\s*[6-9]|\d\s*×\s*\d{2}/i.test(q[2]))) return; cand.push({ q: q, a: a, h: h, uso: uso[h] || '', pri: pri, r: Math.random() }); }); });
       cand.sort((x, y) => (x.uso < y.uso ? -1 : x.uso > y.uso ? 1 : 0) || (x.pri - y.pri) || (x.r - y.r));
       const pegar = (filtro, n) => { const sel = []; for (const c of cand) { if (sel.length >= n) break; if (!c.usado && filtro(c.q)) { c.usado = 1; sel.push(c); } } return sel; };
       const nd = faltaDisc[disc] || 0; const no = Math.max(0, (falta[disc] || 0) - nd);
