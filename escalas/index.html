@@ -196,6 +196,31 @@ table.folha tr.sep td{height:22px}
 .ferias-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
 .shade{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:25;display:none}
 .shade.on{display:block}
+/* vale-transporte */
+table.folha.vt{min-width:0;width:auto}
+table.folha.vt th,table.folha.vt td{font-size:11.5px;min-width:64px;white-space:nowrap;height:20px;padding:1px 4px}
+table.folha.vt th{white-space:normal;line-height:1.15}
+table.folha.vt .fnm{min-width:62px;background:#fff;font-weight:700}
+table.folha.vt .vts{font-weight:500;font-size:10px;color:#1f4ea0}
+table.folha.vt td.vtc{font-weight:500;cursor:pointer;text-align:right;padding-right:6px}
+table.folha.vt td.vt-folga,table.folha.vt td.vt-semvt,table.folha.vt td.vt-faltaJ,table.folha.vt td.vt-afast{color:#6b7280;text-align:center;font-weight:700}
+table.folha.vt td.vt-falta{color:#b91c1c;text-align:center;font-weight:800}
+table.folha.vt td.vt-ferias{background:#FF0000;color:#000;text-align:center;font-weight:700;font-size:10px}
+table.folha.vt td.vt-semEscala{color:#a16207;text-align:center;font-weight:800;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(0,0,0,.05) 4px,rgba(0,0,0,.05) 8px)}
+table.folha.vt td.vt-fora{background:#f3f4f6!important}
+table.folha.vt td.aj{box-shadow:inset 0 0 0 2px #e9a23b}
+table.folha.vt td.vtc:hover{outline:2px solid var(--pri2);outline-offset:-2px}
+table.folha.vt .vtt{background:#fff;min-width:74px;text-align:right;padding-right:6px}
+table.folha.vt th.vtt{background:#C4D79B;text-align:center}
+table.folha.vt tr.vtsub td{border-top:2px solid #000;border-bottom:2px solid #000;font-weight:800}
+table.folha.vt tr.vtsub td.fnm,table.folha.vt tfoot td.fnm{background:#C4D79B}
+table.folha.vt tfoot td{font-weight:700;text-align:right;padding-right:6px}
+table.folha.vt tfoot tr.vtv td{border-top:2px solid #000;font-size:12.5px;font-weight:800}
+table.folha.vt .big2{font-size:14px!important}
+table.folha.vt .edit-click{cursor:pointer}
+.readonly table.folha.vt td.vtc,.readonly table.folha.vt .edit-click{cursor:default;pointer-events:none}
+.vtres td.r,.vtres th.r,table.list td.r,table.list th.r{text-align:right;white-space:nowrap}
+.vtres tfoot td{background:#f3f7e9;border-top:2px solid var(--line)}
 </style>
 </head>
 <body>
@@ -889,13 +914,72 @@ table.folha tr.sep td{height:22px}
     return 'T';
   }
 
+
+  /* --------------- Vale-transporte --------------- */
+  /** valor do VT de um funcionário numa data (histórico de valores: vale o último com "desde" <= data) */
+  function vtValorEm(func, dataISO) {
+    var h = (func && func.vt && func.vt.hist) || [], r = null;
+    for (var i = 0; i < h.length; i++) if (h[i].desde <= dataISO && (!r || h[i].desde >= r.desde)) r = h[i];
+    if (!r) return null;
+    var v = +r.valor || 0, q = r.qtd == null || r.qtd === '' ? 1 : +r.qtd;
+    return { valor: v, qtd: q, total: Math.round(v * q * 100) / 100, desde: r.desde };
+  }
+  var VT_TIPOS = {
+    trab: { cod: '', nome: 'Trabalhou (recebe VT)', paga: true },
+    folga: { cod: 'F', nome: 'Folga', paga: false },
+    falta: { cod: 'FI', nome: 'Falta não justificada', paga: false },
+    faltaJ: { cod: 'FJ', nome: 'Falta justificada', paga: false },
+    afast: { cod: 'AF', nome: 'Afastamento', paga: false },
+    semvt: { cod: 'SV', nome: 'Não precisou de transporte', paga: false }
+  };
+  var r2 = function (x) { return Math.round(x * 100) / 100; };
+  /** Calcula o VT do mês a partir da escala.
+   *  o = { mes:'AAAA-MM', funcionarios, escalas:{semana:escala}, doc:{ajustes:{fid:{data:{t,v,obs}}}, pagamentos:{fid:{q1:{valor},q2:{valor}}}} } */
+  function calcularVT(o) {
+    var y = +o.mes.slice(0, 4), m = +o.mes.slice(5, 7);
+    var dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    var dias = []; for (var i = 1; i <= dim; i++) dias.push(o.mes + '-' + (i < 10 ? '0' : '') + i);
+    var escalas = o.escalas || {}, doc = o.doc || {}, aj = doc.ajustes || {}, pg = doc.pagamentos || {};
+    var sems = []; dias.forEach(function (d) { var s = inicioSemana(d); if (sems.indexOf(s) < 0) sems.push(s); });
+    var semEscala = sems.filter(function (s) { return !escalas[s]; });
+    var linhas = [];
+    (o.funcionarios || []).forEach(function (f) {
+      var naEscala = sems.some(function (s) { return escalas[s] && escalas[s].atribuicoes && escalas[s].atribuicoes[f.id]; });
+      var temAj = aj[f.id] && Object.keys(aj[f.id]).some(function (d) { return d.slice(0, 7) === o.mes; });
+      var temValor = dias.some(function (d) { var v = vtValorEm(f, d); return v && v.total > 0; });
+      if (!temAj && !(temValor && (f.ativo || naEscala))) return;
+      if (f.dataEntrada && f.dataEntrada > dias[dim - 1] && !temAj) return;
+      var cel = dias.map(function (d) {
+        var s = inicioSemana(d), e = escalas[s];
+        var st = statusDia(e && e.atribuicoes ? e.atribuicoes[f.id] : null, d, f, !!e);
+        var base = (st === 'T' || st === 'X') ? 'trab' : st === 'F' ? 'folga' : st === 'V' ? 'ferias' : (!e && f.ativo && !(f.dataEntrada && d < f.dataEntrada)) ? 'semEscala' : 'fora';
+        var a = aj[f.id] && aj[f.id][d], tipo = a && VT_TIPOS[a.t] ? a.t : base;
+        var vd = vtValorEm(f, d), valor = 0;
+        if (tipo === 'trab') valor = a && a.t === 'trab' && a.v != null && a.v !== '' ? +a.v : (vd ? vd.total : 0);
+        var cod = tipo === 'trab' ? '' : tipo === 'ferias' ? 'FÉR' : tipo === 'semEscala' ? '?' : tipo === 'fora' ? '' : VT_TIPOS[tipo].cod;
+        return { d: d, base: base, tipo: tipo, valor: r2(valor), cod: cod, ajuste: a || null };
+      });
+      var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate && c.tipo === 'trab' && c.valor > 0) { n++; v += c.valor; } }); return { dias: n, valor: r2(v) }; };
+      var q1 = soma(1, 15), q2 = soma(16, dim), mes = soma(1, dim);
+      var p = pg[f.id] || {}, pago = { q1: r2(+((p.q1 || {}).valor) || 0), q2: r2(+((p.q2 || {}).valor) || 0) };
+      var vfim = vtValorEm(f, dias[dim - 1]) || vtValorEm(f, dias[0]);
+      linhas.push({ id: f.id, nome: f.nome, setorId: f.setorId, ativo: f.ativo, valorDia: vfim ? vfim.total : 0, passagem: vfim ? vfim.valor : 0, qtd: vfim ? vfim.qtd : 0, cel: cel, q1: q1, q2: q2, mes: mes, pago: pago,
+        saldo: { q1: r2(q1.valor - pago.q1), q2: r2(q2.valor - pago.q2), mes: r2(mes.valor - pago.q1 - pago.q2) },
+        semEscala: cel.filter(function (c) { return c.tipo === 'semEscala'; }).length });
+    });
+    var tot = function (k) { return r2(linhas.reduce(function (a, l) { return a + l[k].valor; }, 0)); };
+    var porDia = dias.map(function (d, i) { return r2(linhas.reduce(function (a, l) { return a + (l.cel[i].tipo === 'trab' ? l.cel[i].valor : 0); }, 0)); });
+    return { mes: o.mes, dias: dias, dim: dim, linhas: linhas, porDia: porDia, semEscala: semEscala,
+      totais: { q1: tot('q1'), q2: tot('q2'), mes: tot('mes'), pago: r2(linhas.reduce(function (a, l) { return a + l.pago.q1 + l.pago.q2; }, 0)) } };
+  }
+
   var Core = {
     DIAS: DIAS, DIAS_CURTO: DIAS_CURTO, GRUPOS: GRUPOS, DIAS_PROIBIDOS: DIAS_PROIBIDOS,
     parse: parse, fmt: fmt, addDias: addDias, diaSemana: diaSemana, inicioSemana: inicioSemana, fimSemana: fimSemana,
     semanasEntre: semanasEntre, dataBR: dataBR, hojeISO: hojeISO, diasDaSemana: diasDaSemana, numeroSemana: numeroSemana,
     folgasDoGrupo: folgasDoGrupo, folgasDe: folgasDe, rotulo: rotulo, gerarEspecial: gerarEspecial, folgasDevidas: folgasDevidas,
     elegivel: elegivel, gerarEscala: gerarEscala, validarEscala: validarEscala,
-    statusDia: statusDia, indexarHistorico: indexarHistorico, hungaro: hungaro,
+    statusDia: statusDia, vtValorEm: vtValorEm, calcularVT: calcularVT, VT_TIPOS: VT_TIPOS, indexarHistorico: indexarHistorico, hungaro: hungaro,
     cadastradosSetor: cadastradosSetor, regraCobertura: regraCobertura, trabalhandoTerQua: trabalhandoTerQua, trabalhandoPorDia: trabalhandoPorDia, IDX_TER: IDX_TER, IDX_QUA: IDX_QUA,
     PERMITIDAS: PERMITIDAS, DIAS_FUNCIONAMENTO: DIAS_FUNCIONAMENTO,
     respeitaSeguidos: respeitaSeguidos, maiorSequencia: maiorSequencia, MAX_SEGUIDOS: MAX_SEGUIDOS,
@@ -916,8 +1000,8 @@ const C = window.Core;
 const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de folga não é fixa nem permanente, ela poderá sofrer alterações a qualquer momento ( no dia anterior a folga ) o horário também poderá ser alterado ( no mesmo dia ) de acordo com a necessidade da Fazenda.\nQualquer duvida, podem procurar a gerencia!';
 const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
 const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
-const S = { setores: [], funcionarios: [], escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
-const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana' };
+const S = { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
+const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
 let DB = null, DL = null;
 const LS_KEY = 'escalas_hotel_v1';
 
@@ -958,7 +1042,7 @@ const Store = {
     atualizarStatus();
   },
   assinar() {
-    const cols = ['setores', 'funcionarios', 'escalas', 'auditoria', 'config'];
+    const cols = ['setores', 'funcionarios', 'escalas', 'auditoria', 'config', 'vt'];
     const timer = setTimeout(() => { if (!S.pronto) { S.pronto = true; S.lento = true; render(); atualizarStatus(); } }, 10000);
     const marcar = (c, snap) => {
       if (!snap.metadata.fromCache) S.carregados[c] = true;
@@ -971,14 +1055,15 @@ const Store = {
     DB.collection('funcionarios').onSnapshot(s => { S.funcionarios = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('funcionarios', s); }, erro('funcionarios'));
     DB.collection('escalas').onSnapshot(s => { const o = {}, ant = {}; s.docs.forEach(d => { const e = Object.assign({}, d.data(), { semana: d.id }); if (C.diaSemana(d.id) === 0) o[d.id] = e; else ant[d.id] = e; }); S.escalas = o; S.escalasAntigas = ant; marcar('escalas', s); }, erro('escalas'));
     DB.collection('auditoria').orderBy('ts', 'desc').limit(800).onSnapshot(s => { S.auditoria = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('auditoria', s); }, erro('auditoria'));
+    DB.collection('vt').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); S.vt = o; marcar('vt', s); }, erro('vt'));
     DB.collection('config').onSnapshot(s => { const g = s.docs.find(d => d.id === 'geral'); if (g) S.config = Object.assign({}, CONFIG_PADRAO, g.data()); marcar('config', s); }, erro('config'));
   },
   carregarLocal() {
-    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
   },
   salvarLocal() {
     if (S.modo === 'nuvem') return Nuvem.guardarCopia();
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ setores: S.setores, funcionarios: S.funcionarios, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
   },
   enfileirar(chave, fn) {
     const ant = this.filas[chave] || Promise.resolve();
@@ -989,12 +1074,14 @@ const Store = {
   aplicar(col, id, limpo) {
     if (col === 'escalas') { if (C.diaSemana(id) === 0) S.escalas[id] = Object.assign({}, limpo, { semana: id }); else S.escalasAntigas[id] = Object.assign({}, limpo, { semana: id }); }
     else if (col === 'config') { if (id === 'geral') S.config = Object.assign({}, CONFIG_PADRAO, limpo); }
+    else if (col === 'vt') S.vt[id] = limpo;
     else if (col === 'auditoria') { const i = S.auditoria.findIndex(x => x.id === id); const o = Object.assign({ id }, limpo); if (i >= 0) S.auditoria[i] = o; else S.auditoria.unshift(o); }
     else { const arr = S[col]; const i = arr.findIndex(x => x.id === id); const obj = Object.assign({ id }, limpo); if (i >= 0) arr[i] = obj; else arr.push(obj); }
   },
   remover(col, id) {
     if (col === 'escalas') { delete S.escalas[id]; delete S.escalasAntigas[id]; }
     else if (col === 'config') S.config = Object.assign({}, CONFIG_PADRAO);
+    else if (col === 'vt') delete S.vt[id];
     else S[col] = S[col].filter(x => x.id !== id);
   },
   async set(col, id, data) {
@@ -1059,7 +1146,7 @@ const Nuvem = {
   },
   async carregarTudo() {
     const r = await this.rpc('esc_ler', { p_desde: null });
-    Object.assign(S, { setores: [], funcionarios: [], escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    Object.assign(S, { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true;
     this.guardarCopia(); render(); atualizarStatus();
@@ -1083,9 +1170,9 @@ const Nuvem = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
   },
-  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), setores: S.setores, funcionarios: S.funcionarios, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
+  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
   lerCopia() {
-    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
+    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
   },
   async falhaGravacao(e) {
     if (e && e.code === 'SESSAO_INVALIDA') { this.sair(true); throw e; }
@@ -1101,7 +1188,7 @@ const Nuvem = {
   async sair(expirou) {
     if (!expirou) { try { await this.rpc('esc_sair', {}); } catch (e) { } }
     try { localStorage.removeItem(this.TOKEN); localStorage.removeItem(this.COPIA); } catch (e) { }
-    Object.assign(S, { setores: [], funcionarios: [], escalas: {}, escalasAntigas: {}, auditoria: [], precisaLogin: true, pronto: true, desde: null });
+    Object.assign(S, { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], precisaLogin: true, pronto: true, desde: null });
     if (expirou) toast('Sua sessão expirou. Entre de novo.');
     render(); atualizarStatus();
   }
@@ -1147,6 +1234,7 @@ const ICON = {
   escala: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
   mensal: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/>',
   funcionarios: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5.5"/>',
+  vt: '<rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-4M16 21l-1-4"/><circle cx="8.5" cy="14" r=".8"/><circle cx="15.5" cy="14" r=".8"/>',
   setores: '<path d="M3 21V8l9-5 9 5v13M9 21v-7h6v7"/>',
   historico: '<path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 3"/>',
   exportar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
@@ -1165,7 +1253,7 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['escala', 'Escala semanal'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+const ROTAS = [['painel', 'Painel'], ['escala', 'Escala semanal'], ['mensal', 'Escala mensal'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
 
 function toast(msg) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
@@ -1256,7 +1344,7 @@ function render() {
   document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
   if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
   const sy = window.scrollY;
-  const fn = { painel: vPainel, escala: vEscala, mensal: vMensal, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { painel: vPainel, escala: vEscala, mensal: vMensal, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -1538,6 +1626,8 @@ function formFunc(f) {
   <div class="fld"><label class="f">Data de entrada <span class="muted small">(deixe em branco se já trabalha no hotel)</span></label><input type="date" name="dataEntrada" value="${esc(f.dataEntrada || '')}"></div></div>
   <div class="fld"><label class="f">Férias</label><div id="ferLista">${(f.ferias || []).map(feriasRow).join('')}</div><button type="button" class="btn sm" data-x="addFer">${ic('plus')} Adicionar período de férias</button>
   <div class="small muted" style="margin-top:4px">Na semana em que houver férias, o funcionário não recebe folgas; os dias de férias aparecem em vermelho na folha.</div></div>
+  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Vale-transporte: valor da passagem (R$)</label><input type="text" inputmode="decimal" name="vtValor" value="${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v ? brl(v.valor) : ''; })()}" placeholder="não recebe"></div>
+  <div class="fld"><label class="f">Passagens por dia</label><input type="text" inputmode="numeric" name="vtQtd" value="${(() => { const v = C.vtValorEm(f, C.hojeISO()); return v ? v.qtd : 1; })()}"></div></div>
   <div class="fld"><label class="f">Observações</label><textarea name="obs" maxlength="1000">${esc(f.obs || '')}</textarea></div>
   ${!S.setores.length ? '<div class="alert w"><span class="ic">!</span><div>Cadastre um setor antes.</div></div>' : ''}
   </form><div class="mf"><button class="btn" data-x="cancel">Cancelar</button><button class="btn pri" data-x="save">Salvar</button></div>`;
@@ -1561,6 +1651,17 @@ function abrirFormFunc(f) {
     ferias.sort((a, b) => a.ini.localeCompare(b.ini));
     const novo = { nome, setorId, funcao: (fd.get('funcao') || '').trim(), ativo: fd.get('ativo') === '1', dataEntrada: fd.get('dataEntrada') || '', obs: (fd.get('obs') || '').trim(), ferias, criadoEm: (f && f.criadoEm) || agoraISO(), atualizadoEm: agoraISO() };
     const id = (f && f.id) || uid('f');
+    // vale-transporte: um novo valor passa a valer a partir do mês atual (os meses anteriores mantêm o valor antigo)
+    const vAnt = C.vtValorEm(f, C.hojeISO()), vS = (fd.get('vtValor') || '').trim(), vV = numBR(vS), vQ = numBR(fd.get('vtQtd') || '1');
+    let vt = (f && f.vt) || undefined;
+    if (vS && !(vV >= 0)) return toast('Valor da passagem inválido.');
+    if (vS && !(vQ >= 0 && vQ === Math.round(vQ))) return toast('Passagens por dia: use um número inteiro.');
+    if (vS && (!vAnt || vAnt.valor !== Math.round(vV * 100) / 100 || vAnt.qtd !== vQ)) {
+      const hist = ((f && f.vt && f.vt.hist) || []).slice(), desde = hist.length ? C.hojeISO().slice(0, 7) + '-01' : '2000-01-01';
+      vt = { hist: hist.filter(x => x.desde !== desde).concat([{ desde, valor: Math.round(vV * 100) / 100, qtd: vQ }]).sort((a, b) => a.desde.localeCompare(b.desde)), nao: false };
+    }
+    if (vt) novo.vt = vt;
+    if (f) { const extra = Object.assign({}, f); delete extra.id; Object.keys(novo).forEach(k => delete extra[k]); Object.assign(novo, extra); }
     try {
       await Store.set('funcionarios', id, novo);
       if (!f) log('funcionario', 'Cadastrado: ' + nome + ' (' + nomeSetor(setorId) + ')');
@@ -2023,7 +2124,7 @@ function abrirWhatsApp() {
 
 /* ---------------- BACKUP / RESTAURAÇÃO ---------------- */
 async function baixarBackup() {
-  const dados = { sistema: 'escalas-hotel', versao: 1, exportadoEm: agoraISO(), config: S.config, setores: S.setores, funcionarios: S.funcionarios, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria };
+  const dados = { sistema: 'escalas-hotel', versao: 1, exportadoEm: agoraISO(), config: S.config, setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria };
   await salvarArquivo('backup-escalas-' + C.hojeISO() + '.json', JSON.stringify(dados, null, 1));
   try { localStorage.setItem('escalas_ultimo_backup', agoraISO()); } catch (e) { }
   log('sistema', 'Backup baixado');
@@ -2042,6 +2143,7 @@ async function restaurar(file) {
     for (const s of d.setores) await Store.set('setores', s.id, s);
     for (const f of d.funcionarios) await Store.set('funcionarios', f.id, f);
     for (const k of Object.keys(d.escalas || {})) await Store.set('escalas', k, d.escalas[k]);
+    if (d.vt) { for (const k of Object.keys(S.vt)) if (!d.vt[k]) await Store.del('vt', k); for (const k of Object.keys(d.vt)) await Store.set('vt', k, d.vt[k]); }
     if (d.config) await Store.set('config', 'geral', d.config);
     const existentes = new Set(S.auditoria.map(a => a.id));
     if (S.modo === 'db') { for (const a of (d.auditoria || []).slice(0, 500)) if (!existentes.has(a.id)) await Store.set('auditoria', a.id, a); }
@@ -2049,6 +2151,382 @@ async function restaurar(file) {
     log('sistema', 'Backup restaurado (arquivo de ' + dtHora(d.exportadoEm) + ')');
     toast('Backup restaurado.');
   } catch (e) { }
+}
+
+/* =====================================================================
+   VALE-TRANSPORTE — calculado pela escala de folgas
+   ===================================================================== */
+const brl = v => (+v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rs = v => 'R$ ' + brl(v);
+const numBR = s => { s = String(s == null ? '' : s).trim().replace(/[R$\s]/g, ''); if (!s) return NaN; if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); return +s; };
+const VT_COR = ['#DDEBF7', '#FCE4D6'];
+const VT_PER = { q1: '1ª quinzena', q2: '2ª quinzena', mes: 'Mês completo' };
+const vtDoc = ym => S.vt[ym] || {};
+function vtOrdenados() { return S.funcionarios.slice().sort((a, b) => cmpSetor(a.setorId, b.setorId) || (a.criadoEm || '').localeCompare(b.criadoEm || '') || a.nome.localeCompare(b.nome)); }
+function vtModelo(ym) { return C.calcularVT({ mes: ym, funcionarios: vtOrdenados(), escalas: S.escalas, doc: vtDoc(ym) }); }
+function vtFaixa(per, dim) { return per === 'q1' ? [1, 15] : per === 'q2' ? [16, dim] : [1, dim]; }
+function vtTituloPer(m, per) { const [a, b] = vtFaixa(per, m.dim); return String(a).padStart(2, '0') + ' A ' + String(b).padStart(2, '0') + '/' + m.mes.slice(5, 7) + '/' + m.mes.slice(0, 4); }
+function vtValorPer(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[vtFaixa(per, m.dim)[1] - 1]); return v ? v.total : l.valorDia; }
+function vtTot(l, per) { return per === 'mes' ? l.mes : l[per]; }
+function vtPago(l, per) { return per === 'mes' ? l.pago.q1 + l.pago.q2 : l.pago[per]; }
+const vtCelTxt = c => c.tipo === 'trab' ? (c.valor > 0 ? brl(c.valor) : '0,00') : c.cod;
+const vtCelTitulo = (l, c) => {
+  const base = { trab: 'trabalho', folga: 'folga', ferias: 'férias', semEscala: 'semana sem escala gerada', fora: 'fora do período de trabalho' }[c.base];
+  let t = l.nome + ' — ' + C.dataBR(c.d) + ': ' + (c.ajuste ? C.VT_TIPOS[c.ajuste.t].nome + ' (ajuste manual; pela escala: ' + base + ')' : 'pela escala: ' + base);
+  if (c.ajuste && c.ajuste.obs) t += ' — ' + c.ajuste.obs;
+  return t;
+};
+/** diferenças entre o fechamento guardado e o cálculo atual */
+function vtDifFechamento(m, q) {
+  const fe = (vtDoc(m.mes).fechamentos || {})[q]; if (!fe) return null;
+  const dif = [];
+  const ids = new Set(Object.keys(fe.porFunc || {}).concat(m.linhas.map(l => l.id)));
+  ids.forEach(id => {
+    const l = m.linhas.find(x => x.id === id), ant = (fe.porFunc || {})[id], agora = l ? l[q].valor : 0, antes = ant ? ant.valor : 0;
+    if (Math.abs(agora - antes) > 0.004) dif.push({ nome: l ? l.nome : (ant && ant.nome) || '?', antes, agora });
+  });
+  return { fe, dif };
+}
+
+function vVT() {
+  const ym = UI.vtMes, m = vtModelo(ym), doc = vtDoc(ym), per = UI.vtPer;
+  const [y, mm] = ym.split('-').map(Number);
+  let h = `<div class="row mb"><div><h1>Vale-transporte</h1><p class="sub" style="margin:0">Calculado automaticamente pela escala de folgas · fechamento por quinzena</p></div></div>
+  <div class="card mb"><div class="row">
+    <button class="btn icon" data-act="vtMesAnt" title="Mês anterior">${ic('chevL')}</button><input type="month" id="vtMes" value="${ym}"><button class="btn icon" data-act="vtMesProx" title="Próximo mês">${ic('chevR')}</button>
+    <b style="margin-left:6px">${MESES[mm - 1]} DE ${y}</b>
+    <div class="sp"></div>
+    ${['q1', 'q2', 'mes'].map(p => `<button class="btn sm ${per === p ? 'pri' : ''}" data-act="vtPer" data-p="${p}">${VT_PER[p]}</button>`).join('')}
+  </div>
+  <div class="row mt"><button class="btn" data-act="vtPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="vtXLS">${ic('xls')} Excel</button>
+  <span class="row" style="gap:6px"><span class="muted" style="font-weight:600">${ic('print').replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px"')} Imprimir:</span><button class="btn sm" data-act="vtPrint" data-p="q1">1ª quinzena</button><button class="btn sm" data-act="vtPrint" data-p="q2">2ª quinzena</button><button class="btn sm" data-act="vtPrint" data-p="mes">Mês completo</button></span></div>
+  </div>
+  <div class="tabs">${[['controle', 'Controle diário'], ['resumo', 'Resumo e fechamento'], ['cadastro', 'Valores por funcionário']].map(([k, t]) => `<button class="${UI.vtTab === k ? 'on' : ''}" data-act="vtTab" data-t="${k}">${t}</button>`).join('')}</div>`;
+  // avisos
+  const semValor = S.funcionarios.filter(f => f.ativo && !(C.vtValorEm(f, m.dias[m.dim - 1]) || {}).total && !(f.vt && f.vt.nao));
+  if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste mês ainda <b>sem escala</b> (${m.semEscala.map(semanaLabel).join('; ')}). Esses dias aparecem com <b>?</b> e não entram no cálculo. Gere a escala em <a href="#mensal">Escala mensal</a>.</div></div>`;
+  if (semValor.length && UI.vtTab !== 'cadastro') h += `<div class="alert w"><span class="ic">!</span><div>Sem valor de vale-transporte cadastrado: <b>${semValor.map(f => esc(f.nome)).join(', ')}</b>. <a href="#" data-act="vtTab" data-t="cadastro">Cadastrar valores</a> (ou marque “não recebe VT”).</div></div>`;
+  ['q1', 'q2'].forEach(q => {
+    const d = vtDifFechamento(m, q); if (!d || !d.dif.length) return;
+    h += `<div class="alert w"><span class="ic">!</span><div>A ${VT_PER[q]} foi fechada em ${dtHora(d.fe.em)}, mas a escala ou os ajustes mudaram depois: ${d.dif.map(x => `<b>${esc(x.nome)}</b> ${rs(x.antes)} → ${rs(x.agora)}`).join('; ')}. <a href="#" data-act="vtFechar" data-q="${q}" class="edit-only">Atualizar o fechamento</a></div></div>`;
+  });
+  if (!m.linhas.length && UI.vtTab !== 'cadastro') return h + `<div class="card empty"><b>Ninguém com vale-transporte neste mês</b>Cadastre o valor da passagem de cada funcionário na aba <a href="#" data-act="vtTab" data-t="cadastro">Valores por funcionário</a>.</div>`;
+  if (UI.vtTab === 'resumo') return h + vtResumoHTML(m);
+  if (UI.vtTab === 'cadastro') return h + vtCadastroHTML(m);
+  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AF</b> afastamento</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><i style="background:#fff;border-color:#e9a23b;border-width:2px"></i>dia ajustado à mão</span></div>
+  <p class="small muted edit-only">Toque em um dia para corrigir (falta, afastamento, não precisou de transporte, valor diferente). Toque em <b>PAGO</b> para registrar o pagamento.</p>`;
+}
+
+function vtTabelaHTML(m, per) {
+  const [ini, fim] = vtFaixa(per, m.dim), L = m.linhas, n = L.length;
+  const thN = (l, i, cont, extra) => `<th style="background:${VT_COR[i % 2]}" ${extra || ''}>${cont}</th>`;
+  let h = `<div class="folha-wrap"><table class="folha vt"><thead>
+  <tr><th colspan="${n + 2}" class="ft1" style="background:#C4D79B;color:#000"><span>VALE TRANSPORTE</span></th></tr>
+  <tr><th colspan="${n + 2}" class="ft2" style="background:#C4D79B;color:#000"><span>${vtTituloPer(m, per)}</span></th></tr>
+  <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(l.nome.toUpperCase()))).join('')}<th rowspan="3" class="vtt">TOTAL DO DIA</th></tr>
+  <tr>${L.map((l, i) => thN(l, i, `<span class="vts">${esc(nomeSetor(l.setorId).toUpperCase())}</span>`)).join('')}</tr>
+  <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorPer(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorPer(m, l, per) ? rs(vtValorPer(m, l, per)) : 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(l.nome)}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
+  </thead><tbody>`;
+  const sub = (q, rot) => `<tr class="vtsub"><td class="fnm">${rot}</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${l[q].valor ? brl(l[q].valor) : '-'}</td>`).join('')}<td class="vtt">${brl(L.reduce((a, l) => a + l[q].valor, 0))}</td></tr>`;
+  for (let k = ini; k <= fim; k++) {
+    const d = m.dias[k - 1], fer = feriadoEm(d);
+    h += `<tr><td class="fnm" ${fer ? `style="background:${COR_FERIADO}" title="Feriado: ${esc(fer.nome)}"` : ''}>${k} ${C.DIAS_CURTO[C.diaSemana(d)].toUpperCase()}</td>`;
+    L.forEach((l, i) => {
+      const c = l.cel[k - 1];
+      const cls = ['vtc', c.tipo === 'trab' ? '' : 'vt-' + c.tipo, c.ajuste ? 'aj' : ''].join(' ');
+      h += `<td class="${cls}" style="${c.tipo === 'ferias' ? '' : 'background:' + VT_COR[i % 2]}" data-act="vtDia" data-id="${l.id}" data-d="${d}" title="${esc(vtCelTitulo(l, c))}">${vtCelTxt(c)}</td>`;
+    });
+    h += `<td class="vtt">${m.porDia[k - 1] ? brl(m.porDia[k - 1]) : ''}</td></tr>`;
+    if (per === 'mes' && k === 15) h += sub('q1', '1ª QUINZ.');
+  }
+  if (per === 'mes') h += sub('q2', '2ª QUINZ.');
+  const totP = L.reduce((a, l) => a + vtTot(l, per).valor, 0), pagoP = L.reduce((a, l) => a + vtPago(l, per), 0);
+  h += `</tbody><tfoot>
+  <tr class="vtv"><td class="fnm">VALOR</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-'}</td>`).join('')}<td class="vtt big2">${brl(totP)}</td></tr>
+  <tr><td class="fnm">DIAS</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${vtTot(l, per).dias}</td>`).join('')}<td class="vtt">${L.reduce((a, l) => a + vtTot(l, per).dias, 0)}</td></tr>
+  <tr><td class="fnm">PAGO</td>${L.map((l, i) => { const p = vtPago(l, per); const pg = (vtDoc(m.mes).pagamentos || {})[l.id] || {}; const info = ['q1', 'q2'].filter(q => (per === 'mes' || per === q) && pg[q]).map(q => VT_PER[q] + ': ' + rs(pg[q].valor) + (pg[q].data ? ' em ' + C.dataBR(pg[q].data) : '') + (pg[q].forma ? ' (' + pg[q].forma + ')' : '')).join(' · '); return `<td style="background:${VT_COR[i % 2]}" class="edit-click" data-act="vtPag" data-id="${l.id}" title="${esc(info || 'Registrar pagamento de ' + l.nome)}">${p ? brl(p) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="vtt">${brl(pagoP)}</td></tr>
+  <tr class="vtsaldo"><td class="fnm">SALDO</td>${L.map((l, i) => { const s = Math.round((vtTot(l, per).valor - vtPago(l, per)) * 100) / 100; return `<td style="background:${VT_COR[i % 2]};color:${s > 0 ? '#C00000' : s < 0 ? '#1d4ed8' : '#000'}">${s ? brl(s) : '-'}</td>`; }).join('')}<td class="vtt">${brl(totP - pagoP)}</td></tr>
+  </tfoot></table></div>`;
+  return h;
+}
+
+function vtResumoHTML(m) {
+  const doc = vtDoc(m.mes), fe = doc.fechamentos || {}, T = m.totais;
+  const saldo = T.mes - T.pago;
+  let h = `<div class="grid g4 mb">
+    <div class="card kpi"><div class="l">1ª quinzena (01 a 15)</div><div class="n">${rs(T.q1)}</div><div class="x">${m.linhas.reduce((a, l) => a + l.q1.dias, 0)} diárias${fe.q1 ? ' · fechada' : ''}</div></div>
+    <div class="card kpi"><div class="l">2ª quinzena (16 a ${m.dim})</div><div class="n">${rs(T.q2)}</div><div class="x">${m.linhas.reduce((a, l) => a + l.q2.dias, 0)} diárias${fe.q2 ? ' · fechada' : ''}</div></div>
+    <div class="card kpi"><div class="l">Total do mês (hotel)</div><div class="n">${rs(T.mes)}</div><div class="x">${m.linhas.length} funcionário(s)</div></div>
+    <div class="card kpi"><div class="l">Pago / saldo a pagar</div><div class="n" style="font-size:22px">${rs(T.pago)}</div><div class="x" style="color:${saldo > 0.004 ? 'var(--err)' : 'var(--ok)'};font-weight:700">Saldo: ${rs(saldo)}</div></div>
+  </div>
+  <div class="card mb"><h2>Fechamento das quinzenas</h2><div class="grid g2">${['q1', 'q2'].map(q => {
+    const f = fe[q], d = vtDifFechamento(m, q);
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px"><div class="row"><b>${VT_PER[q]}</b>${f ? '<span class="badge b-ok">fechada</span>' : '<span class="badge b-draft">aberta</span>'}<div class="sp"></div>
+    ${f ? `<button class="btn sm edit-only" data-act="vtReabrir" data-q="${q}">Reabrir</button>` : `<button class="btn sm pri edit-only" data-act="vtFechar" data-q="${q}">${ic('check')} Fechar quinzena</button>`}
+    <button class="btn sm edit-only" data-act="vtPagarTodos" data-q="${q}">Marcar todos como pagos</button></div>
+    <div class="small muted mt">${f ? `Fechada em ${dtHora(f.em)} com total de <b>${rs(f.total)}</b>.${d && d.dif.length ? ' <span style="color:var(--warn)">A escala mudou depois do fechamento.</span>' : ' Confere com a escala atual.'}` : 'Ao fechar, os valores ficam guardados. Se a escala mudar depois, o sistema avisa a diferença.'}</div></div>`;
+  }).join('')}</div></div>
+  <div class="tw"><table class="list vtres"><thead><tr><th>Funcionário</th><th>Setor</th><th class="r">Passagem</th><th class="r">Qtd/dia</th><th class="r">Valor diário</th><th class="r">Dias 1ª</th><th class="r">1ª quinzena</th><th class="r">Dias 2ª</th><th class="r">2ª quinzena</th><th class="r">Dias no mês</th><th class="r">Total do mês</th><th class="r">Pago</th><th class="r">Saldo</th></tr></thead><tbody>`;
+  m.linhas.forEach(l => {
+    const s = l.saldo.mes;
+    h += `<tr><td><b>${esc(l.nome)}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td><td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>
+    <td class="r">${l.q1.dias}</td><td class="r">${rs(l.q1.valor)}</td><td class="r">${l.q2.dias}</td><td class="r">${rs(l.q2.valor)}</td><td class="r">${l.mes.dias}</td><td class="r"><b>${rs(l.mes.valor)}</b></td><td class="r">${rs(l.pago.q1 + l.pago.q2)}</td><td class="r" style="color:${s > 0.004 ? 'var(--err)' : s < -0.004 ? 'var(--off)' : 'inherit'};font-weight:700">${rs(s)}</td></tr>`;
+  });
+  const sm = k => m.linhas.reduce((a, l) => a + k(l), 0);
+  h += `</tbody><tfoot><tr class="vtft"><td colspan="5"><b>TOTAL GERAL DO HOTEL</b></td><td class="r">${sm(l => l.q1.dias)}</td><td class="r"><b>${rs(T.q1)}</b></td><td class="r">${sm(l => l.q2.dias)}</td><td class="r"><b>${rs(T.q2)}</b></td><td class="r">${sm(l => l.mes.dias)}</td><td class="r"><b>${rs(T.mes)}</b></td><td class="r">${rs(T.pago)}</td><td class="r"><b>${rs(saldo)}</b></td></tr></tfoot></table></div>`;
+  const alt = (doc.alteracoes || []);
+  if (alt.length) h += `<details class="card mt"><summary style="cursor:pointer;font-weight:700">Histórico de ajustes deste mês (${alt.length})</summary><ul class="list-sm mt">${alt.slice().reverse().map(x => `<li><span>${esc(x.texto)}</span><span class="small muted">${dtHora(x.ts)}</span></li>`).join('')}</ul></details>`;
+  return h;
+}
+
+function vtCadastroHTML(m) {
+  const ref = m.dias[m.dim - 1];
+  const fs = vtOrdenados().filter(f => f.ativo || (f.vt && f.vt.hist && f.vt.hist.length));
+  let h = `<div class="alert i"><span class="ic">i</span><div>O valor diário é <b>valor da passagem × passagens por dia</b>. Ao mudar um valor, escolha a partir de quando ele vale: os meses anteriores continuam com o valor antigo.</div></div>
+  <div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th class="r">Valor da passagem</th><th class="r">Passagens/dia</th><th class="r">Valor diário</th><th>Vale desde</th><th></th></tr></thead><tbody>`;
+  fs.forEach(f => {
+    const v = C.vtValorEm(f, ref), nao = f.vt && f.vt.nao;
+    h += `<tr><td><b>${esc(f.nome)}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td>
+    <td class="r">${v ? rs(v.valor) : '—'}</td><td class="r">${v ? v.qtd : '—'}</td><td class="r"><b>${v ? rs(v.total) : nao ? '<span class="badge b-off">não recebe</span>' : '<span class="badge b-err">não cadastrado</span>'}</b></td>
+    <td>${v ? (v.desde <= '2000-12-31' ? 'sempre' : C.dataBR(v.desde)) : ''}</td><td class="r"><button class="btn sm edit-only" data-act="vtValor" data-id="${f.id}">${ic('edit')} Editar</button></td></tr>`;
+  });
+  return h + '</tbody></table></div>';
+}
+
+/* ---- edição ---- */
+async function vtSalvarDoc(ym, mut, texto) {
+  const doc = clone(vtDoc(ym)); doc.mes = ym;
+  mut(doc);
+  doc.alteracoes = (doc.alteracoes || []).concat([{ ts: agoraISO(), texto }]).slice(-300);
+  doc.atualizadoEm = agoraISO();
+  try { await Store.set('vt', ym, doc); log('vt', 'VT ' + ym.slice(5) + '/' + ym.slice(0, 4) + ': ' + texto); return true; } catch (e) { return false; }
+}
+function vtEditarDia(fid, d) {
+  const ym = d.slice(0, 7), m = vtModelo(ym), l = m.linhas.find(x => x.id === fid); if (!l) return;
+  const c = l.cel[+d.slice(8) - 1], a = c.ajuste || {};
+  const base = { trab: 'Trabalho', folga: 'Folga', ferias: 'Férias', semEscala: 'Semana sem escala', fora: 'Fora do período' }[c.base];
+  const w = abrirModal(`<div class="mh">${esc(l.nome)} — ${C.DIAS[C.diaSemana(d)].toLowerCase()}, ${C.dataBR(d)}</div><div class="mbd">
+  <p>Pela escala: <b>${base}</b> · valor diário ${rs(l.valorDia)}</p>
+  <div class="fld"><label class="f">Neste dia</label><select id="vtT" style="width:100%"><option value="">Seguir a escala (automático)</option>${Object.entries(C.VT_TIPOS).map(([k, t]) => `<option value="${k}" ${a.t === k ? 'selected' : ''}>${t.nome}</option>`).join('')}</select></div>
+  <div class="fld" id="vtVBox"><label class="f">Valor do VT neste dia <span class="muted small">(em branco = valor diário normal)</span></label><input type="text" inputmode="decimal" id="vtV" value="${a.v != null && a.v !== '' ? brl(a.v) : ''}" placeholder="${brl(l.valorDia)}"></div>
+  <div class="fld"><label class="f">Aplicar até o dia <span class="muted small">(para afastamentos de vários dias)</span></label><input type="date" id="vtAte" value="${d}" min="${d}" max="${m.dias[m.dim - 1]}"></div>
+  <div class="fld"><label class="f">Observação</label><input type="text" id="vtObs" value="${esc(a.obs || '')}" maxlength="200" style="width:100%"></div>
+  </div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
+  const vb = w.querySelector('#vtVBox'), sel = w.querySelector('#vtT');
+  const upd = () => { vb.style.display = sel.value === 'trab' ? '' : 'none'; }; upd(); sel.onchange = upd;
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const t = sel.value, ate = w.querySelector('#vtAte').value || d, obs = w.querySelector('#vtObs').value.trim();
+    let v = null; const vs = w.querySelector('#vtV').value;
+    if (t === 'trab' && vs.trim()) { v = numBR(vs); if (!(v >= 0)) return toast('Valor inválido.'); }
+    if (ate < d || ate.slice(0, 7) !== ym) return toast('O "até o dia" precisa ser no mesmo mês, a partir de ' + C.dataBR(d) + '.');
+    const dias = m.dias.filter(x => x >= d && x <= ate);
+    const txt = l.nome + ', ' + (dias.length > 1 ? C.dataBR(d).slice(0, 5) + ' a ' + C.dataBR(ate).slice(0, 5) : C.dataBR(d).slice(0, 5)) + ': ' + (t ? C.VT_TIPOS[t].nome + (v != null ? ' (' + rs(v) + ')' : '') : 'voltou a seguir a escala') + (obs ? ' — ' + obs : '');
+    const ok = await vtSalvarDoc(ym, doc => {
+      doc.ajustes = doc.ajustes || {}; const aj = doc.ajustes[fid] = doc.ajustes[fid] || {};
+      dias.forEach(x => { if (t) aj[x] = Object.assign({ t, obs, em: agoraISO() }, v != null ? { v } : {}); else delete aj[x]; });
+      if (!Object.keys(aj).length) delete doc.ajustes[fid];
+    }, txt);
+    if (ok) { fecharModal(w); toast('Ajuste salvo.'); }
+  };
+}
+function vtEditarValor(fid) {
+  const f = funcPorId(fid); if (!f) return;
+  const hist = ((f.vt && f.vt.hist) || []).slice().sort((a, b) => a.desde.localeCompare(b.desde));
+  const atual = C.vtValorEm(f, C.hojeISO()) || C.vtValorEm(f, UI.vtMes + '-28') || {};
+  const desdePad = hist.length ? UI.vtMes + '-01' : '';
+  const w = abrirModal(`<div class="mh">Vale-transporte — ${esc(f.nome)}</div><div class="mbd">
+  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Valor da passagem (R$)</label><input type="text" inputmode="decimal" id="vtPv" value="${atual.valor != null ? brl(atual.valor) : ''}" placeholder="0,00"></div>
+  <div class="fld"><label class="f">Passagens por dia</label><input type="text" inputmode="numeric" id="vtPq" value="${atual.qtd != null ? atual.qtd : 1}"></div></div>
+  <p>Valor diário: <b id="vtPt">—</b></p>
+  <div class="fld"><label class="f">Vale a partir de <span class="muted small">(em branco = desde sempre)</span></label><input type="date" id="vtPd" value="${desdePad}"></div>
+  <label class="row" style="gap:8px;margin-bottom:10px"><input type="checkbox" id="vtNao" ${f.vt && f.vt.nao ? 'checked' : ''}> Não recebe vale-transporte</label>
+  ${hist.length ? `<div class="fld"><label class="f">Histórico de valores</label><ul class="list-sm">${hist.map((x, i) => `<li><span>${x.desde <= '2000-12-31' ? 'Desde sempre' : 'A partir de ' + C.dataBR(x.desde)}: ${rs(x.valor)} × ${x.qtd} = <b>${rs(x.valor * x.qtd)}</b>/dia</span><button class="btn icon sm danger" data-x="del" data-i="${i}" title="Remover">${ic('trash')}</button></li>`).join('')}</ul></div>` : ''}
+  </div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
+  const pv = w.querySelector('#vtPv'), pq = w.querySelector('#vtPq'), pt = w.querySelector('#vtPt');
+  const calc = () => { const v = numBR(pv.value), q = numBR(pq.value); pt.textContent = v >= 0 && q >= 0 ? rs(v * q) : '—'; }; calc(); pv.oninput = calc; pq.oninput = calc;
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelectorAll('[data-x=del]').forEach(b => b.onclick = async () => {
+    const x = hist[+b.dataset.i]; if (!await confirmar('Remover valor?', `<p>Remover o valor de ${rs(x.valor)} × ${x.qtd} (${x.desde <= '2000-12-31' ? 'desde sempre' : 'a partir de ' + C.dataBR(x.desde)})? Os meses que usavam esse valor serão recalculados.</p>`, 'Remover', true)) return;
+    const nh = hist.filter((y, i) => i !== +b.dataset.i);
+    try { await Store.set('funcionarios', f.id, Object.assign({}, f, { vt: Object.assign({}, f.vt, { hist: nh }), atualizadoEm: agoraISO() })); log('vt', 'Valor de VT removido: ' + f.nome); fecharModal(w); } catch (e) { }
+  });
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const nao = w.querySelector('#vtNao').checked;
+    const v = numBR(pv.value), q = numBR(pq.value), desde = w.querySelector('#vtPd').value || '2000-01-01';
+    let nh = hist;
+    if (!nao || pv.value.trim()) {
+      if (!(v >= 0)) return toast('Informe o valor da passagem.');
+      if (!(q >= 0) || q !== Math.round(q)) return toast('Passagens por dia: use um número inteiro.');
+      nh = hist.filter(x => x.desde !== desde).concat([{ desde, valor: Math.round(v * 100) / 100, qtd: q }]).sort((a, b) => a.desde.localeCompare(b.desde));
+    }
+    try {
+      await Store.set('funcionarios', f.id, Object.assign({}, f, { vt: { hist: nh, nao }, atualizadoEm: agoraISO() }));
+      log('vt', 'Vale-transporte de ' + f.nome + ': ' + (nao ? 'não recebe' : rs(v) + ' × ' + q + ' = ' + rs(v * q) + '/dia' + (desde > '2000-12-31' ? ' a partir de ' + C.dataBR(desde) : '')));
+      fecharModal(w); toast('Valor salvo.');
+    } catch (e) { }
+  };
+}
+function vtPagamento(fid) {
+  const ym = UI.vtMes, m = vtModelo(ym), l = m.linhas.find(x => x.id === fid); if (!l) return;
+  const pg = ((vtDoc(ym).pagamentos || {})[fid]) || {};
+  let q = UI.vtPer === 'q2' ? 'q2' : 'q1'; if (UI.vtPer === 'mes' && pg.q1 && !pg.q2) q = 'q2';
+  const w = abrirModal(`<div class="mh">Pagamento de VT — ${esc(l.nome)}</div><div class="mbd">
+  <div class="fld"><label class="f">Quinzena</label><select id="pgQ" style="width:100%">${['q1', 'q2'].map(k => `<option value="${k}" ${k === q ? 'selected' : ''}>${VT_PER[k]} — a pagar ${rs(l[k].valor)}${pg[k] ? ' · pago ' + rs(pg[k].valor) : ''}</option>`).join('')}</select></div>
+  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Valor pago (R$)</label><input type="text" inputmode="decimal" id="pgV"></div>
+  <div class="fld"><label class="f">Data</label><input type="date" id="pgD"></div></div>
+  <div class="fld"><label class="f">Forma</label><select id="pgF" style="width:100%">${['PIX', 'Dinheiro', 'Transferência', 'Folha de pagamento', 'Outro'].map(x => `<option>${x}</option>`).join('')}</select></div>
+  </div><div class="mf"><button class="btn danger" data-x="r">Remover pagamento</button><div class="sp"></div><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
+  const sq = w.querySelector('#pgQ');
+  const preencher = () => { const p = pg[sq.value]; w.querySelector('#pgV').value = brl(p ? p.valor : l[sq.value].valor); w.querySelector('#pgD').value = p ? p.data || '' : C.hojeISO(); w.querySelector('#pgF').value = p ? p.forma || 'PIX' : 'PIX'; w.querySelector('[data-x=r]').style.display = p ? '' : 'none'; };
+  preencher(); sq.onchange = preencher;
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=r]').onclick = async () => { const k = sq.value; if (await vtSalvarDoc(ym, doc => { if (doc.pagamentos && doc.pagamentos[fid]) delete doc.pagamentos[fid][k]; }, 'Pagamento removido: ' + l.nome + ' (' + VT_PER[k] + ')')) fecharModal(w); };
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const k = sq.value, v = numBR(w.querySelector('#pgV').value), dt = w.querySelector('#pgD').value, fo = w.querySelector('#pgF').value;
+    if (!(v >= 0)) return toast('Valor inválido.');
+    if (await vtSalvarDoc(ym, doc => { doc.pagamentos = doc.pagamentos || {}; doc.pagamentos[fid] = Object.assign({}, doc.pagamentos[fid], { [k]: { valor: Math.round(v * 100) / 100, data: dt, forma: fo } }); }, 'Pagamento: ' + l.nome + ' — ' + VT_PER[k] + ' ' + rs(v) + (dt ? ' em ' + C.dataBR(dt) : '') + ' (' + fo + ')')) { fecharModal(w); toast('Pagamento registrado.'); }
+  };
+}
+async function vtFechar(q) {
+  const ym = UI.vtMes, m = vtModelo(ym), tot = m.totais[q];
+  const sem = m.semEscala.filter(s => q === 'q1' ? s <= ym + '-15' : C.fimSemana(s) >= ym + '-16');
+  if (!await confirmar('Fechar a ' + VT_PER[q] + '?', `<p>Total da ${VT_PER[q]}: <b>${rs(tot)}</b> (${m.linhas.filter(l => l[q].valor).length} funcionário(s)).</p>${sem.length ? '<div class="alert w"><span class="ic">!</span><div>Há semana sem escala nesse período: esses dias não entraram no cálculo.</div></div>' : ''}<p class="muted">Os valores ficam guardados. Se a escala mudar depois, o sistema mostra a diferença.</p>`, 'Fechar quinzena')) return;
+  const porFunc = {}; m.linhas.forEach(l => { porFunc[l.id] = { nome: l.nome, dias: l[q].dias, valor: l[q].valor }; });
+  if (await vtSalvarDoc(ym, doc => { doc.fechamentos = Object.assign({}, doc.fechamentos, { [q]: { em: agoraISO(), total: tot, porFunc } }); }, VT_PER[q] + ' fechada: ' + rs(tot))) toast('Quinzena fechada.');
+}
+async function vtReabrir(q) {
+  if (!await confirmar('Reabrir a ' + VT_PER[q] + '?', '<p>O fechamento guardado será descartado. Os valores continuam sendo calculados pela escala.</p>', 'Reabrir')) return;
+  await vtSalvarDoc(UI.vtMes, doc => { if (doc.fechamentos) delete doc.fechamentos[q]; }, VT_PER[q] + ' reaberta');
+}
+async function vtPagarTodos(q) {
+  const ym = UI.vtMes, m = vtModelo(ym), pend = m.linhas.filter(l => l[q].valor > 0 && Math.abs(l[q].valor - l.pago[q]) > 0.004);
+  if (!pend.length) return toast('Todos já estão pagos nesta quinzena.');
+  const w = abrirModal(`<div class="mh">Marcar ${VT_PER[q]} como paga</div><div class="mbd"><p>${pend.length} funcionário(s), total <b>${rs(pend.reduce((a, l) => a + l[q].valor, 0))}</b>: ${pend.map(l => esc(l.nome)).join(', ')}.</p>
+  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Data</label><input type="date" id="pgD" value="${C.hojeISO()}"></div><div class="fld"><label class="f">Forma</label><select id="pgF">${['PIX', 'Dinheiro', 'Transferência', 'Folha de pagamento', 'Outro'].map(x => `<option>${x}</option>`).join('')}</select></div></div></div>
+  <div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Marcar como pago</button></div>`);
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const dt = w.querySelector('#pgD').value, fo = w.querySelector('#pgF').value;
+    if (await vtSalvarDoc(ym, doc => { doc.pagamentos = doc.pagamentos || {}; pend.forEach(l => { doc.pagamentos[l.id] = Object.assign({}, doc.pagamentos[l.id], { [q]: { valor: l[q].valor, data: dt, forma: fo } }); }); }, VT_PER[q] + ' paga para ' + pend.length + ' funcionário(s) (' + fo + ')')) { fecharModal(w); toast('Pagamentos registrados.'); }
+  };
+}
+
+/* ---- exportação ---- */
+function vtNomeArq(per, ext) { return ('vale-transporte-' + UI.vtMes + '-' + { q1: '1a-quinzena', q2: '2a-quinzena', mes: 'mes' }[per]) + '.' + ext; }
+async function vtPDF(per, imprimir) {
+  try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
+  catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
+  const m = vtModelo(UI.vtMes), L = m.linhas; if (!L.length) return toast('Nada para exportar.');
+  const [ini, fim] = vtFaixa(per, m.dim), n = L.length;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const verde = rgb('#C4D79B'), cor = i => rgb(VT_COR[i % 2]), preto = [0, 0, 0], branco = [255, 255, 255], azul = [31, 78, 160];
+  const hc = (t, i, extra) => ({ content: t, styles: Object.assign({ fillColor: cor(i) }, extra || {}) });
+  const head = [
+    [{ content: 'VALE TRANSPORTE  ' + vtTituloPer(m, per), colSpan: n + 2, styles: { fontSize: 13, fillColor: verde } }],
+    [{ content: 'DATA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }].concat(L.map((l, i) => hc(l.nome.toUpperCase(), i))).concat([{ content: 'TOTAL DO DIA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }]),
+    L.map((l, i) => hc(nomeSetor(l.setorId).toUpperCase(), i, { textColor: azul, fontStyle: 'normal', fontSize: 5.5 })),
+    L.map((l, i) => hc(vtValorPer(m, l, per) ? 'R$ ' + brl(vtValorPer(m, l, per)) : '-', i, { textColor: azul, fontStyle: 'normal' }))
+  ];
+  const body = [], linhaSub = (q, rot) => [{ content: rot, styles: { fillColor: verde } }].concat(L.map((l, i) => hc(l[q].valor ? brl(l[q].valor) : '-', i))).concat([{ content: brl(L.reduce((a, l) => a + l[q].valor, 0)), styles: { fillColor: verde } }]);
+  for (let k = ini; k <= fim; k++) {
+    const d = m.dias[k - 1], fer = feriadoEm(d);
+    body.push([{ content: k + ' ' + C.DIAS_CURTO[C.diaSemana(d)].toUpperCase(), styles: { halign: 'left', fillColor: fer ? rgb(COR_FERIADO) : branco } }]
+      .concat(L.map((l, i) => { const c = l.cel[k - 1]; return { content: vtCelTxt(c), styles: { fillColor: c.tipo === 'ferias' ? rgb(COR_FERIAS) : cor(i), textColor: c.tipo === 'trab' ? preto : [110, 110, 110], fontStyle: c.tipo === 'trab' ? 'normal' : 'bold' } }; }))
+      .concat([{ content: m.porDia[k - 1] ? brl(m.porDia[k - 1]) : '', styles: { fillColor: branco } }]));
+    if (per === 'mes' && k === 15) body.push(linhaSub('q1', '1ª QUINZ.'));
+  }
+  if (per === 'mes') body.push(linhaSub('q2', '2ª QUINZ.'));
+  const totP = L.reduce((a, l) => a + vtTot(l, per).valor, 0), pagoP = L.reduce((a, l) => a + vtPago(l, per), 0);
+  const foot = [
+    [{ content: 'VALOR', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-', i, { fontStyle: 'bold' }))).concat([{ content: brl(totP), styles: { fillColor: verde, fontStyle: 'bold', fontSize: 8 } }]),
+    [{ content: 'DIAS', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(String(vtTot(l, per).dias), i))).concat([{ content: String(L.reduce((a, l) => a + vtTot(l, per).dias, 0)), styles: { fillColor: verde } }]),
+    [{ content: 'PAGO', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtPago(l, per) ? brl(vtPago(l, per)) : '', i))).concat([{ content: brl(pagoP), styles: { fillColor: verde } }]),
+    [{ content: 'SALDO', styles: { fillColor: verde } }].concat(L.map((l, i) => { const s = vtTot(l, per).valor - vtPago(l, per); return hc(Math.abs(s) > 0.004 ? brl(s) : '-', i, { textColor: s > 0.004 ? [192, 0, 0] : preto, fontStyle: 'bold' }); })).concat([{ content: brl(totP - pagoP), styles: { fillColor: verde, fontStyle: 'bold' } }])
+  ];
+  const dataW = 15, totW = 17, colW = (W - 12 - dataW - totW) / n;
+  const colStyles = { 0: { cellWidth: dataW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: colW }; colStyles[n + 1] = { cellWidth: totW };
+  const nl = fim - ini + 1 + (per === 'mes' ? 2 : 0);
+  doc.autoTable({
+    head, body, foot, startY: 6, theme: 'grid', margin: { left: 6, right: 6 }, showFoot: 'lastPage',
+    styles: { font: 'helvetica', fontSize: n > 14 ? 6 : 7, halign: 'center', valign: 'middle', cellPadding: nl > 20 ? 0.6 : 1.2, lineColor: preto, lineWidth: 0.15, textColor: preto, minCellHeight: nl > 20 ? 4.1 : 6, overflow: 'linebreak' },
+    headStyles: { textColor: preto, fontStyle: 'bold', fontSize: n > 14 ? 5.8 : 6.8 }, footStyles: { textColor: preto, fontStyle: 'bold' },
+    columnStyles: colStyles
+  });
+  const y = doc.lastAutoTable.finalY + 4;
+  doc.setFontSize(7); doc.setTextColor(90);
+  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, doc.internal.pageSize.getHeight() - 4));
+  const blob = doc.output('blob'), nome = vtNomeArq(per, 'pdf');
+  if (imprimir) { try { const u = URL.createObjectURL(blob), win = window.open(u, '_blank'); if (win) { setTimeout(() => URL.revokeObjectURL(u), 60000); return; } } catch (e) { } }
+  await salvarArquivo(imprimir ? nome.replace('.pdf', '-impressao.pdf') : nome, blob);
+}
+async function vtExcel() {
+  try { await carregarScript('libs/exceljs.min.js'); } catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de Excel.</p>'); }
+  const m = vtModelo(UI.vtMes), L = m.linhas, n = L.length; if (!n) return toast('Nada para exportar.');
+  const argb = hex => 'FF' + hex.replace('#', '').toUpperCase();
+  const fill = hex => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: argb(hex) } });
+  const fino = { style: 'thin', color: { argb: 'FF000000' } }, borda = { top: fino, left: fino, bottom: fino, right: fino };
+  const center = { horizontal: 'center', vertical: 'middle' }, moeda = '#,##0.00';
+  const colL = c => { let s = ''; while (c > 0) { const r = (c - 1) % 26; s = String.fromCharCode(65 + r) + s; c = Math.floor((c - 1) / 26); } return s; };
+  const wb = new ExcelJS.Workbook(); wb.creator = S.config.nomeHotel || 'Escalas';
+  const ws = wb.addWorksheet('VT ' + UI.vtMes.slice(5) + '-' + UI.vtMes.slice(0, 4), { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 1, margins: { left: 0.2, right: 0.2, top: 0.3, bottom: 0.3, header: 0.1, footer: 0.1 } }, views: [{ state: 'frozen', xSplit: 1, ySplit: 5, showGridLines: false }] });
+  const nc = n + 2, cel = (r, c, v, st) => { const x = ws.getCell(r, c); x.value = v; Object.assign(x, Object.assign({ border: borda, alignment: center, font: { name: 'Calibri', size: 10 } }, st || {})); return x; };
+  ws.mergeCells(1, 1, 1, nc); cel(1, 1, 'VALE TRANSPORTE ' + vtTituloPer(m, 'mes'), { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true, size: 16 } });
+  cel(2, 1, 'DATA', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } }); ws.mergeCells(2, 1, 4, 1);
+  cel(2, nc, 'TOTAL DO DIA', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true, size: 9 }, alignment: Object.assign({ wrapText: true }, center) }); ws.mergeCells(2, nc, 4, nc);
+  L.forEach((l, i) => {
+    const c = i + 2, f = fill(VT_COR[i % 2]);
+    cel(2, c, l.nome.toUpperCase(), { fill: f, font: { name: 'Calibri', bold: true, size: 10 }, alignment: Object.assign({ wrapText: true }, center) });
+    cel(3, c, nomeSetor(l.setorId).toUpperCase(), { fill: f, font: { name: 'Calibri', size: 8, color: { argb: 'FF1F4EA0' } } });
+    cel(4, c, l.valorDia, { fill: f, numFmt: '"R$" #,##0.00', font: { name: 'Calibri', size: 9, color: { argb: 'FF1F4EA0' } } });
+  });
+  const r0 = 5; let r = r0; const linhaQ = {};
+  m.dias.forEach((d, k) => {
+    const fer = feriadoEm(d);
+    cel(r, 1, (k + 1) + ' ' + C.DIAS_CURTO[C.diaSemana(d)].toUpperCase(), { alignment: { horizontal: 'left', vertical: 'middle' }, fill: fer ? fill(COR_FERIADO) : undefined, font: { name: 'Calibri', bold: true, size: 10 } });
+    L.forEach((l, i) => { const c = l.cel[k]; cel(r, i + 2, c.tipo === 'trab' ? (c.valor > 0 ? c.valor : null) : (c.cod || null), { fill: fill(c.tipo === 'ferias' ? COR_FERIAS : VT_COR[i % 2]), numFmt: moeda, font: { name: 'Calibri', size: 10, bold: c.tipo !== 'trab', color: { argb: c.tipo === 'trab' ? 'FF000000' : 'FF6E6E6E' } } }); });
+    cel(r, nc, { formula: `SUM(B${r}:${colL(nc - 1)}${r})`, result: m.porDia[k] }, { numFmt: moeda, font: { name: 'Calibri', bold: true, size: 10 } });
+    if (k === 14) linhaQ.q1f = r;
+    r++;
+  });
+  const rFim = r - 1;
+  const somaLinha = (rot, a, b, q) => {
+    cel(r, 1, rot, { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
+    for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `SUM(${L1}${a}:${L1}${b})`, result: l ? l[q].valor : m.totais[q] }, { numFmt: moeda, fill: c === nc ? fill('#C4D79B') : fill(VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true } }); }
+    return r++;
+  };
+  const rq1 = somaLinha('1ª QUINZENA', r0, linhaQ.q1f, 'q1'), rq2 = somaLinha('2ª QUINZENA', linhaQ.q1f + 1, rFim, 'q2');
+  cel(r, 1, 'TOTAL DO MÊS', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
+  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `${L1}${rq1}+${L1}${rq2}`, result: l ? l.mes.valor : m.totais.mes }, { numFmt: moeda, fill: fill(c === nc ? '#C4D79B' : VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true, size: 11 } }); }
+  const rTot = r++;
+  cel(r, 1, 'DIAS', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
+  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: c === nc ? `SUM(B${r}:${colL(nc - 1)}${r})` : `COUNT(${L1}${r0}:${L1}${rFim})`, result: l ? l.mes.dias : m.linhas.reduce((x, y) => x + y.mes.dias, 0) }, { fill: fill(c === nc ? '#C4D79B' : VT_COR[(c - 2) % 2]) }); }
+  r++;
+  cel(r, 1, 'PAGO', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
+  L.forEach((l, i) => cel(r, i + 2, l.pago.q1 + l.pago.q2, { numFmt: moeda, fill: fill(VT_COR[i % 2]) }));
+  cel(r, nc, { formula: `SUM(B${r}:${colL(nc - 1)}${r})`, result: m.totais.pago }, { numFmt: moeda, fill: fill('#C4D79B') });
+  const rPago = r++;
+  cel(r, 1, 'SALDO', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
+  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `${L1}${rTot}-${L1}${rPago}`, result: l ? l.saldo.mes : m.totais.mes - m.totais.pago }, { numFmt: moeda, fill: fill(c === nc ? '#C4D79B' : VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true, color: { argb: 'FFC00000' } } }); }
+  ws.getColumn(1).width = 14; for (let c = 2; c < nc; c++) ws.getColumn(c).width = 11.5; ws.getColumn(nc).width = 12;
+  ws.getRow(2).height = 30;
+  // resumo
+  const rs2 = wb.addWorksheet('Resumo', { views: [{ showGridLines: false }] });
+  const cab = ['Funcionário', 'Setor', 'Passagem', 'Qtd/dia', 'Valor diário', 'Dias 1ª', '1ª quinzena', 'Dias 2ª', '2ª quinzena', 'Dias no mês', 'Total do mês', 'Pago', 'Saldo'];
+  rs2.mergeCells(1, 1, 1, cab.length); Object.assign(rs2.getCell(1, 1), { value: 'RESUMO DO VALE-TRANSPORTE — ' + MESES[+UI.vtMes.slice(5) - 1] + ' DE ' + UI.vtMes.slice(0, 4), font: { name: 'Calibri', bold: true, size: 14 }, alignment: center });
+  cab.forEach((t, i) => Object.assign(rs2.getCell(3, i + 1), { value: t, font: { name: 'Calibri', bold: true }, fill: fill('#C4D79B'), border: borda, alignment: center }));
+  L.forEach((l, k) => {
+    const rr = 4 + k, vals = [l.nome, nomeSetor(l.setorId), l.passagem, l.qtd, l.valorDia, l.q1.dias, l.q1.valor, l.q2.dias, l.q2.valor, { formula: `F${rr}+H${rr}`, result: l.mes.dias }, { formula: `G${rr}+I${rr}`, result: l.mes.valor }, l.pago.q1 + l.pago.q2, { formula: `K${rr}-L${rr}`, result: l.saldo.mes }];
+    vals.forEach((v, i) => Object.assign(rs2.getCell(rr, i + 1), { value: v, border: borda, numFmt: [2, 4, 6, 8, 10, 11, 12].includes(i) ? moeda : undefined, font: { name: 'Calibri', bold: i === 0 || i === 10 } }));
+  });
+  const rt = 4 + n;
+  Object.assign(rs2.getCell(rt, 1), { value: 'TOTAL GERAL DO HOTEL', font: { name: 'Calibri', bold: true }, border: borda }); rs2.mergeCells(rt, 1, rt, 5);
+  [6, 7, 8, 9, 10, 11, 12, 13].forEach(c => { const L1 = colL(c); Object.assign(rs2.getCell(rt, c), { value: { formula: `SUM(${L1}4:${L1}${rt - 1})` }, numFmt: [7, 9, 11, 12, 13].includes(c) ? moeda : undefined, font: { name: 'Calibri', bold: true }, border: borda, fill: fill('#C4D79B') }); });
+  [24, 16, 11, 8, 12, 8, 13, 8, 13, 11, 14, 12, 12].forEach((w, i) => rs2.getColumn(i + 1).width = w);
+  const buf = await wb.xlsx.writeBuffer();
+  await salvarArquivo(vtNomeArq('mes', 'xlsx'), new Blob([buf]));
 }
 
 /* =====================================================================
@@ -2170,12 +2648,24 @@ document.addEventListener('click', async ev => {
     case 'baixarBk': {
       try {
         const b = await Nuvem.rpc('esc_obter_backup', { p_id: +id });
-        const d = { sistema: 'escalas-hotel', versao: 1, exportadoEm: b.feito_em, config: CONFIG_PADRAO, setores: [], funcionarios: [], escalas: {}, auditoria: [] };
-        (b.docs || []).forEach(x => { const o = Object.assign({ id: x.i }, x.d); if (x.c === 'escalas') d.escalas[x.i] = Object.assign({}, x.d, { semana: x.i }); else if (x.c === 'config') { if (x.i === 'geral') d.config = x.d; } else d[x.c].push(o); });
+        const d = { sistema: 'escalas-hotel', versao: 1, exportadoEm: b.feito_em, config: CONFIG_PADRAO, setores: [], funcionarios: [], escalas: {}, vt: {}, auditoria: [] };
+        (b.docs || []).forEach(x => { const o = Object.assign({ id: x.i }, x.d); if (x.c === 'vt') d.vt[x.i] = x.d; else if (x.c === 'escalas') d.escalas[x.i] = Object.assign({}, x.d, { semana: x.i }); else if (x.c === 'config') { if (x.i === 'geral') d.config = x.d; } else d[x.c].push(o); });
         await salvarArquivo('backup-automatico-' + String(b.feito_em).slice(0, 10) + '.json', JSON.stringify(d, null, 1));
       } catch (e) { toast('Não foi possível baixar.'); }
       return;
     }
+    case 'vtMesAnt': case 'vtMesProx': { ev.preventDefault(); let [y, m] = UI.vtMes.split('-').map(Number); m += act === 'vtMesAnt' ? -1 : 1; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } UI.vtMes = y + '-' + String(m).padStart(2, '0'); return render(); }
+    case 'vtTab': ev.preventDefault(); UI.vtTab = el.dataset.t; return render();
+    case 'vtPer': UI.vtPer = el.dataset.p; return render();
+    case 'vtDia': if (S.somenteLeitura) return; return vtEditarDia(id, el.dataset.d);
+    case 'vtValor': if (S.somenteLeitura) return; return vtEditarValor(id);
+    case 'vtPag': if (S.somenteLeitura) return; return vtPagamento(id);
+    case 'vtFechar': ev.preventDefault(); return vtFechar(el.dataset.q);
+    case 'vtReabrir': return vtReabrir(el.dataset.q);
+    case 'vtPagarTodos': return vtPagarTodos(el.dataset.q);
+    case 'vtPDF': return vtPDF(UI.vtPer, false);
+    case 'vtPrint': return vtPDF(el.dataset.p, true);
+    case 'vtXLS': return vtExcel();
     case 'expPDF': return exportarPDF(false);
     case 'expPrint': return exportarPDF(true);
     case 'expXLS': return exportarExcel();
@@ -2188,6 +2678,7 @@ document.addEventListener('change', ev => {
   const t = ev.target;
   if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
   else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
+  else if (t.id === 'vtMes' && t.value) { UI.vtMes = t.value; render(); }
   else if (t.id === 'fSetor') { UI.filtroSetor = t.value; render(); }
   else if (t.id === 'fSit') { UI.situacao = t.value; render(); }
   else if (t.id === 'expPeriodo') { UI.expPeriodo = t.value; render(); }
