@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escalas — Hotel Fazenda Oasis</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-180.png">
+<meta name="theme-color" content="#0f4c5c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f9; --card:#fff; --ink:#111827; --ink2:#4b5563; --ink3:#9ca3af; --line:#e5e7eb;
+  --pri:#0f4c5c; --pri2:#13687d; --pri-soft:#e6f1f3; --acc:#e9a23b;
+  --ok:#15803d; --ok-bg:#dcfce7; --ok-bd:#86efac;
+  --off:#1d4ed8; --off-bg:#dbeafe; --off-bd:#93c5fd;
+  --fix:#6b7280; --fix-bg:#eef0f3; --fix-bd:#d1d5db;
+  --err:#b91c1c; --err-bg:#fee2e2; --warn:#a16207; --warn-bg:#fef3c7;
+  --r:12px; --sh:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--pri2)}
+.app{display:flex;min-height:100vh}
+/* Sidebar */
+.side{width:236px;background:var(--pri);color:#e6f1f3;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0;z-index:30}
+.brand{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+.brand b{display:block;font-size:15px;font-weight:800;letter-spacing:.2px;color:#fff}
+.brand small{opacity:.75;font-size:12px}
+.nav{padding:10px 8px;flex:1;overflow:auto}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#d6e7ea;text-decoration:none;font-weight:500;margin-bottom:2px}
+.nav a:hover{background:rgba(255,255,255,.08)}
+.nav a.on{background:#fff;color:var(--pri);font-weight:700}
+.nav svg{width:18px;height:18px;flex-shrink:0}
+.side-foot{padding:12px 16px;font-size:12px;border-top:1px solid rgba(255,255,255,.1);opacity:.85}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#9ca3af}
+.dot.g{background:#4ade80}.dot.y{background:#facc15}
+/* Main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--pri);color:#fff;position:sticky;top:0;z-index:20}
+.top b{font-size:15px}
+.burger{background:none;border:0;color:#fff;padding:6px;cursor:pointer}
+.content{padding:24px 28px 60px;max-width:1400px;width:100%}
+h1{font-size:22px;margin:0 0 4px;font-weight:800;letter-spacing:-.2px}
+.sub{color:var(--ink2);margin:0 0 20px}
+h2{font-size:16px;margin:0 0 12px;font-weight:700}
+h3{font-size:14px;margin:0 0 8px;font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:18px}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.kpi .n{font-size:28px;font-weight:800;letter-spacing:-.5px}
+.kpi .l{color:var(--ink2);font-size:13px}
+.kpi .x{font-size:12px;color:var(--ink3);margin-top:2px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.mt{margin-top:16px}.mb{margin-bottom:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:600;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:#f9fafb}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.pri:hover{background:var(--pri2)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.danger{color:var(--err);border-color:#fecaca}
+.btn.danger:hover{background:var(--err-bg)}
+.btn.wa{background:#25d366;border-color:#25d366;color:#fff}
+.btn.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+.btn.icon{padding:6px 8px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn svg{width:16px;height:16px}
+.big{font-size:16px;padding:14px 22px;border-radius:12px;font-weight:800;letter-spacing:.3px;box-shadow:0 4px 14px rgba(15,76,92,.25)}
+input[type=text],input[type=password],input[type=date],input[type=month],input[type=search],select,textarea{border:1px solid #d1d5db;border-radius:9px;padding:8px 10px;background:#fff;min-height:38px;max-width:100%}
+textarea{width:100%;min-height:90px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--pri2);outline-offset:-1px;border-color:var(--pri2)}
+label.f{display:block;font-weight:600;font-size:13px;margin:0 0 4px;color:var(--ink2)}
+.fld{margin-bottom:12px}
+.fld input,.fld select,.fld textarea{width:100%}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.b-ok{background:var(--ok-bg);color:var(--ok)}
+.b-draft{background:var(--warn-bg);color:var(--warn)}
+.b-off{background:#f3f4f6;color:#6b7280}
+.b-err{background:var(--err-bg);color:var(--err)}
+.b-blue{background:var(--off-bg);color:var(--off)}
+.muted{color:var(--ink2)}.small{font-size:12px}
+.alert{border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px}
+.alert.e{background:var(--err-bg);color:#7f1d1d}
+.alert.w{background:var(--warn-bg);color:#713f12}
+.alert.i{background:var(--pri-soft);color:#134e5e}
+.alert.s{background:var(--ok-bg);color:#14532d}
+.alert b{font-weight:700}
+.alert .ic{font-weight:800;flex-shrink:0;width:18px;text-align:center}
+/* Tables */
+.tw{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:#fff;-webkit-overflow-scrolling:touch}
+table{border-collapse:separate;border-spacing:0;width:100%}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{background:#f9fafb;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2);font-weight:700;position:sticky;top:0;z-index:2}
+tr:last-child td{border-bottom:0}
+table.list tr:hover td{background:#fafbfc}
+.esc th.d,.esc td.d{text-align:center;padding:5px 4px;min-width:62px}
+.esc td.nm{position:sticky;left:0;background:#fff;z-index:1;min-width:190px;max-width:260px;border-right:1px solid var(--line)}
+.esc th.nm{position:sticky;left:0;z-index:3;border-right:1px solid var(--line)}
+.esc tr.sec td{background:var(--pri-soft);color:var(--pri);font-weight:800;font-size:13px;letter-spacing:.3px;position:sticky;left:0}
+.esc tr.sec td span{font-weight:500;color:var(--ink2);margin-left:8px;font-size:12px}
+.cell{display:block;border-radius:7px;padding:6px 2px;font-weight:700;font-size:12px;border:1px solid}
+.c-T{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)}
+.c-F{background:var(--off-bg);color:var(--off);border-color:var(--off-bd)}
+.c-X{background:var(--fix-bg);color:var(--fix);border-color:var(--fix-bd)}
+.c-V{background:#ff3b30;color:#fff;border-color:#e11d48}
+.c--{background:#fafafa;color:#c0c4cc;border-color:#eee;border-style:dashed}
+.esc tr.tot td{background:#f9fafb;font-size:12px;color:var(--ink2);font-weight:600}
+.esc td.nm .fn{font-weight:700}
+.esc td.nm .fu{font-size:12px;color:var(--ink3)}
+.today{box-shadow:inset 0 -3px 0 var(--acc)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2)}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-3px;margin-right:5px;border:1px solid}
+.lockon{color:var(--acc)}
+.mini select{min-height:30px;padding:3px 6px;font-size:13px;border-radius:7px}
+.mes td.d,.mes th.d{min-width:38px;padding:4px 2px}
+.mes .cell{padding:4px 0;font-size:11px}
+.mes th.wk{background:#eef2f6}
+/* bars */
+.bars{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:170px;margin-top:8px}
+.bar{display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;height:100%;gap:2px}
+.bar .w{background:#4ade80;border-radius:6px 6px 0 0}
+.bar .o{background:#60a5fa;border-radius:0 0 6px 6px}
+.bar .lb{text-align:center;font-size:12px;color:var(--ink2);margin-top:4px;font-weight:600}
+.bar .nn{text-align:center;font-size:11px;color:var(--ink2)}
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow:auto}
+.tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--ink2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button.on{color:var(--pri);border-color:var(--pri)}
+/* modal */
+.mbg{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal{background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal.wide{max-width:820px}
+.mh{padding:18px 20px 6px;font-weight:800;font-size:17px}
+.mbd{padding:8px 20px 4px}
+.mf{padding:14px 20px 18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;z-index:200;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:90vw}
+.empty{text-align:center;padding:36px 16px;color:var(--ink2)}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+.list-sm{margin:0;padding:0;list-style:none}
+.list-sm li{padding:7px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px;justify-content:space-between}
+.list-sm li:last-child{border-bottom:0}
+.chip{display:inline-block;background:#f3f4f6;border-radius:6px;padding:1px 7px;margin:2px 3px 2px 0;font-size:12.5px}
+.chip.b{background:var(--off-bg);color:var(--off)}
+.hide{display:none!important}
+.show-m{display:none}
+.loading{padding:60px;text-align:center;color:var(--ink2)}
+.spin{width:28px;height:28px;border:3px solid #d1d5db;border-top-color:var(--pri);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto 10px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.g-pill{display:inline-block;min-width:24px;text-align:center;border-radius:6px;padding:1px 6px;font-weight:700;font-size:12px}
+.gp1{background:#ede9fe;color:#6d28d9}.gp2{background:#fce7f3;color:#be185d}.gp3{background:#ffedd5;color:#c2410c}.gp4{background:var(--off-bg);color:var(--off)}
+.readonly .edit-only{display:none!important}
+@media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){
+  .side{position:fixed;left:-260px;transition:left .2s;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  .side.open{left:0}
+  .top{display:flex}
+  .content{padding:16px 12px 70px}
+  .g2,.g3{grid-template-columns:1fr}
+  h1{font-size:19px}
+  .esc td.nm{min-width:130px;max-width:150px}
+  .esc td.nm .fu{display:none}
+  .big{width:100%}
+  .hide-m{display:none!important}
+  table.folha th.ft1,table.folha th.ft2{text-align:left}
+  table.folha th.ft1 span,table.folha th.ft2 span{position:sticky;left:8px}
+  .fimp{text-align:left}
+  .show-m{display:block}
+}
+@media (max-width:480px){.g4{grid-template-columns:1fr 1fr}.kpi .n{font-size:22px}.card{padding:14px}}
+/* folha no formato da planilha */
+.folha-wrap{overflow:auto;background:#fff;border-radius:var(--r);padding:12px;border:1px solid var(--line);-webkit-overflow-scrolling:touch}
+table.folha{border-collapse:collapse;width:100%;min-width:900px;font-family:Calibri,Carlito,Arial,sans-serif;border:2px solid #000}
+table.folha th,table.folha td{border:1px solid #000;padding:2px 3px;text-align:center;font-weight:700;font-size:12px;height:22px;position:static;background:#fff;color:#000;text-transform:none;letter-spacing:0}
+table.folha th.ft1{color:#C00000;font-size:20px;border-bottom:1px solid #000;padding:4px}
+table.folha th.ft2{color:#C00000;font-size:15px;padding:3px}
+table.folha th.fer{background:#DDEBF7}
+table.folha .fnm{text-align:left;white-space:nowrap;min-width:96px;font-size:12px;position:sticky;left:0;z-index:1}
+table.folha th.fnm{text-align:center;font-size:13px}
+table.folha td.fv{background:#FF0000;color:#000;font-size:13px;letter-spacing:.5px}
+table.folha td.nd{background:repeating-linear-gradient(45deg,#f3f4f6,#f3f4f6 4px,#e5e7eb 4px,#e5e7eb 8px)!important}
+table.folha tr.sep td{height:22px}
+.fimp{border:2px solid #000;border-top:0;text-align:center;padding:4px 14px 10px;font-family:Calibri,Carlito,Arial,sans-serif;min-width:900px}
+.fimp-t{color:#C00000;font-weight:800;font-size:40px;line-height:1.15}
+.fimp p{margin:4px 0;font-size:15px}
+.fleg{margin:14px 0 0 60px;display:flex;align-items:center;gap:10px;font-family:Calibri,Carlito,Arial,sans-serif;font-size:16px}
+.fleg-f{display:inline-block;border:1.5px solid #000;width:44px;text-align:center;font-weight:800;padding:2px 0}
+.cor-in{width:44px;height:34px;padding:2px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer}
+.ferias-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.shade{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:25;display:none}
+.shade.on{display:block}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side" id="side">
+    <div class="brand"><b id="brandName">Gestão de Escalas</b><small>Escalas e folgas de funcionários</small></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot" id="storeStatus"><span class="dot"></span>Conectando…</div>
+  </aside>
+  <div class="shade" id="shade"></div>
+  <div class="main">
+    <div class="top"><button class="burger" id="burger" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><b id="topTitle">Escalas</b></div>
+    <div class="content" id="view"><div class="loading"><div class="spin"></div>Carregando dados…</div></div>
+  </div>
+</div>
+<div id="modals"></div>
+<script>window.NUVEM = {"url": "https://cxddpwyqxfpjqrbcffhk.supabase.co", "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZGRwd3lxeGZwanFyYmNmZmhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTM1MjksImV4cCI6MjEwOTcyOTUyOX0.3e71_a8CQWfrRShr56pBAtt8aD4rg2U2J0JOS4b2OK8"};</script>
+<script src="core.js?v=3"></script>
+<script>
+'use strict';
+/* =====================================================================
+   ESTADO E ARMAZENAMENTO
+   ===================================================================== */
+const C = window.Core;
+const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de folga não é fixa nem permanente, ela poderá sofrer alterações a qualquer momento ( no dia anterior a folga ) o horário também poderá ser alterado ( no mesmo dia ) de acordo com a necessidade da Fazenda.\nQualquer duvida, podem procurar a gerencia!';
+const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
+const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
+const S = { setores: [], funcionarios: [], escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
+const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana' };
+let DB = null, DL = null;
+const LS_KEY = 'escalas_hotel_v1';
+
+const uid = p => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const agoraISO = () => new Date().toISOString();
+const dtHora = iso => { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+const setorPorId = id => S.setores.find(s => s.id === id);
+const funcPorId = id => S.funcionarios.find(f => f.id === id);
+const nomeSetor = id => (setorPorId(id) || {}).nome || 'Sem setor';
+const semanaLabel = sem => C.dataBR(sem).slice(0, 5) + ' a ' + C.dataBR(C.fimSemana(sem));
+const setoresOrd = () => S.setores.slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || a.nome.localeCompare(b.nome));
+const ordemSetor = id => { const i = setoresOrd().findIndex(s => s.id === id); return i < 0 ? 9999 : i; };
+const corSetor = id => { const s = setorPorId(id); if (s && s.cor) return s.cor; const i = ordemSetor(id); return i === 9999 ? '#FFFFFF' : PALETA[i % PALETA.length]; };
+const cmpSetor = (a, b) => ordemSetor(a) - ordemSetor(b) || nomeSetor(a).localeCompare(nomeSetor(b));
+function feriadosLista() { if (Array.isArray(S.config.feriados)) return S.config.feriados; const y = +C.hojeISO().slice(0, 4); return C.feriadosNacionais(y).concat(C.feriadosNacionais(y + 1)); }
+function feriadoEm(d) { return feriadosLista().find(f => f.data === d); }
+const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+const historicoArr = () => Object.values(S.escalas);
+
+const Store = {
+  filas: {},
+  async init() {
+    if (window.STANDALONE) { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { } }
+    if (window.NUVEM) { S.modo = 'nuvem'; return Nuvem.iniciar(); }
+    try {
+      if (!window.STANDALONE && window.claude && typeof window.claude.use === 'function') {
+        DB = await window.claude.use('db');
+        try { DL = await window.claude.use('downloads'); } catch (e) { DL = null; }
+        try {
+          const u = await window.claude.use('user');
+          if (u && typeof u.can === 'function') { const pode = await u.can('data.write'); if (pode === false) S.somenteLeitura = true; }
+        } catch (e) { }
+      }
+    } catch (e) { DB = null; }
+    if (DB) { S.modo = 'db'; this.assinar(); }
+    else { S.modo = 'local'; this.carregarLocal(); S.pronto = true; render(); }
+    atualizarStatus();
+  },
+  assinar() {
+    const cols = ['setores', 'funcionarios', 'escalas', 'auditoria', 'config'];
+    const timer = setTimeout(() => { if (!S.pronto) { S.pronto = true; S.lento = true; render(); atualizarStatus(); } }, 10000);
+    const marcar = (c, snap) => {
+      if (!snap.metadata.fromCache) S.carregados[c] = true;
+      if (cols.every(x => S.carregados[x])) { clearTimeout(timer); S.lento = false; }
+      if (!S.pronto && cols.every(x => S.carregados[x])) S.pronto = true;
+      agendarRender(); atualizarStatus();
+    };
+    const erro = c => e => { S.carregados[c] = true; if (e && e.code === 'revoked') S.somenteLeitura = true; S.erroDb = e && e.message; agendarRender(); atualizarStatus(); };
+    DB.collection('setores').onSnapshot(s => { S.setores = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('setores', s); }, erro('setores'));
+    DB.collection('funcionarios').onSnapshot(s => { S.funcionarios = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('funcionarios', s); }, erro('funcionarios'));
+    DB.collection('escalas').onSnapshot(s => { const o = {}, ant = {}; s.docs.forEach(d => { const e = Object.assign({}, d.data(), { semana: d.id }); if (C.diaSemana(d.id) === 0) o[d.id] = e; else ant[d.id] = e; }); S.escalas = o; S.escalasAntigas = ant; marcar('escalas', s); }, erro('escalas'));
+    DB.collection('auditoria').orderBy('ts', 'desc').limit(800).onSnapshot(s => { S.auditoria = s.docs.map(d => Object.assign({ id: d.id }, d.data())); marcar('auditoria', s); }, erro('auditoria'));
+    DB.collection('config').onSnapshot(s => { const g = s.docs.find(d => d.id === 'geral'); if (g) S.config = Object.assign({}, CONFIG_PADRAO, g.data()); marcar('config', s); }, erro('config'));
+  },
+  carregarLocal() {
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
+  },
+  salvarLocal() {
+    if (S.modo === 'nuvem') return Nuvem.guardarCopia();
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ setores: S.setores, funcionarios: S.funcionarios, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
+  },
+  enfileirar(chave, fn) {
+    const ant = this.filas[chave] || Promise.resolve();
+    const p = ant.catch(() => { }).then(fn);
+    this.filas[chave] = p;
+    return p;
+  },
+  aplicar(col, id, limpo) {
+    if (col === 'escalas') { if (C.diaSemana(id) === 0) S.escalas[id] = Object.assign({}, limpo, { semana: id }); else S.escalasAntigas[id] = Object.assign({}, limpo, { semana: id }); }
+    else if (col === 'config') { if (id === 'geral') S.config = Object.assign({}, CONFIG_PADRAO, limpo); }
+    else if (col === 'auditoria') { const i = S.auditoria.findIndex(x => x.id === id); const o = Object.assign({ id }, limpo); if (i >= 0) S.auditoria[i] = o; else S.auditoria.unshift(o); }
+    else { const arr = S[col]; const i = arr.findIndex(x => x.id === id); const obj = Object.assign({ id }, limpo); if (i >= 0) arr[i] = obj; else arr.push(obj); }
+  },
+  remover(col, id) {
+    if (col === 'escalas') { delete S.escalas[id]; delete S.escalasAntigas[id]; }
+    else if (col === 'config') S.config = Object.assign({}, CONFIG_PADRAO);
+    else S[col] = S[col].filter(x => x.id !== id);
+  },
+  async set(col, id, data) {
+    if (S.somenteLeitura) { toast(S.modo === 'nuvem' ? 'Sem conexão: não é possível alterar agora.' : 'Você tem acesso somente leitura.'); throw new Error('ro'); }
+    const limpo = JSON.parse(JSON.stringify(data));
+    delete limpo.id;
+    if (S.modo === 'db') {
+      return this.enfileirar(col + '/' + id, () => DB.collection(col).doc(id).set(limpo)).catch(e => this.falha(e));
+    }
+    this.aplicar(col, id, limpo);
+    this.salvarLocal(); agendarRender();
+    if (S.modo === 'nuvem') return this.enfileirar(col + '/' + id, () => Nuvem.rpc('esc_salvar', { p_colecao: col, p_id: id, p_dados: limpo })).catch(e => Nuvem.falhaGravacao(e));
+  },
+  async del(col, id) {
+    if (S.somenteLeitura) { toast(S.modo === 'nuvem' ? 'Sem conexão: não é possível alterar agora.' : 'Você tem acesso somente leitura.'); throw new Error('ro'); }
+    if (S.modo === 'db') return this.enfileirar(col + '/' + id, () => DB.collection(col).doc(id).delete()).catch(e => this.falha(e));
+    this.remover(col, id);
+    this.salvarLocal(); agendarRender();
+    if (S.modo === 'nuvem') return this.enfileirar(col + '/' + id, () => Nuvem.rpc('esc_apagar', { p_colecao: col, p_id: id })).catch(e => Nuvem.falhaGravacao(e));
+  },
+  falha(e) {
+    const code = e && e.code;
+    if (code === 'invalid_argument' || code === 'not_granted' || code === 'revoked') { S.somenteLeitura = true; agendarRender(); }
+    modalMsg('Não foi possível salvar', '<div class="alert e"><span class="ic">!</span><div>O armazenamento recusou a gravação' + (code ? ' (' + esc(code) + ')' : '') + '. ' + (code === 'quota_exceeded' ? 'O limite de armazenamento foi atingido: exclua escalas antigas ou faça um backup e limpe o histórico.' : 'Verifique sua conexão e tente de novo.') + '</div></div>');
+    throw e;
+  }
+};
+
+/* =====================================================================
+   NUVEM (Supabase) — versão online, com senha
+   ===================================================================== */
+const Nuvem = {
+  TOKEN: 'esc_token', COPIA: 'esc_copia_nuvem',
+  token() { try { return localStorage.getItem(this.TOKEN); } catch (e) { return null; } },
+  async rpc(fn, args, semToken) {
+    const body = Object.assign({}, args || {}); if (!semToken) body.p_token = this.token();
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+    let r;
+    try {
+      r = await fetch(window.NUVEM.url + '/rest/v1/rpc/' + fn, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', apikey: window.NUVEM.key, Authorization: 'Bearer ' + window.NUVEM.key }, body: JSON.stringify(body) });
+    } catch (e) { const x = new Error('SEM_CONEXAO'); x.code = 'SEM_CONEXAO'; throw x; }
+    finally { clearTimeout(t); }
+    const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) { }
+    if (!r.ok) { const x = new Error((j && j.message) || ('HTTP ' + r.status)); x.code = (j && j.message) || ('HTTP_' + r.status); throw x; }
+    return j;
+  },
+  async iniciar() {
+    if (!this.token()) { S.precisaLogin = true; S.pronto = true; render(); atualizarStatus(); return; }
+    try { await this.carregarTudo(); }
+    catch (e) {
+      if (e.code === 'SESSAO_INVALIDA') return this.sair(true);
+      // sem internet: mostra a última cópia, só para consulta
+      if (this.lerCopia()) { S.offline = true; S.somenteLeitura = true; S.pronto = true; render(); }
+      else { S.erroConexao = true; S.pronto = true; render(); }
+    }
+    atualizarStatus();
+    this.agendarSync();
+  },
+  aplicarDocs(docs) {
+    docs.forEach(d => { if (d.x) Store.remover(d.c, d.i); else Store.aplicar(d.c, d.i, d.d || {}); });
+    S.auditoria.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+  },
+  async carregarTudo() {
+    const r = await this.rpc('esc_ler', { p_desde: null });
+    Object.assign(S, { setores: [], funcionarios: [], escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    this.aplicarDocs(r.docs || []);
+    S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true;
+    this.guardarCopia(); render(); atualizarStatus();
+  },
+  async sincronizar() {
+    if (!S.desde || S.precisaLogin || document.hidden) return;
+    if (Object.values(Store.filas).length && await Promise.race([Promise.all(Object.values(Store.filas)).then(() => false, () => false), new Promise(r => setTimeout(() => r(true), 50))])) return; // gravações em andamento
+    try {
+      if (S.offline) return await this.carregarTudo();
+      const r = await this.rpc('esc_ler', { p_desde: S.desde });
+      if (r.docs && r.docs.length) { this.aplicarDocs(r.docs); this.guardarCopia(); agendarRender(); }
+      S.desde = r.agora; if (S.semRede) { S.semRede = false; atualizarStatus(); }
+    } catch (e) {
+      if (e.code === 'SESSAO_INVALIDA') return this.sair(true);
+      if (e.code === 'SEM_CONEXAO' && !S.semRede) { S.semRede = true; atualizarStatus(); }
+    }
+  },
+  agendarSync() {
+    if (this._t) return;
+    this._t = setInterval(() => this.sincronizar(), 30000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sincronizar(); });
+    window.addEventListener('online', () => this.sincronizar());
+  },
+  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), setores: S.setores, funcionarios: S.funcionarios, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
+  lerCopia() {
+    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
+  },
+  async falhaGravacao(e) {
+    if (e && e.code === 'SESSAO_INVALIDA') { this.sair(true); throw e; }
+    await modalMsg('Alteração não salva', `<div class="alert e"><span class="ic">!</span><div>${e && e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet. A última alteração <b>não foi salva</b>.' : 'O servidor recusou a gravação (' + esc(e && e.message) + ').'} Os dados serão recarregados do servidor.</div></div>`);
+    try { await this.carregarTudo(); } catch (x) { S.offline = true; S.somenteLeitura = true; render(); atualizarStatus(); }
+    throw e;
+  },
+  async entrar(senha) {
+    try { const tok = await this.rpc('esc_entrar', { p_senha: senha }, true); localStorage.setItem(this.TOKEN, tok); await this.carregarTudo(); this.agendarSync(); return null; }
+    catch (e) { return e.code === 'SENHA_INCORRETA' ? 'Senha incorreta.' : e.code === 'BLOQUEADO' ? 'Muitas tentativas erradas. Aguarde 15 minutos.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Erro: ' + e.message; }
+  },
+  async sair(expirou) {
+    if (!expirou) { try { await this.rpc('esc_sair', {}); } catch (e) { } }
+    try { localStorage.removeItem(this.TOKEN); localStorage.removeItem(this.COPIA); } catch (e) { }
+    Object.assign(S, { setores: [], funcionarios: [], escalas: {}, escalasAntigas: {}, auditoria: [], precisaLogin: true, pronto: true, desde: null });
+    if (expirou) toast('Sua sessão expirou. Entre de novo.');
+    render(); atualizarStatus();
+  }
+};
+function vLogin() {
+  return `<div style="max-width:380px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1><p class="sub" style="text-align:center">Sistema de escalas de folga</p>
+  ${S.erroConexao ? '<div class="alert e"><span class="ic">!</span><div>Sem conexão com a internet.</div></div>' : ''}
+  <form id="fLogin"><div class="fld"><label class="f">Senha</label><input type="password" id="loginSenha" autocomplete="current-password" style="width:100%" autofocus></div>
+  <div id="loginErro" class="small" style="color:var(--err);min-height:18px"></div>
+  <button class="btn pri" style="width:100%" type="submit">Entrar</button></form></div>`;
+}
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'fLogin') return;
+  ev.preventDefault();
+  const b = ev.target.querySelector('button'); b.disabled = true; b.textContent = 'Entrando…';
+  const err = await Nuvem.entrar(document.getElementById('loginSenha').value);
+  if (err) { const e = document.getElementById('loginErro'); if (e) e.textContent = err; b.disabled = false; b.textContent = 'Entrar'; }
+});
+async function log(tipo, texto, semana) {
+  const e = { ts: agoraISO(), tipo, texto, semana: semana || null };
+  if (S.modo === 'db' || S.modo === 'nuvem') { try { await Store.set('auditoria', uid('log'), e); } catch (x) { } }
+  else { S.auditoria.unshift(Object.assign({ id: uid('log') }, e)); Store.salvarLocal(); }
+}
+let rT = null;
+function agendarRender() { if (rT) return; rT = setTimeout(() => { rT = null; render(); }, 30); }
+function atualizarStatus() {
+  const el = document.getElementById('storeStatus');
+  let h;
+  if (!S.modo) h = '<span class="dot"></span>Conectando…';
+  else if (S.modo === 'db') h = S.lento ? '<span class="dot y"></span>Dados salvos na nuvem (conexão lenta)' : '<span class="dot g"></span>Dados salvos na nuvem';
+  else if (S.modo === 'nuvem') h = S.precisaLogin ? '<span class="dot"></span>Aguardando senha' : (S.offline || S.semRede) ? '<span class="dot y"></span>Sem internet — só consulta' : '<span class="dot g"></span>Salvo na nuvem';
+  else h = window.STANDALONE ? '<span class="dot g"></span>Salvo neste aparelho — faça backups' : '<span class="dot y"></span>Salvo só neste navegador — faça backups';
+  if (S.somenteLeitura && S.modo !== 'nuvem') h += '<br><span class="small">Modo somente leitura</span>';
+  el.innerHTML = h;
+  document.getElementById('brandName').textContent = S.config.nomeHotel || 'Gestão de Escalas';
+}
+
+/* =====================================================================
+   UTILIDADES DE INTERFACE
+   ===================================================================== */
+const ICON = {
+  painel: '<path d="M3 13h8V3H3zM13 21h8v-8h-8zM3 21h8v-6H3zM13 3v8h8V3z"/>',
+  escala: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+  mensal: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/>',
+  funcionarios: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 21c0-3-2-5-5-5.5"/>',
+  setores: '<path d="M3 21V8l9-5 9 5v13M9 21v-7h6v7"/>',
+  historico: '<path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 3"/>',
+  exportar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+  backup: '<path d="M4 7c0-2 4-3 8-3s8 1 8 3-4 3-8 3-8-1-8-3zM4 7v10c0 2 4 3 8 3s8-1 8-3V7M4 12c0 2 4 3 8 3s8-1 8-3"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
+  swap: '<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
+  move: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  chevL: '<path d="M15 18l-6-6 6-6"/>', chevR: '<path d="M9 18l6-6-6-6"/>',
+  pdf: '<path d="M6 2h9l5 5v15H6zM14 2v6h6"/>', xls: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+  print: '<path d="M6 9V2h12v7M6 18H4v-7h16v7h-2M8 14h8v8H8z"/>',
+  wa: '<path d="M3 21l1.6-4.8A9 9 0 1121 12a9 9 0 01-13.2 7.9z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>',
+  check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
+};
+const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
+const ROTAS = [['painel', 'Painel'], ['escala', 'Escala semanal'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+function abrirModal(html, wide) {
+  const wrap = document.createElement('div'); wrap.className = 'mbg';
+  wrap.innerHTML = '<div class="modal' + (wide ? ' wide' : '') + '" role="dialog">' + html + '</div>';
+  wrap.addEventListener('mousedown', e => { if (e.target === wrap) fecharModal(wrap); });
+  document.getElementById('modals').appendChild(wrap);
+  const f = wrap.querySelector('input,select,textarea'); if (f) setTimeout(() => f.focus(), 30);
+  return wrap;
+}
+function fecharModal(w) { (w || document.querySelector('#modals .mbg:last-child'))?.remove(); }
+function modalMsg(titulo, corpo, botoes) {
+  return new Promise(res => {
+    const bs = botoes || [{ t: 'Entendi', c: 'pri', v: true }];
+    const w = abrirModal('<div class="mh">' + titulo + '</div><div class="mbd">' + corpo + '</div><div class="mf">' + bs.map((b, i) => '<button class="btn ' + (b.c || '') + '" data-i="' + i + '">' + b.t + '</button>').join('') + '</div>', bs.wide);
+    w.querySelectorAll('.mf button').forEach(b => b.onclick = () => { fecharModal(w); res(bs[+b.dataset.i].v); });
+  });
+}
+const confirmar = (titulo, corpo, okTxt, perigo) => modalMsg(titulo, corpo, [{ t: 'Cancelar', v: false }, { t: okTxt || 'Confirmar', c: perigo ? 'danger' : 'pri', v: true }]);
+function listaProblemas(erros, avisos) {
+  let h = '';
+  const porSetor = {};
+  (erros || []).forEach(e => { const k = e.setor || 'Geral'; (porSetor[k] = porSetor[k] || []).push(e.msg); });
+  Object.keys(porSetor).forEach(k => { h += '<div class="alert e"><span class="ic">!</span><div><b>' + esc(k) + '</b><br>' + porSetor[k].map(esc).join('<br>') + '</div></div>'; });
+  (avisos || []).forEach(a => { h += '<div class="alert w"><span class="ic">i</span><div>' + esc(a.msg) + '</div></div>'; });
+  return h;
+}
+function cellHTML(st, extraTitle) {
+  const t = { T: 'Trab.', F: 'Folga', X: 'Trab.', V: 'Férias', '-': '—' }[st];
+  const tt = { T: 'Trabalho', F: 'Folga', X: 'Trabalho — dia fixo, sem alteração (sexta/sábado)', V: 'Férias', '-': 'Sem escala / não admitido' }[st];
+  return '<span class="cell c-' + st + '" title="' + tt + (extraTitle ? ' · ' + extraTitle : '') + '">' + t + '</span>';
+}
+const gPill = g => '<span class="g-pill gp' + g + '" title="' + esc(C.GRUPOS[g] ? C.GRUPOS[g].nome : '') + '">' + g + '</span>';
+
+/* =====================================================================
+   ALERTAS GLOBAIS
+   ===================================================================== */
+function alertasGerais() {
+  const out = [];
+  if (S.modo === 'local' && S.funcionarios.length) {
+    let ub = null; try { ub = localStorage.getItem('escalas_ultimo_backup'); } catch (e) { }
+    const dias = ub ? Math.floor((Date.now() - new Date(ub).getTime()) / 86400000) : null;
+    if (dias === null) out.push({ t: 'w', m: 'Você ainda não fez nenhum backup. Os dados ficam só neste aparelho: baixe um backup e guarde no Google Drive, WhatsApp ou pen drive.', link: 'backup' });
+    else if (dias >= 7) out.push({ t: 'w', m: 'Seu último backup foi há ' + dias + ' dias. Baixe um backup novo.', link: 'backup' });
+  }
+  const hoje = C.hojeISO(), semAtual = C.inicioSemana(hoje), prox = C.addDias(semAtual, 7);
+  const ativos = S.funcionarios.filter(f => f.ativo);
+  if (Object.keys(S.escalasAntigas).length) out.push({ t: 'w', m: Object.keys(S.escalasAntigas).length + ' escala(s) no formato antigo (semana de segunda a domingo) foram ignoradas. Exclua-as em Backup e configurações e gere de novo.', link: 'backup' });
+  if (!S.setores.length) out.push({ t: 'i', m: 'Cadastre os setores do hotel para começar.', link: 'setores' });
+  if (!ativos.length) out.push({ t: 'i', m: 'Nenhum funcionário ativo cadastrado.', link: 'funcionarios' });
+  ativos.filter(f => !setorPorId(f.setorId)).forEach(f => out.push({ t: 'e', m: f.nome + ' está ativo sem setor definido. A escala não pode ser gerada até corrigir.', link: 'funcionarios' }));
+  S.setores.forEach(s => {
+    const n = ativos.filter(f => f.setorId === s.id).length;
+    if (n === 0) out.push({ t: 'w', m: 'Setor "' + s.nome + '" não tem funcionários ativos.', link: 'setores' });
+    else if (n === 1) out.push({ t: 'w', m: 'Setor "' + s.nome + '" tem apenas 1 funcionário: nos dias de folga dele o setor ficará sem ninguém.', link: 'funcionarios' });
+  });
+  [[semAtual, 'desta semana'], [prox, 'da próxima semana']].forEach(([sem, rot]) => {
+    const e = S.escalas[sem];
+    if (!e) { if (ativos.length) out.push({ t: sem === semAtual ? 'e' : 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') ainda não foi gerada.', link: 'escala', sem }); return; }
+    if (e.status !== 'aprovada') out.push({ t: 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') está em rascunho, aguardando aprovação.', link: 'escala', sem });
+    const v = C.validarEscala(e, S.funcionarios, S.setores, historicoArr());
+    v.erros.forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'escala', sem }));
+    v.avisos.filter(a => a.fora).forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'escala', sem }));
+    v.avisos.filter(a => !/repete a combinação/.test(a.msg) && !a.fora).forEach(x => out.push({ t: 'w', m: 'Escala ' + rot + ': ' + x.msg, link: 'escala', sem }));
+  });
+  return out;
+}
+
+/* =====================================================================
+   RENDERIZAÇÃO
+   ===================================================================== */
+function render() {
+  document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
+  document.getElementById('nav').innerHTML = ROTAS.map(([k, t]) => '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '">' + ic(k) + t + '</a>').join('');
+  document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
+  atualizarStatus();
+  const v = document.getElementById('view');
+  if (!S.pronto) { v.innerHTML = '<div class="loading"><div class="spin"></div>Carregando dados…</div>'; return; }
+  document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
+  if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
+  const sy = window.scrollY;
+  const fn = { painel: vPainel, escala: vEscala, mensal: vMensal, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  let topo = '';
+  if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
+  if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
+  else if (S.modo === 'local') topo += '<div class="alert w"><span class="ic">!</span><div>Armazenamento na nuvem indisponível nesta visualização: os dados estão sendo salvos <b>apenas neste navegador</b>. Faça backups regulares em <a href="#backup">Backup</a>.</div></div>';
+  if (S.modo === 'nuvem' && (S.offline || S.semRede)) topo += `<div class="alert w"><span class="ic">!</span><div><b>Sem internet.</b> ${S.offline ? 'Mostrando a última cópia salva neste aparelho' + (S.copiaEm ? ' (' + dtHora(S.copiaEm) + ')' : '') + ', só para consulta.' : 'As alterações não serão salvas até a conexão voltar.'} <a href="#" data-act="reconectar">Tentar de novo</a></div></div>`;
+  else if (S.somenteLeitura) topo += '<div class="alert i"><span class="ic">i</span><div>Você está em modo somente leitura.</div></div>';
+  v.innerHTML = topo + fn();
+  const foco = UI._foco; if (foco) { const el = document.getElementById(foco); if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { } } UI._foco = null; }
+  window.scrollTo(0, sy);
+}
+
+/* ---------------- PAINEL ---------------- */
+function vPainel() {
+  const hoje = C.hojeISO(), sem = C.inicioSemana(hoje);
+  const ativos = S.funcionarios.filter(f => f.ativo), inat = S.funcionarios.length - ativos.length;
+  const escA = S.escalas[sem];
+  const dias = C.diasDaSemana(sem);
+  const trab = [0, 0, 0, 0, 0, 0, 0], folg = [0, 0, 0, 0, 0, 0, 0];
+  if (escA) Object.keys(escA.atribuicoes || {}).forEach(id => {
+    const f = funcPorId(id); dias.forEach((d, i) => { const st = C.statusDia(escA.atribuicoes[id], d, f, true); if (st === 'F') folg[i]++; else if (st === 'T' || st === 'X') trab[i]++; });
+  });
+  const maxB = Math.max(1, ...trab.map((t, i) => t + folg[i]));
+  // domingos
+  const tres = C.addDias(sem, -7 * 12);
+  let domTotal = 0; const domPorFunc = {};
+  historicoArr().filter(e => e.semana >= tres && e.semana <= sem).forEach(e => Object.entries(e.atribuicoes || {}).forEach(([id, a]) => { if (a.g === 4) { domTotal++; domPorFunc[id] = (domPorFunc[id] || 0) + 1; } }));
+  const domSem = escA ? Object.values(escA.atribuicoes || {}).filter(a => a.g === 4) : [];
+  // próximas folgas
+  const prox = [];
+  for (let i = 0; i < 10; i++) {
+    const d = C.addDias(hoje, i), e = S.escalas[C.inicioSemana(d)];
+    if (!e) continue;
+    const nomes = Object.entries(e.atribuicoes || {}).filter(([id, a]) => C.statusDia(a, d, funcPorId(id)) === 'F').map(([id, a]) => (funcPorId(id) || a).nome);
+    if (nomes.length) prox.push({ d, nomes });
+  }
+  const al = alertasGerais();
+  const ult = historicoArr().sort((a, b) => b.semana.localeCompare(a.semana)).slice(0, 6);
+  return `
+  <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${C.DIAS[C.diaSemana(hoje)].toLowerCase()}, ${C.dataBR(hoje)}</p></div><div class="sp"></div>
+  <a class="btn pri big edit-only" href="#escala" data-act="irGerar" data-sem="${sem}">${ic('bolt')} GERAR ESCALA AUTOMÁTICA</a></div>
+  <div class="grid g4">
+    <div class="card kpi"><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s) · ${S.funcionarios.length} cadastrados</div></div>
+    <div class="card kpi"><div class="l">Setores</div><div class="n">${S.setores.length}</div><div class="x">${S.setores.filter(s => ativos.some(f => f.setorId === s.id)).length} com funcionários ativos</div></div>
+    <div class="card kpi"><div class="l">Escala desta semana</div><div class="n" style="font-size:18px;margin-top:6px">${escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>') : '<span class="badge b-err">Não gerada</span>'}</div><div class="x">${semanaLabel(sem)}</div></div>
+    <div class="card kpi"><div class="l">Folgas dominicais</div><div class="n">${domSem.length}</div><div class="x">neste domingo · ${domTotal} nas últimas 12 semanas</div></div>
+  </div>
+  <div class="grid g2 mt">
+    <div class="card"><div class="row"><h2 style="margin:0">Trabalhando × folga por dia</h2><div class="sp"></div><span class="small muted">${semanaLabel(sem)}</span></div>
+      ${escA ? `<div class="bars">${dias.map((d, i) => `<div class="bar"><div class="nn">${trab[i]} / ${folg[i]}</div><div class="w" style="height:${trab[i] / maxB * 120}px" title="${trab[i]} trabalhando"></div><div class="o" style="height:${folg[i] / maxB * 120}px" title="${folg[i]} de folga"></div><div class="lb ${d === hoje ? 'today' : ''}">${C.DIAS_CURTO[i]}</div></div>`).join('')}</div>
+      <div class="legend mt"><span><i style="background:#4ade80;border-color:#4ade80"></i>Trabalhando</span><span><i style="background:#60a5fa;border-color:#60a5fa"></i>De folga</span></div>`
+      : '<div class="empty"><b>Sem escala nesta semana</b>Gere a escala para ver a distribuição por dia.</div>'}
+    </div>
+    <div class="card"><h2>Alertas de problemas</h2>
+      ${al.length ? al.slice(0, 12).map(a => `<div class="alert ${a.t}"><span class="ic">${a.t === 'e' ? '!' : 'i'}</span><div>${esc(a.m)} ${a.link ? `<a href="#${a.link}" ${a.sem ? `data-act="irSemana" data-sem="${a.sem}"` : ''}>Abrir</a>` : ''}</div></div>`).join('') + (al.length > 12 ? `<div class="small muted">+ ${al.length - 12} alerta(s)</div>` : '')
+      : '<div class="alert s"><span class="ic">✓</span><div>Nenhum problema encontrado.</div></div>'}
+    </div>
+  </div>
+  <div class="grid g3 mt">
+    <div class="card"><h2>Próximas folgas</h2>
+      ${prox.length ? '<ul class="list-sm">' + prox.slice(0, 7).map(p => `<li><div><b>${C.DIAS_CURTO[C.diaSemana(p.d)]} ${C.dataBR(p.d).slice(0, 5)}</b>${p.d === hoje ? ' <span class="badge b-blue">hoje</span>' : ''}<div>${p.nomes.map(n => '<span class="chip b">' + esc(n) + '</span>').join('')}</div></div></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma folga programada nos próximos dias (gere as escalas).</p>'}
+    </div>
+    <div class="card"><h2>Folga no domingo desta semana</h2>
+      ${domSem.length ? '<ul class="list-sm">' + Object.entries(escA.atribuicoes).filter(([, a]) => a.g === 4).map(([id, a]) => `<li><span>${esc((funcPorId(id) || a).nome)}</span><span class="muted small">${esc(nomeSetor((funcPorId(id) || a).setorId))}</span></li>`).join('') + '</ul>' : '<p class="muted">Ninguém de folga no domingo (ou escala não gerada).</p>'}
+      <h3 class="mt">Mais domingos (12 semanas)</h3>
+      ${Object.keys(domPorFunc).length ? '<ul class="list-sm">' + Object.entries(domPorFunc).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, n]) => `<li><span>${esc((funcPorId(id) || {}).nome || 'Removido')}</span><b>${n}</b></li>`).join('') + '</ul>' : '<p class="muted small">Sem histórico ainda.</p>'}
+    </div>
+    <div class="card"><h2>Últimas escalas</h2>
+      ${ult.length ? '<ul class="list-sm">' + ult.map(e => `<li><a href="#escala" data-act="irSemana" data-sem="${e.semana}">${semanaLabel(e.semana)}</a><span>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</span></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma escala gerada ainda.</p>'}
+    </div>
+  </div>`;
+}
+
+/* ---------------- ESCALA SEMANAL ---------------- */
+function vEscala() {
+  const sem = UI.semana, e = S.escalas[sem];
+  const hoje = C.hojeISO();
+  const dias = C.diasDaSemana(sem);
+  const aprov = e && e.status === 'aprovada';
+  let h = `<div class="row mb"><div><h1>Escala semanal</h1><p class="sub" style="margin:0">Domingo a sábado · ${semanaLabel(sem)}</p></div></div>
+  <div class="card mb"><div class="row">
+    <button class="btn icon" data-act="semAnt" title="Semana anterior">${ic('chevL')}</button>
+    <input type="date" id="inSemana" value="${sem}" title="Escolha qualquer dia da semana">
+    <button class="btn icon" data-act="semProx" title="Próxima semana">${ic('chevR')}</button>
+    <button class="btn sm" data-act="semHoje">Esta semana</button>
+    ${e ? (aprov ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho — aguardando aprovação</span>') : '<span class="badge b-off">Não gerada</span>'}
+    <div class="sp"></div>
+    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
+  </div>
+  <div class="row mt edit-only">
+    <button class="btn pri big" data-act="gerar">${ic('bolt')} ${e ? 'REGENERAR ESCALA AUTOMÁTICA' : 'GERAR ESCALA AUTOMÁTICA'}</button>
+    ${e && !aprov ? `<button class="btn ok" data-act="aprovar">${ic('check')} Aprovar escala</button>` : ''}
+    ${aprov ? `<button class="btn" data-act="reabrir">${ic('edit')} Reabrir para edição</button>` : ''}
+    ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar / WhatsApp</a>` : ''}
+    ${e ? `<button class="btn danger sm" data-act="excluirEscala">${ic('trash')} Excluir escala</button>` : ''}
+  </div></div>`;
+  if (!e) {
+    const ativos = S.funcionarios.filter(f => C.elegivel(f, sem));
+    h += `<div class="card empty"><b>Nenhuma escala para ${semanaLabel(sem)}</b>${ativos.length ? `Há ${ativos.length} funcionário(s) ativo(s) em ${new Set(ativos.map(f => f.setorId)).size} setor(es). Clique em <b>GERAR ESCALA AUTOMÁTICA</b>.` : 'Cadastre setores e funcionários primeiro.'}</div>`;
+    return h + legenda();
+  }
+  const v = C.validarEscala(e, S.funcionarios, S.setores, historicoArr());
+  if (v.erros.length) h += `<div class="card mb" style="border-color:#fecaca"><h2 style="color:var(--err)">Esta escala tem problemas</h2>${listaProblemas(v.erros, [])}
+    </div>`;
+  const fora = v.avisos.filter(a => a.fora);
+  if ((v.erros.some(x => /não tem combinação/.test(x.msg)) || fora.length) && !aprov) h += `<div class="card mb edit-only" style="border-color:#fde68a">${fora.length ? listaProblemas([], fora) : ''}<button class="btn pri" data-act="completar">Atualizar escala: incluir quem falta e retirar quem está de férias/inativo (sem mexer nos demais)</button></div>`;
+  const avisos = v.avisos.filter(a => !a.fora);
+  if (avisos.length) h += `<details class="card mb"><summary style="cursor:pointer;font-weight:700">${avisos.length} aviso(s) — não impedem a aprovação</summary><div class="mt">${listaProblemas([], avisos)}</div></details>`;
+  h += legenda();
+  // tabela
+  const ids = Object.keys(e.atribuicoes || {});
+  const linhas = ids.map(id => ({ id, a: e.atribuicoes[id], f: funcPorId(id) }));
+  const grupos = {};
+  linhas.forEach(l => { const sid = l.f ? l.f.setorId : l.a.setorId; (grupos[sid] = grupos[sid] || []).push(l); });
+  const ordem = Object.keys(grupos).sort(cmpSetor).filter(sid => !UI.filtroSetor || sid === UI.filtroSetor);
+  const editavel = !aprov && !S.somenteLeitura;
+  h += `<div class="tw mt"><table class="esc"><thead><tr><th class="nm">Funcionário</th>${dias.map((d, i) => `<th class="d ${d === hoje ? 'today' : ''}" ${feriadoEm(d) ? `style="background:#DDEBF7" title="Feriado: ${esc(feriadoEm(d).nome)}"` : ''}>${C.DIAS_CURTO[i]}<br><span style="font-weight:500">${C.dataBR(d).slice(0, 5)}</span>${feriadoEm(d) ? '<br><span style="color:var(--off);font-size:10px">feriado</span>' : ''}</th>`).join('')}<th>Combinação</th>${editavel ? '<th class="hide-m">Ações</th>' : ''}</tr></thead><tbody>`;
+  const totT = [0, 0, 0, 0, 0, 0, 0], totF = [0, 0, 0, 0, 0, 0, 0];
+  ordem.forEach(sid => {
+    const ls = grupos[sid].sort((x, y) => (x.f || x.a).nome.localeCompare((y.f || y.a).nome));
+    const cad = C.cadastradosSetor(S.funcionarios, sid, sem), regra = C.regraCobertura(cad.length);
+    let cob = '';
+    if (regra) { const atr = {}; cad.forEach(f => { if (e.atribuicoes[f.id]) atr[f.id] = e.atribuicoes[f.id].g; }); const t = C.trabalhandoTerQua(cad, atr, sem); cob = ` · <b>Equipe reduzida</b> — Ter: ${t.ter.map(f => esc(f.nome)).join(', ') || '<span style="color:var(--err)">ninguém</span>'} · Qua: ${t.qua.map(f => esc(f.nome)).join(', ') || '<span style="color:var(--err)">ninguém</span>'} <span>(${regra === 'exato1' ? 'exatamente 1' : 'pelo menos 1'})</span>`; }
+    h += `<tr class="sec"><td colspan="${editavel ? 10 : 9}" style="background:${corSetor(sid)};color:#1f2937">${esc(nomeSetor(sid) === 'Sem setor' ? (ls[0].a.setorNome || 'Sem setor') : nomeSetor(sid))}<span>${ls.length} funcionário(s)</span><span style="color:#1f2937">${cob}</span></td></tr>`;
+    ls.forEach(({ id, a, f }) => {
+      const nome = (f || a).nome;
+      h += `<tr><td class="nm"><div class="fn">${a.bloq ? '<span class="lockon" title="Combinação bloqueada">🔒 </span>' : ''}${esc(nome)}</div><div class="fu">${esc((f || a).funcao || '')}${f && !f.ativo ? ' · <span style="color:var(--err)">inativo</span>' : ''}</div></td>`;
+      dias.forEach((d, i) => { const st = C.statusDia(a, d, f, true); if (st === 'F') totF[i]++; else if (st === 'T' || st === 'X') totT[i]++; h += `<td class="d">${cellHTML(st)}</td>`; });
+      h += `<td class="mini">${editavel ? `<select data-act="mudarGrupo" data-id="${id}" ${a.bloq ? 'disabled title="Desbloqueie para alterar"' : ''}>${[1, 2, 3, 4].map(g => `<option value="${g}" ${a.g === g ? 'selected' : ''}>${g} · ${C.GRUPOS[g].nome}</option>`).join('')}</select>` : gPill(a.g) + ' <span class="small muted hide-m">' + esc(C.GRUPOS[a.g] ? C.GRUPOS[a.g].nome : '?') + '</span>'}</td>`;
+      if (editavel) h += `<td class="hide-m" style="white-space:nowrap"><button class="btn icon sm" data-act="bloq" data-id="${id}" title="${a.bloq ? 'Desbloquear' : 'Bloquear esta combinação (a regeneração não altera)'}">${ic(a.bloq ? 'lock' : 'unlock')}</button> <button class="btn icon sm" data-act="trocar" data-id="${id}" title="Trocar folgas com outro funcionário">${ic('swap')}</button></td>`;
+      h += '</tr>';
+    });
+  });
+  h += `<tr class="tot"><td class="nm" style="background:#f9fafb">Trabalhando</td>${totT.map(n => `<td class="d">${n}</td>`).join('')}<td colspan="2"></td></tr>`;
+  h += `<tr class="tot"><td class="nm" style="background:#f9fafb">De folga</td>${totF.map(n => `<td class="d">${n}</td>`).join('')}<td colspan="2"></td></tr>`;
+  h += '</tbody></table></div>';
+  if (editavel) h += '<p class="small muted mt">No celular, toque e segure o nome para bloquear ou trocar folgas. Toda alteração é conferida contra as regras antes de ser salva.</p>';
+  if (aprov) h += '<p class="small muted mt">Escala aprovada: para alterar, clique em <b>Reabrir para edição</b>.</p>';
+  h += `<div class="small muted mt">Gerada em ${dtHora(e.geradaEm)}${e.aprovadaEm && aprov ? ' · aprovada em ' + dtHora(e.aprovadaEm) : ''}</div>`;
+  if ((e.alteracoes || []).length) h += `<details class="card mt"><summary style="cursor:pointer;font-weight:700">Alterações desta escala (${e.alteracoes.length})</summary><ul class="list-sm mt">${e.alteracoes.slice().reverse().map(x => `<li><span>${esc(x.texto)}</span><span class="small muted">${dtHora(x.ts)}</span></li>`).join('')}</ul></details>`;
+  return h;
+}
+function legenda() {
+  return `<div class="legend mt"><span><i class="c-T"></i>Trabalho</span><span><i class="c-F"></i>Folga</span><span><i class="c-X"></i>Trabalho fixo — sexta e sábado (sem alteração)</span><span><i class="c-V"></i>Férias</span><span><i class="c--"></i>Sem escala / não admitido</span><span><i style="background:#DDEBF7;border-color:#9BC2E6"></i>Feriado</span>
+  <span>Combinações: ${[1, 2, 3, 4].map(g => gPill(g) + ' ' + C.GRUPOS[g].nome).join(' · ')}</span></div>`;
+}
+
+/* ---------------- ESCALA MENSAL ---------------- */
+function semanasDoMes(ym) {
+  const ini = ym + '-01'; const [y, m] = ym.split('-').map(Number);
+  const fim = C.addDias(C.fmt(Date.UTC(y, m, 1)), -1);
+  const fimFolha = C.addDias(ini, Math.max(31, +fim.slice(8)) - 1); // a folha mostra 31 colunas, como a planilha do hotel
+  const sems = []; let s = C.inicioSemana(ini);
+  while (s <= fimFolha) { sems.push(s); s = C.addDias(s, 7); }
+  return { ini, fim, sems };
+}
+function vMensal() {
+  const { sems } = semanasDoMes(UI.mes);
+  const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorId: UI.filtroSetor }));
+  const faltam = sems.filter(s => !S.escalas[s]);
+  let h = `<div class="row mb"><div><h1>Escala mensal</h1><p class="sub" style="margin:0">Folha de folga do mês, no mesmo formato da planilha do hotel</p></div></div>
+  <div class="card mb"><div class="row">
+    <button class="btn icon" data-act="mesAnt">${ic('chevL')}</button><input type="month" id="inMes" value="${UI.mes}"><button class="btn icon" data-act="mesProx">${ic('chevR')}</button>
+    <div class="sp"></div>
+    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
+  </div>
+  <div class="row mt">${sems.map(s => `<a href="#escala" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? (S.escalas[s].status === 'aprovada' ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-draft">rasc.</span>') : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
+  ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
+  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
+  </div>`;
+  if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
+  if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
+  return h + folhaHTML(m);
+}
+
+/* =====================================================================
+   FOLHA DE FOLGA (formato da planilha do hotel)
+   ===================================================================== */
+function periodoFolha(tipo) {
+  if (tipo === 'semana') return { ini: UI.semana, n: 7, sub: 'SEMANA DE ' + C.dataBR(UI.semana) + ' A ' + C.dataBR(C.fimSemana(UI.semana)) };
+  const [y, mm] = UI.mes.split('-').map(Number);
+  const dim = new Date(Date.UTC(y, mm, 0)).getUTCDate();
+  return { ini: UI.mes + '-01', n: Math.max(31, dim), sub: MESES[mm - 1] + ' DE ' + y };
+}
+function folhaModelo(o) {
+  const cols = []; for (let i = 0; i < o.n; i++) cols.push(C.addDias(o.ini, i));
+  const fimP = cols[cols.length - 1];
+  const sems = [...new Set(cols.map(d => C.inicioSemana(d)))];
+  const ids = new Set(S.funcionarios.filter(f => f.ativo && setorPorId(f.setorId) && (!f.dataEntrada || f.dataEntrada <= fimP)).map(f => f.id));
+  sems.forEach(s => Object.keys((S.escalas[s] || {}).atribuicoes || {}).forEach(id => ids.add(id)));
+  let linhas = [...ids].map(id => {
+    const f = funcPorId(id); let a = null;
+    sems.forEach(s => { const e = S.escalas[s]; if (e && e.atribuicoes && e.atribuicoes[id]) a = e.atribuicoes[id]; });
+    if (!f && !a) return null;
+    const sid = f ? f.setorId : a.setorId;
+    const cel = cols.map(d => { const e = S.escalas[C.inicioSemana(d)]; const st = C.statusDia(e && e.atribuicoes ? e.atribuicoes[id] : null, d, f, !!e); return st === 'F' ? 'F' : st === 'V' ? 'V' : st === '-' ? '-' : ''; });
+    const gs = sems.map(s => { const e = S.escalas[s]; return e && e.atribuicoes && e.atribuicoes[id] ? e.atribuicoes[id].g : null; });
+    return { id, f, nome: (f || a).nome, funcao: (f || a).funcao || '', sid, sNome: f ? nomeSetor(sid) : (a.setorNome || 'Sem setor'), cel, gs, criado: (f && f.criadoEm) || '' };
+  }).filter(Boolean);
+  if (o.setorId) linhas = linhas.filter(l => l.sid === o.setorId);
+  if (o.funcId) linhas = linhas.filter(l => l.id === o.funcId);
+  const gm = {}; linhas.forEach(l => (gm[l.sid] = gm[l.sid] || []).push(l));
+  const grupos = Object.keys(gm).sort(cmpSetor).map(sid => ({ sid, nome: gm[sid][0].sNome, cor: corSetor(sid), linhas: gm[sid].sort((a, b) => (a.criado || '').localeCompare(b.criado || '') || a.nome.localeCompare(b.nome)) }));
+  const feriados = cols.map(d => feriadoEm(d) || null);
+  const semEscala = sems.filter(s => !S.escalas[s]);
+  const pend = sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length;
+  return { cols, sems, grupos, linhas, feriados, semEscala, pend, sub: o.sub, titulo: S.config.tituloFolha || 'ESCALA DE FOLGA' };
+}
+/** percorre as células de uma linha agrupando dias seguidos de férias: [{tipo, ini, n}] */
+function segmentos(cel) {
+  const r = [];
+  for (let i = 0; i < cel.length; i++) {
+    if (cel[i] === 'V') { let k = i; while (k + 1 < cel.length && cel[k + 1] === 'V') k++; r.push({ tipo: 'V', i, n: k - i + 1 }); i = k; }
+    else r.push({ tipo: cel[i], i, n: 1 });
+  }
+  return r;
+}
+const COR_FERIADO = '#DDEBF7', COR_FERIAS = '#FF0000', COR_TITULO = '#C00000';
+function folhaHTML(m) {
+  const n = m.cols.length;
+  const thDia = (d, i, txt) => `<th class="${m.feriados[i] ? 'fer' : ''}" ${m.feriados[i] ? `title="Feriado: ${esc(m.feriados[i].nome)}"` : ''}>${txt}</th>`;
+  let h = `<div class="folha-wrap"><table class="folha"><thead>
+  <tr><th colspan="${n + 1}" class="ft1"><span>${esc(m.titulo)}</span></th></tr>
+  <tr><th colspan="${n + 1}" class="ft2"><span>${esc(m.sub)}</span></th></tr>
+  <tr><th rowspan="2" class="fnm">FUNCIONÁRIOS</th>${m.cols.map((d, i) => thDia(d, i, +d.slice(8))).join('')}</tr>
+  <tr>${m.cols.map((d, i) => thDia(d, i, C.DIAS_CURTO[C.diaSemana(d)].toUpperCase())).join('')}</tr></thead><tbody>`;
+  m.grupos.forEach((g, gi) => {
+    if (gi > 0) h += `<tr class="sep"><td class="fnm"></td>${m.cols.map((d, i) => `<td ${m.feriados[i] ? `style="background:${COR_FERIADO}"` : ''}></td>`).join('')}</tr>`;
+    g.linhas.forEach(l => {
+      h += `<tr><td class="fnm" style="background:${g.cor}" title="${esc(g.nome)}">${esc(l.nome.toUpperCase())}</td>`;
+      segmentos(l.cel).forEach(sg => {
+        if (sg.tipo === 'V') h += `<td colspan="${sg.n}" class="fv">FÉRIAS</td>`;
+        else h += `<td class="${sg.tipo === '-' ? 'nd' : ''}" style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : ''}</td>`;
+      });
+      h += '</tr>';
+    });
+  });
+  h += `</tbody></table>
+  <div class="fimp"><div class="fimp-t">IMPORTANTE</div>${(S.config.textoImportante || '').split('\n').map(p => `<p>${esc(p)}</p>`).join('')}</div>
+  <div class="fleg"><span class="fleg-f">F</span><b>FOLGA SEMANAL</b></div>
+  ${m.pend ? '<p class="small" style="color:var(--warn)">Contém semana em rascunho, ainda não aprovada.</p>' : ''}</div>`;
+  return h;
+}
+
+/* ---------------- FUNCIONÁRIOS ---------------- */
+function vFuncionarios() {
+  return `<div class="row mb"><div><h1>Funcionários</h1><p class="sub" style="margin:0">Cadastro, edição, transferência e situação</p></div><div class="sp"></div>
+    <button class="btn edit-only" data-act="importarFunc">Cadastrar vários de uma vez</button>
+    <button class="btn pri edit-only" data-act="novoFunc">${ic('plus')} Novo funcionário</button></div>
+  <div class="card mb"><div class="row">
+    <input type="search" id="busca" placeholder="Buscar por nome ou função…" value="${esc(UI.busca)}" style="flex:1;min-width:180px">
+    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
+    <select id="fSit"><option value="ativos" ${UI.situacao === 'ativos' ? 'selected' : ''}>Ativos</option><option value="inativos" ${UI.situacao === 'inativos' ? 'selected' : ''}>Inativos</option><option value="todos" ${UI.situacao === 'todos' ? 'selected' : ''}>Todos</option></select>
+  </div></div>
+  <div id="listaFunc">${listaFuncHTML()}</div>`;
+}
+function listaFuncHTML() {
+  const q = UI.busca.trim().toLowerCase();
+  const fs = S.funcionarios.filter(f => (UI.situacao === 'todos' || (UI.situacao === 'ativos' ? f.ativo : !f.ativo)) && (!UI.filtroSetor || f.setorId === UI.filtroSetor) && (!q || (f.nome + ' ' + (f.funcao || '')).toLowerCase().includes(q)))
+    .sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome));
+  if (!S.funcionarios.length) return '<div class="card empty"><b>Nenhum funcionário cadastrado</b>' + (S.setores.length ? 'Clique em "Novo funcionário" ou "Cadastrar vários de uma vez".' : 'Cadastre os <a href="#setores">setores</a> primeiro.') + '</div>';
+  if (!fs.length) return '<div class="card empty"><b>Nenhum resultado</b>Ajuste os filtros.</div>';
+  const sem = C.inicioSemana(C.hojeISO()), e = S.escalas[sem];
+  return `<div class="tw"><table class="list"><thead><tr><th>Nome</th><th class="hide-m">Setor</th><th class="hide-m">Função</th><th>Situação</th><th class="hide-m">Entrada</th><th class="hide-m">Folga atual</th><th class="edit-only">Ações</th></tr></thead><tbody>
+  ${fs.map(f => `<tr><td><b>${esc(f.nome)}</b><div class="small muted show-m">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</div>${f.obs ? `<div class="small muted">${esc(f.obs)}</div>` : ''}</td>
+  <td class="hide-m">${setorPorId(f.setorId) ? esc(nomeSetor(f.setorId)) : '<span class="badge b-err">Sem setor</span>'}</td><td class="hide-m">${esc(f.funcao || '')}</td>
+  <td>${f.ativo ? (C.emFerias(f, C.hojeISO()) ? '<span class="badge" style="background:#fee2e2;color:#b91c1c">De férias</span>' : '<span class="badge b-ok">Ativo</span>') : '<span class="badge b-off">Inativo</span>'}${(f.ferias || []).filter(p => p.fim >= C.hojeISO()).map(p => `<div class="small muted">Férias ${C.dataBR(p.ini).slice(0, 5)}–${C.dataBR(p.fim).slice(0, 5)}</div>`).join('')}</td><td class="hide-m">${C.dataBR(f.dataEntrada)}</td>
+  <td class="hide-m">${e && e.atribuicoes && e.atribuicoes[f.id] ? gPill(e.atribuicoes[f.id].g) + ' <span class="small">' + C.GRUPOS[e.atribuicoes[f.id].g].nome + '</span>' : '<span class="muted small">—</span>'}</td>
+  <td class="edit-only" style="white-space:nowrap"><button class="btn icon sm" data-act="editFunc" data-id="${f.id}" title="Editar">${ic('edit')}</button> <button class="btn icon sm" data-act="transfFunc" data-id="${f.id}" title="Transferir de setor">${ic('move')}</button> <button class="btn icon sm danger" data-act="delFunc" data-id="${f.id}" title="Excluir">${ic('trash')}</button></td></tr>`).join('')}
+  </tbody></table></div><p class="small muted mt">${fs.length} funcionário(s) listado(s).</p>`;
+}
+function formFunc(f) {
+  f = f || { ativo: true, dataEntrada: C.hojeISO(), setorId: UI.filtroSetor || '' };
+  return `<div class="mh">${f.id ? 'Editar funcionário' : 'Novo funcionário'}</div><form class="mbd" id="fFunc">
+  <div class="fld"><label class="f">Nome completo *</label><input type="text" name="nome" required value="${esc(f.nome || '')}" maxlength="120"></div>
+  <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Setor *</label><select name="setorId" required><option value="">Selecione…</option>${setoresOrd().map(s => `<option value="${s.id}" ${f.setorId === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>
+  <div class="fld"><label class="f">Função</label><input type="text" name="funcao" value="${esc(f.funcao || '')}" maxlength="80"></div>
+  <div class="fld"><label class="f">Situação</label><select name="ativo"><option value="1" ${f.ativo ? 'selected' : ''}>Ativo</option><option value="0" ${!f.ativo ? 'selected' : ''}>Inativo</option></select></div>
+  <div class="fld"><label class="f">Data de entrada</label><input type="date" name="dataEntrada" value="${esc(f.dataEntrada || '')}"></div></div>
+  <div class="fld"><label class="f">Férias</label><div id="ferLista">${(f.ferias || []).map(feriasRow).join('')}</div><button type="button" class="btn sm" data-x="addFer">${ic('plus')} Adicionar período de férias</button>
+  <div class="small muted" style="margin-top:4px">Na semana em que houver férias, o funcionário não recebe folgas; os dias de férias aparecem em vermelho na folha.</div></div>
+  <div class="fld"><label class="f">Observações</label><textarea name="obs" maxlength="1000">${esc(f.obs || '')}</textarea></div>
+  ${!S.setores.length ? '<div class="alert w"><span class="ic">!</span><div>Cadastre um setor antes.</div></div>' : ''}
+  </form><div class="mf"><button class="btn" data-x="cancel">Cancelar</button><button class="btn pri" data-x="save">Salvar</button></div>`;
+}
+const feriasRow = p => `<div class="ferias-row"><span class="small">de</span><input type="date" class="fIni" value="${esc(p.ini || '')}"><span class="small">até</span><input type="date" class="fFim" value="${esc(p.fim || '')}"><button type="button" class="btn icon sm danger" data-x="delFer" title="Remover">${ic('trash')}</button></div>`;
+function abrirFormFunc(f) {
+  const w = abrirModal(formFunc(f));
+  w.querySelector('[data-x=cancel]').onclick = () => fecharModal(w);
+  w.addEventListener('click', ev => {
+    if (ev.target.closest('[data-x=addFer]')) { w.querySelector('#ferLista').insertAdjacentHTML('beforeend', feriasRow({})); }
+    const del = ev.target.closest('[data-x=delFer]'); if (del) del.closest('.ferias-row').remove();
+  });
+  const salvar = async () => {
+    const fd = new FormData(w.querySelector('form'));
+    const nome = (fd.get('nome') || '').trim(), setorId = fd.get('setorId');
+    if (!nome) return toast('Informe o nome.');
+    if (!setorId) return toast('Escolha o setor.');
+    const ferias = []; let ferErr = '';
+    w.querySelectorAll('.ferias-row').forEach(r => { const ini = r.querySelector('.fIni').value, fim = r.querySelector('.fFim').value; if (!ini && !fim) return; if (!ini || !fim) ferErr = 'Preencha o início e o fim das férias.'; else if (fim < ini) ferErr = 'O fim das férias não pode ser antes do início.'; else ferias.push({ ini, fim }); });
+    if (ferErr) return toast(ferErr);
+    ferias.sort((a, b) => a.ini.localeCompare(b.ini));
+    const novo = { nome, setorId, funcao: (fd.get('funcao') || '').trim(), ativo: fd.get('ativo') === '1', dataEntrada: fd.get('dataEntrada') || '', obs: (fd.get('obs') || '').trim(), ferias, criadoEm: (f && f.criadoEm) || agoraISO(), atualizadoEm: agoraISO() };
+    const id = (f && f.id) || uid('f');
+    try {
+      await Store.set('funcionarios', id, novo);
+      if (!f) log('funcionario', 'Cadastrado: ' + nome + ' (' + nomeSetor(setorId) + ')');
+      else {
+        const mud = [];
+        if (f.setorId !== setorId) mud.push('transferido de ' + nomeSetor(f.setorId) + ' para ' + nomeSetor(setorId));
+        if (f.ativo !== novo.ativo) mud.push(novo.ativo ? 'reativado' : 'inativado');
+        if (f.nome !== nome) mud.push('nome alterado de "' + f.nome + '"');
+        if ((f.funcao || '') !== novo.funcao) mud.push('função: ' + (novo.funcao || '—'));
+        if (JSON.stringify(f.ferias || []) !== JSON.stringify(ferias)) mud.push('férias: ' + (ferias.map(p => C.dataBR(p.ini) + ' a ' + C.dataBR(p.fim)).join(', ') || 'nenhuma'));
+        log('funcionario', 'Editado: ' + nome + (mud.length ? ' — ' + mud.join('; ') : ''));
+      }
+      fecharModal(w); toast('Funcionário salvo.');
+    } catch (e) { }
+  };
+  w.querySelector('[data-x=save]').onclick = salvar;
+  w.querySelector('form').onsubmit = ev => { ev.preventDefault(); salvar(); };
+}
+function abrirImportFunc() {
+  const w = abrirModal(`<div class="mh">Cadastrar vários funcionários</div><div class="mbd">
+  <p class="muted">Cole uma linha por funcionário, no formato <b>Nome ; Setor ; Função ; Data de entrada (opcional)</b>. Setores que não existirem serão criados.</p>
+  <textarea id="impTxt" style="min-height:180px" placeholder="Maria da Silva; Recepção; Recepcionista; 01/03/2024&#10;João Souza; Cozinha; Auxiliar de cozinha"></textarea>
+  <div id="impPrev" class="small muted mt"></div></div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Cadastrar</button></div>`, true);
+  const ta = w.querySelector('#impTxt');
+  const parse = () => ta.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => { const p = l.split(/[;\t]/).map(x => x.trim()); let d = p[3] || ''; const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) d = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); else if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) d = ''; return { nome: p[0], setor: p[1] || '', funcao: p[2] || '', data: d }; }).filter(x => x.nome);
+  ta.oninput = () => { const l = parse(); w.querySelector('#impPrev').textContent = l.length + ' funcionário(s) reconhecido(s)' + (l.some(x => !x.setor) ? ' — atenção: há linhas sem setor.' : ''); };
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const l = parse(); if (!l.length) return toast('Nada para cadastrar.');
+    if (l.some(x => !x.setor)) return toast('Todas as linhas precisam do setor.');
+    const mapa = {}, novosSet = {}; S.setores.forEach(s => mapa[s.nome.toLowerCase()] = s.id);
+    const baseOrdem = S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1;
+    try {
+      for (const x of l) {
+        let sid = mapa[x.setor.toLowerCase()];
+        if (!sid) { sid = uid('s'); mapa[x.setor.toLowerCase()] = sid; const o = baseOrdem + Object.keys(novosSet).length; novosSet[sid] = 1; await Store.set('setores', sid, { nome: x.setor, ordem: o, cor: PALETA[o % PALETA.length], criadoEm: agoraISO() }); }
+        await Store.set('funcionarios', uid('f'), { nome: x.nome, setorId: sid, funcao: x.funcao, ativo: true, dataEntrada: x.data || C.hojeISO(), obs: '', criadoEm: agoraISO() });
+      }
+      log('funcionario', 'Cadastro em lote: ' + l.length + ' funcionário(s)');
+      fecharModal(w); toast(l.length + ' funcionário(s) cadastrado(s).');
+    } catch (e) { }
+  };
+}
+
+/* ---------------- SETORES ---------------- */
+const SUGESTOES = ['Recepção', 'Cozinha', 'Copa', 'Governança / Camareiras', 'Restaurante / Salão', 'Bar', 'Lazer', 'Manutenção', 'Jardinagem', 'Lavanderia', 'Portaria / Segurança', 'Administrativo'];
+function vSetores() {
+  const ativos = S.funcionarios.filter(f => f.ativo);
+  const faltam = SUGESTOES.filter(n => !S.setores.some(s => s.nome.toLowerCase() === n.toLowerCase()));
+  const lista = setoresOrd();
+  return `<div class="row mb"><div><h1>Setores</h1><p class="sub" style="margin:0">A ordem e a cor de cada setor são usadas na folha de folga</p></div><div class="sp"></div><button class="btn pri edit-only" data-act="novoSetor">${ic('plus')} Novo setor</button></div>
+  ${lista.length ? `<div class="tw"><table class="list"><thead><tr><th class="edit-only">Ordem</th><th>Setor</th><th>Ativos</th><th class="hide-m">Inativos</th><th class="hide-m">Folga domingo (semana atual)</th><th class="edit-only">Ações</th></tr></thead><tbody>
+  ${lista.map((s, i) => { const n = ativos.filter(f => f.setorId === s.id).length, ni = S.funcionarios.filter(f => !f.ativo && f.setorId === s.id).length; const e = S.escalas[C.inicioSemana(C.hojeISO())]; const dom = e ? Object.entries(e.atribuicoes || {}).filter(([id, a]) => a.g === 4 && (funcPorId(id) || a).setorId === s.id).map(([id, a]) => (funcPorId(id) || a).nome) : []; return `<tr><td class="edit-only" style="white-space:nowrap"><button class="btn icon sm" data-act="setorMover" data-id="${s.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button> <button class="btn icon sm" data-act="setorMover" data-id="${s.id}" data-d="1" ${i === lista.length - 1 ? 'disabled' : ''} title="Descer">▼</button></td><td><span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #0003;vertical-align:-2px;margin-right:8px;background:${corSetor(s.id)}"></span><b>${esc(s.nome)}</b>${n === 1 ? ' <span class="badge b-draft">1 pessoa</span>' : ''}${n >= 2 ? ' <span class="badge b-blue" title="Terça e quarta: pelo menos 1 trabalhando">ter/qua: mín. 1</span>' : ''}</td><td>${n}</td><td class="hide-m">${ni}</td><td class="hide-m">${dom.length ? dom.map(esc).join(', ') : '<span class="muted">—</span>'}</td><td class="edit-only" style="white-space:nowrap"><button class="btn icon sm" data-act="editSetor" data-id="${s.id}" title="Editar nome e cor">${ic('edit')}</button> <button class="btn icon sm danger" data-act="delSetor" data-id="${s.id}" title="Excluir">${ic('trash')}</button></td></tr>`; }).join('')}
+  </tbody></table></div>` : '<div class="card empty"><b>Nenhum setor cadastrado</b>Crie os setores do hotel.</div>'}
+  ${faltam.length ? `<div class="card mt edit-only"><h3>Adicionar setores comuns de hotel com um clique</h3><div class="row">${faltam.map(n => `<button class="btn sm" data-act="addSug" data-n="${esc(n)}">${ic('plus')} ${esc(n)}</button>`).join('')}</div></div>` : ''}`;
+}
+async function moverSetor(id, d) {
+  const l = setoresOrd(); const i = l.findIndex(s => s.id === id), j = i + d;
+  if (i < 0 || j < 0 || j >= l.length) return;
+  [l[i], l[j]] = [l[j], l[i]];
+  try {
+    for (let k = 0; k < l.length; k++) if (l[k].ordem !== k || !l[k].cor) await Store.set('setores', l[k].id, Object.assign({}, l[k], { ordem: k, cor: l[k].cor || corSetor(l[k].id) }));
+    log('setor', 'Ordem dos setores: ' + l.map(s => s.nome).join(', '));
+  } catch (e) { }
+}
+function abrirFormSetor(s) {
+  const cor = s ? corSetor(s.id) : PALETA[S.setores.length % PALETA.length];
+  const w = abrirModal(`<div class="mh">${s ? 'Editar setor' : 'Novo setor'}</div><form class="mbd"><div class="fld"><label class="f">Nome do setor</label><input type="text" id="sNome" value="${esc(s ? s.nome : '')}" maxlength="60" style="width:100%"></div>
+  <div class="fld"><label class="f">Cor na folha de folga</label><div class="row"><input type="color" id="sCor" class="cor-in" value="${cor}">${PALETA.map(c => `<button type="button" class="btn icon sm" data-cor="${c}" style="background:${c};width:28px;height:28px" title="${c}"></button>`).join('')}</div></div></form>
+  <div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
+  w.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { w.querySelector('#sCor').value = b.dataset.cor; });
+  const salvar = async () => {
+    const n = w.querySelector('#sNome').value.trim(); const c = w.querySelector('#sCor').value.toUpperCase();
+    if (!n) return toast('Informe o nome.');
+    if (S.setores.some(x => x.nome.toLowerCase() === n.toLowerCase() && (!s || x.id !== s.id))) return toast('Já existe um setor com esse nome.');
+    const ordem = s ? (s.ordem ?? ordemSetor(s.id)) : S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1;
+    try { await Store.set('setores', s ? s.id : uid('s'), { nome: n, cor: c, ordem, criadoEm: s ? s.criadoEm || agoraISO() : agoraISO() }); log('setor', s ? 'Setor editado: ' + s.nome + (s.nome !== n ? ' → ' + n : '') : 'Setor criado: ' + n); fecharModal(w); } catch (e) { }
+  };
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w); w.querySelector('[data-x=s]').onclick = salvar; w.querySelector('form').onsubmit = e => { e.preventDefault(); salvar(); };
+}
+
+/* ---------------- HISTÓRICO ---------------- */
+function vHistorico() {
+  const tabs = [['escalas', 'Escalas anteriores'], ['domingos', 'Folgas aos domingos'], ['combinacoes', 'Combinações utilizadas'], ['rodizio', 'Rodízio de folgas'], ['alteracoes', 'Histórico de alterações']];
+  let h = `<div class="row mb"><div><h1>Histórico</h1><p class="sub" style="margin:0">O histórico é usado automaticamente para organizar as próximas escalas</p></div></div>
+  <div class="tabs">${tabs.map(([k, t]) => `<button class="${UI.histTab === k ? 'on' : ''}" data-act="histTab" data-t="${k}">${t}</button>`).join('')}</div>`;
+  const escs = historicoArr().sort((a, b) => b.semana.localeCompare(a.semana));
+  const nomeDe = (id, a) => (funcPorId(id) || a || {}).nome || 'Removido';
+  if (UI.histTab === 'escalas') {
+    if (!escs.length) return h + '<div class="card empty"><b>Nenhuma escala ainda</b></div>';
+    h += `<div class="tw"><table class="list"><thead><tr><th>Semana</th><th>Situação</th><th>Funcionários</th><th class="hide-m">Domingo</th><th class="hide-m">Comb. 1/2/3/4</th><th class="hide-m">Alterações</th><th></th></tr></thead><tbody>`;
+    escs.forEach(e => { const at = Object.values(e.atribuicoes || {}); const c = [1, 2, 3, 4].map(g => at.filter(a => a.g === g).length); h += `<tr><td><b>${semanaLabel(e.semana)}</b></td><td>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</td><td>${at.length}</td><td class="hide-m">${c[3]}</td><td class="hide-m">${c.join(' / ')}</td><td class="hide-m">${(e.alteracoes || []).length}</td><td><a class="btn sm" href="#escala" data-act="irSemana" data-sem="${e.semana}">Abrir</a></td></tr>`; });
+    return h + '</tbody></table></div>';
+  }
+  if (UI.histTab === 'domingos') {
+    const linhas = [];
+    const ids = new Set(S.funcionarios.filter(f => f.ativo).map(f => f.id)); escs.forEach(e => Object.keys(e.atribuicoes || {}).forEach(id => ids.add(id)));
+    ids.forEach(id => { let a0 = null; const doms = []; escs.forEach(e => { const a = (e.atribuicoes || {})[id]; if (a) { a0 = a0 || a; if (a.g === 4) doms.push(C.addDias(e.semana, 6)); } }); const f = funcPorId(id); linhas.push({ id, nome: nomeDe(id, a0), setor: f ? nomeSetor(f.setorId) : (a0 ? a0.setorNome : ''), doms, ativo: f && f.ativo }); });
+    linhas.sort((a, b) => a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome));
+    h += `<div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th>Total</th><th>Último domingo de folga</th><th class="hide-m">Domingos de folga</th></tr></thead><tbody>${linhas.map(l => `<tr><td><b>${esc(l.nome)}</b>${!l.ativo ? ' <span class="badge b-off">inativo</span>' : ''}</td><td>${esc(l.setor)}</td><td>${l.doms.length}</td><td>${l.doms[0] ? C.dataBR(l.doms[0]) : '<span class="muted">nunca</span>'}</td><td class="hide-m">${l.doms.slice(0, 8).map(d => '<span class="chip b">' + C.dataBR(d).slice(0, 5) + '</span>').join('')}${l.doms.length > 8 ? '…' : ''}</td></tr>`).join('')}</tbody></table></div>`;
+    return h;
+  }
+  if (UI.histTab === 'combinacoes') {
+    const ult = escs.slice(0, 12).reverse();
+    if (!ult.length) return h + '<div class="card empty"><b>Sem histórico</b></div>';
+    const ids = new Set(); ult.forEach(e => Object.keys(e.atribuicoes || {}).forEach(id => ids.add(id)));
+    const ls = [...ids].map(id => { let a0 = null; ult.forEach(e => { if ((e.atribuicoes || {})[id]) a0 = e.atribuicoes[id]; }); const f = funcPorId(id); return { id, nome: nomeDe(id, a0), setor: f ? nomeSetor(f.setorId) : a0.setorNome }; }).sort((a, b) => a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome));
+    h += legenda() + `<div class="tw mt"><table class="list esc"><thead><tr><th class="nm">Funcionário</th><th class="hide-m">Setor</th>${ult.map(e => `<th class="d">${C.dataBR(e.semana).slice(0, 5)}</th>`).join('')}</tr></thead><tbody>${ls.map(l => `<tr><td class="nm"><b>${esc(l.nome)}</b></td><td class="hide-m">${esc(l.setor)}</td>${ult.map(e => { const a = (e.atribuicoes || {})[l.id]; return `<td class="d">${a ? gPill(a.g) : '<span class="muted">·</span>'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div><p class="small muted mt">Últimas ${ult.length} semanas. O número é a combinação de folgas recebida.</p>`;
+    return h;
+  }
+  if (UI.histTab === 'rodizio') {
+    const cont = {};
+    escs.forEach(e => Object.entries(e.atribuicoes || {}).forEach(([id, a]) => { cont[id] = cont[id] || { 1: 0, 2: 0, 3: 0, 4: 0, n: 0, a }; cont[id][a.g]++; cont[id].n++; }));
+    const ls = Object.entries(cont).map(([id, c]) => { const f = funcPorId(id); return { id, c, nome: nomeDe(id, c.a), setor: f ? nomeSetor(f.setorId) : c.a.setorNome }; }).sort((a, b) => a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome));
+    if (!ls.length) return h + '<div class="card empty"><b>Sem histórico</b></div>';
+    h += `<div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th class="hide-m">Setor</th><th>Semanas</th>${[1, 2, 3, 4].map(g => `<th title="${C.GRUPOS[g].nome}">${gPill(g)}</th>`).join('')}</tr></thead><tbody>${ls.map(l => `<tr><td><b>${esc(l.nome)}</b></td><td class="hide-m">${esc(l.setor)}</td><td>${l.c.n}</td>${[1, 2, 3, 4].map(g => `<td>${l.c[g]}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="small muted mt">Quantas vezes cada funcionário recebeu cada combinação. ${[1, 2, 3, 4].map(g => gPill(g) + ' ' + C.GRUPOS[g].nome).join(' · ')}</p>`;
+    return h;
+  }
+  // alterações
+  if (!S.auditoria.length) return h + '<div class="card empty"><b>Nenhuma alteração registrada</b></div>';
+  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x.semana ? ` <a href="#escala" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  return h;
+}
+
+/* ---------------- EXPORTAR ---------------- */
+function vExportar() {
+  const fs = S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  const temEsc = UI.expPeriodo === 'semana' ? !!S.escalas[UI.semana] : semanasDoMes(UI.mes).sems.some(s => S.escalas[s]);
+  return `<div class="row mb"><div><h1>Exportar e compartilhar</h1><p class="sub" style="margin:0">PDF, Excel, impressão e WhatsApp</p></div></div>
+  <div class="card"><div class="grid g2" style="gap:12px">
+    <div class="fld"><label class="f">Período</label><select id="expPeriodo"><option value="semana" ${UI.expPeriodo === 'semana' ? 'selected' : ''}>Semana</option><option value="mes" ${UI.expPeriodo === 'mes' ? 'selected' : ''}>Mês</option></select></div>
+    <div class="fld"><label class="f">${UI.expPeriodo === 'semana' ? 'Semana (qualquer dia dela)' : 'Mês'}</label>${UI.expPeriodo === 'semana' ? `<input type="date" id="inSemana" value="${UI.semana}">` : `<input type="month" id="inMes" value="${UI.mes}">`}</div>
+    <div class="fld"><label class="f">O que exportar</label><select id="expEscopo"><option value="completa" ${UI.expEscopo === 'completa' ? 'selected' : ''}>Escala completa (todos os setores)</option><option value="setor" ${UI.expEscopo === 'setor' ? 'selected' : ''}>Escala de um setor</option><option value="func" ${UI.expEscopo === 'func' ? 'selected' : ''}>Escala individual de um funcionário</option></select></div>
+    ${UI.expEscopo === 'setor' ? `<div class="fld"><label class="f">Setor</label><select id="expSetor">${setoresOrd().map(s => `<option value="${s.id}" ${UI.expSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : ''}
+    ${UI.expEscopo === 'func' ? `<div class="fld"><label class="f">Funcionário</label><select id="expFunc">${fs.map(f => `<option value="${f.id}" ${UI.expFunc === f.id ? 'selected' : ''}>${esc(f.nome)} — ${esc(nomeSetor(f.setorId))}</option>`).join('')}</select></div>` : ''}
+  </div>
+  <p class="muted">${UI.expPeriodo === 'semana' ? 'Semana ' + semanaLabel(UI.semana) : 'Mês ' + UI.mes.split('-').reverse().join('/')} ${temEsc ? '' : ' — <b style="color:var(--err)">não há escala gerada neste período</b>'}</p>
+  <div class="row">
+    <button class="btn pri" data-act="expPDF" ${temEsc ? '' : 'disabled'}>${ic('pdf')} Baixar PDF</button>
+    <button class="btn" data-act="expXLS" ${temEsc ? '' : 'disabled'}>${ic('xls')} Exportar Excel</button>
+    <button class="btn" data-act="expPrint" ${temEsc ? '' : 'disabled'}>${ic('print')} Imprimir</button>
+    <button class="btn wa" data-act="expWA" ${temEsc ? '' : 'disabled'}>${ic('wa')} WhatsApp</button>
+  </div>
+  <p class="small muted mt">Imprimir gera um PDF em A4 paisagem pronto para impressão (abra o arquivo e imprima). Os arquivos baixados pedem sua confirmação antes de salvar.</p></div>`;
+}
+
+/* ---------------- BACKUP ---------------- */
+function vBackup() {
+  const n = { s: S.setores.length, f: S.funcionarios.length, e: Object.keys(S.escalas).length + Object.keys(S.escalasAntigas).length, a: S.auditoria.length };
+  return `<div class="row mb"><div><h1>Backup e configurações</h1><p class="sub" style="margin:0">Armazenamento, cópia de segurança e recuperação</p></div></div>
+  <div class="grid g2">
+  <div class="card"><h2>Armazenamento</h2>
+    <p>${S.modo === 'nuvem' ? '<span class="dot g"></span><b>Salvo na nuvem (Supabase)</b> — os mesmos dados no computador e no celular. O servidor faz um backup automático todo dia e guarda os últimos 30.' : S.modo === 'db' ? '<span class="dot g"></span><b>Salvo na nuvem</b> — os dados permanecem salvos ao fechar e ficam disponíveis em qualquer dispositivo em que você abrir este sistema.' : '<span class="dot y"></span><b>Salvo neste aparelho e neste navegador.</b> Os dados continuam salvos ao fechar. Para passar para outro aparelho, baixe o backup aqui e restaure no outro. Faça backup toda semana.'}</p>
+    <ul class="list-sm"><li><span>Setores</span><b>${n.s}</b></li><li><span>Funcionários</span><b>${n.f}</b></li><li><span>Escalas</span><b>${n.e}</b></li><li><span>Registros de alterações</span><b>${n.a}</b></li></ul>
+  </div>
+  <div class="card"><h2>Cópia de segurança</h2>
+    <p class="muted">O backup é um arquivo .json com todos os setores, funcionários, escalas e histórico.</p>
+    <div class="row"><button class="btn pri" data-act="backup">${ic('exportar')} Baixar backup</button>
+    <label class="btn edit-only" style="cursor:pointer">Restaurar backup<input type="file" id="inRestore" accept=".json,application/json" class="hide"></label></div>
+    <p class="small muted mt">Restaurar substitui todos os dados atuais pelos do arquivo.</p>
+  </div>
+  ${S.modo === 'nuvem' ? `<div class="card"><h2>Acesso</h2>
+    <div class="fld"><label class="f">Senha atual</label><input type="password" id="snAtual" autocomplete="current-password"></div>
+    <div class="fld"><label class="f">Nova senha (mínimo 6 caracteres)</label><input type="password" id="snNova" autocomplete="new-password"></div>
+    <div class="row"><button class="btn pri" data-act="trocarSenha">Trocar senha</button><button class="btn danger" data-act="sairNuvem">Sair deste aparelho</button></div>
+    <p class="small muted mt">Trocar a senha desconecta os outros aparelhos.</p></div>
+  <div class="card"><h2>Backups automáticos do servidor</h2><div id="bkAuto"><button class="btn sm" data-act="listarBk">Ver backups automáticos</button></div></div>` : ''}
+  <div class="card edit-only"><h2>Folha de folga</h2>
+    <div class="fld"><label class="f">Nome da empresa (topo do sistema e WhatsApp)</label><input type="text" id="cfgNome" value="${esc(S.config.nomeHotel || '')}" maxlength="100"></div>
+    <div class="fld"><label class="f">Título da folha</label><input type="text" id="cfgTitulo" value="${esc(S.config.tituloFolha || 'ESCALA DE FOLGA')}" maxlength="60"></div>
+    <div class="fld"><label class="f">Texto do quadro IMPORTANTE (cada linha vira um parágrafo)</label><textarea id="cfgImp" style="min-height:130px">${esc(S.config.textoImportante || '')}</textarea></div>
+    <button class="btn pri" data-act="salvarCfg">Salvar</button>
+  </div>
+  <div class="card"><h2>Feriados</h2>
+    <p class="muted small">Os feriados aparecem destacados em azul-claro na folha. Não mudam as regras de folga.</p>
+    <div class="row edit-only mb"><input type="date" id="ferData"><input type="text" id="ferNome" placeholder="Nome (ex.: Padroeira)" style="flex:1;min-width:140px"><button class="btn pri sm" data-act="ferAdd">${ic('plus')} Adicionar</button></div>
+    <div class="row edit-only mb"><select id="ferAno">${[0, 1, 2].map(k => { const y = +C.hojeISO().slice(0, 4) + k; return `<option>${y}</option>`; }).join('')}</select><button class="btn sm" data-act="ferNac">Adicionar feriados nacionais do ano</button></div>
+    <ul class="list-sm" style="max-height:300px;overflow:auto">${feriadosLista().filter(f => f.data >= C.addDias(C.hojeISO(), -60)).map(f => `<li><span><b>${C.dataBR(f.data)}</b> ${C.DIAS_CURTO[C.diaSemana(f.data)]} · ${esc(f.nome)}</span><button class="btn icon sm danger edit-only" data-act="ferDel" data-d="${f.data}" title="Remover">${ic('trash')}</button></li>`).join('') || '<li class="muted">Nenhum feriado cadastrado.</li>'}</ul>
+  </div>
+  ${Object.keys(S.escalasAntigas).length ? `<div class="card edit-only"><h2>Escalas no formato antigo</h2><p>${Object.keys(S.escalasAntigas).length} escala(s) foram feitas com semana de segunda a domingo e não são usadas no formato atual (domingo a sábado).</p><button class="btn danger" data-act="delAntigas">${ic('trash')} Excluir escalas antigas</button></div>` : ''}
+  <div class="card"><h2>Regras aplicadas</h2>
+    <ul class="list-sm"><li>Somente 4 combinações: ${[1, 2, 3, 4].map(g => gPill(g) + ' ' + C.GRUPOS[g].nome).join(', ')}.</li><li>Sexta e sábado: ninguém folga.</li><li>Domingo: no máximo 1 de folga por setor; quem folga domingo folga também segunda e quinta.</li><li>Terça e quarta (equipe reduzida): todo setor com 2 ou mais funcionários tem pelo menos 1 trabalhando.</li><li>Modelo de cada setor: 1 pessoa com domingo, segunda e quinta (em rodízio) e as demais divididas entre segunda e terça e terça e quarta, alternando a cada semana. Quarta e quinta só é usada se for necessário.</li><li>Semana de domingo a sábado. Quem está de férias na semana não recebe folga nela.</li></ul>
+  </div></div>`;
+}
+
+/* =====================================================================
+   AÇÕES
+   ===================================================================== */
+async function acaoGerar(sem, opts) {
+  opts = opts || {};
+  const atual = S.escalas[sem];
+  if (atual && !opts.semConfirmar) {
+    const nb = Object.values(atual.atribuicoes || {}).filter(a => a.bloq).length;
+    const ok = await confirmar('Regenerar escala?', `<p>A escala de <b>${semanaLabel(sem)}</b> ${atual.status === 'aprovada' ? '<b>já está aprovada</b> e' : ''} será refeita automaticamente${nb ? `, mantendo as <b>${nb} combinação(ões) bloqueada(s)</b>` : ''}. Ela voltará para rascunho.</p>`, 'Regenerar');
+    if (!ok) return false;
+  }
+  const bloqueios = {};
+  if (atual) Object.entries(atual.atribuicoes || {}).forEach(([id, a]) => { if (a.bloq) bloqueios[id] = a.g; });
+  const historico = historicoArr().filter(e => e.semana !== sem);
+  const r = C.gerarEscala({ semana: sem, funcionarios: S.funcionarios, setores: S.setores, historico, bloqueios });
+  if (!r.ok) {
+    await modalMsg('Não foi possível gerar a escala', `<p>A escala de <b>${semanaLabel(sem)}</b> <b>não foi gerada</b>, porque não é possível montar uma escala que respeite todas as regras. Corrija os pontos abaixo e tente de novo:</p>${listaProblemas(r.erros, [])}`);
+    return false;
+  }
+  const doc = { semana: sem, status: 'rascunho', geradaEm: agoraISO(), atribuicoes: r.atribuicoes, avisosGeracao: r.avisos.map(a => a.msg), alteracoes: (atual && atual.alteracoes || []).concat([{ ts: agoraISO(), texto: atual ? 'Escala regenerada automaticamente' : 'Escala gerada automaticamente' }]).slice(-200) };
+  try { await Store.set('escalas', sem, doc); } catch (e) { return false; }
+  log('escala', (atual ? 'Escala regenerada' : 'Escala gerada') + ' automaticamente (' + Object.keys(r.atribuicoes).length + ' funcionários)', sem);
+  if (!opts.silencioso) {
+    const at = Object.values(r.atribuicoes); const c = [1, 2, 3, 4].map(g => at.filter(a => a.g === g).length);
+    await modalMsg('Escala gerada — confira e aprove', `<div class="alert s"><span class="ic">✓</span><div>Todas as regras foram conferidas: ${at.length} funcionário(s), só as 4 combinações autorizadas, ninguém folga sexta ou sábado, no máximo 1 folga dominical por setor (com segunda e quinta) e a cobertura de terça e quarta de cada setor está correta.</div></div>
+      <p>Distribuição: ${[1, 2, 3, 4].map((g, i) => gPill(g) + ' ' + C.GRUPOS[g].nome + ': <b>' + c[i] + '</b>').join('<br>')}</p>${r.avisos.length ? '<h3>Avisos</h3>' + listaProblemas([], r.avisos) : ''}<p class="muted">A escala está em <b>rascunho</b>. Revise a tabela e clique em <b>Aprovar escala</b>.</p>`);
+  }
+  return true;
+}
+async function salvarAlteracao(sem, novasAtrib, texto) {
+  const e = S.escalas[sem];
+  const v = C.validarEscala({ semana: sem, atribuicoes: novasAtrib }, S.funcionarios, S.setores, historicoArr());
+  if (v.erros.length) {
+    await modalMsg('Alteração não permitida', `<p>Essa alteração <b>não foi salva</b> porque viola as regras obrigatórias:</p>${listaProblemas(v.erros, [])}`);
+    render();
+    return false;
+  }
+  const doc = Object.assign({}, e, { atribuicoes: novasAtrib, alteracoes: (e.alteracoes || []).concat([{ ts: agoraISO(), texto }]).slice(-200) });
+  try { await Store.set('escalas', sem, doc); } catch (x) { render(); return false; }
+  log('escala', texto, sem);
+  toast('Alteração salva e conferida.');
+  return true;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+function atualizarSnapshot(at, id) { const f = funcPorId(id); if (f) { at[id].nome = f.nome; at[id].setorId = f.setorId; at[id].setorNome = nomeSetor(f.setorId); at[id].funcao = f.funcao || ''; } }
+
+async function mudarGrupo(id, g) {
+  const sem = UI.semana, e = S.escalas[sem]; if (!e) return;
+  const at = clone(e.atribuicoes); const ant = at[id].g; if (ant === g) return;
+  at[id].g = g; atualizarSnapshot(at, id);
+  const f = funcPorId(id), nome = (f || at[id]).nome;
+  const v = C.validarEscala({ semana: sem, atribuicoes: at }, S.funcionarios, S.setores, historicoArr());
+  if (v.erros.length && f) {
+    // procura trocas com colegas do mesmo setor que deixem a escala válida
+    const opc = Object.keys(at).filter(x => x !== id && !at[x].bloq && at[x].g === g && funcPorId(x) && funcPorId(x).setorId === f.setorId)
+      .filter(x => { const t = clone(at); t[x].g = ant; return C.validarEscala({ semana: sem, atribuicoes: t }, S.funcionarios, S.setores).ok; });
+    if (opc.length) {
+      const r = await modalMsg('Essa alteração sozinha quebra as regras', `${listaProblemas(v.erros, [])}<p>Para dar <b>${esc(C.GRUPOS[g].nome)}</b> a ${esc(nome)}, é possível <b>trocar as folgas</b> com um colega do setor, que passa a ficar com <b>${esc(C.GRUPOS[ant].nome)}</b>:</p>`,
+        [{ t: 'Cancelar', v: null }].concat(opc.slice(0, 4).map(x => ({ t: 'Trocar com ' + esc(funcPorId(x).nome), c: 'pri', v: x }))));
+      if (!r) { render(); return; }
+      at[r].g = ant; atualizarSnapshot(at, r);
+      return salvarAlteracao(sem, at, 'Troca de folgas: ' + nome + ' (' + C.GRUPOS[ant].nome + ' → ' + C.GRUPOS[g].nome + ') ⇄ ' + funcPorId(r).nome + ' (→ ' + C.GRUPOS[ant].nome + ')');
+    }
+  }
+  return salvarAlteracao(sem, at, 'Combinação alterada: ' + nome + ' de ' + C.GRUPOS[ant].nome + ' para ' + C.GRUPOS[g].nome);
+}
+async function trocarFolgas(id) {
+  const sem = UI.semana, e = S.escalas[sem]; const a = e.atribuicoes[id]; const f = funcPorId(id);
+  const outros = Object.keys(e.atribuicoes).filter(x => x !== id && e.atribuicoes[x].g !== a.g).map(x => ({ id: x, a: e.atribuicoes[x], f: funcPorId(x) }))
+    .sort((p, q) => ((q.f || q.a).setorId === (f || a).setorId) - ((p.f || p.a).setorId === (f || a).setorId) || (p.f || p.a).nome.localeCompare((q.f || q.a).nome));
+  const w = abrirModal(`<div class="mh">Trocar folgas</div><div class="mbd"><p><b>${esc((f || a).nome)}</b> está com ${gPill(a.g)} ${C.GRUPOS[a.g].nome}. Trocar com:</p>
+  <select id="tSel" style="width:100%">${outros.map(o => `<option value="${o.id}" ${o.a.bloq ? 'disabled' : ''}>${esc((o.f || o.a).nome)} — ${esc(nomeSetor((o.f || o.a).setorId))} — ${C.GRUPOS[o.a.g].nome}${o.a.bloq ? ' (bloqueado)' : ''}</option>`).join('')}</select>
+  <p class="small muted mt">A troca é conferida contra todas as regras antes de ser salva.</p></div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Trocar</button></div>`);
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const outro = w.querySelector('#tSel').value; if (!outro) return;
+    fecharModal(w);
+    const at = clone(e.atribuicoes); const g1 = at[id].g, g2 = at[outro].g; at[id].g = g2; at[outro].g = g1; atualizarSnapshot(at, id); atualizarSnapshot(at, outro);
+    await salvarAlteracao(sem, at, 'Troca de folgas: ' + (f || a).nome + ' (→ ' + C.GRUPOS[g2].nome + ') ⇄ ' + (funcPorId(outro) || at[outro]).nome + ' (→ ' + C.GRUPOS[g1].nome + ')');
+  };
+}
+async function completarEscala() {
+  const sem = UI.semana, e = S.escalas[sem];
+  const bloqueios = {}; Object.entries(e.atribuicoes).forEach(([id, a]) => { const f = funcPorId(id); if (f && C.elegivel(f, sem)) bloqueios[id] = a.g; });
+  const r = C.gerarEscala({ semana: sem, funcionarios: S.funcionarios, setores: S.setores, historico: historicoArr().filter(x => x.semana !== sem), bloqueios });
+  if (!r.ok) return modalMsg('Não foi possível completar', listaProblemas(r.erros, []) + '<p>Use <b>Regenerar</b> para refazer a escala inteira.</p>');
+  Object.keys(r.atribuicoes).forEach(id => { r.atribuicoes[id].bloq = !!(e.atribuicoes[id] && e.atribuicoes[id].bloq); });
+  const novos = Object.keys(r.atribuicoes).filter(id => !e.atribuicoes[id]).map(id => r.atribuicoes[id].nome);
+  await salvarAlteracao(sem, r.atribuicoes, 'Escala completada: incluídos ' + (novos.join(', ') || '—') + '; removidos inativos');
+}
+async function gerarMes() {
+  const { sems } = semanasDoMes(UI.mes);
+  const faltam = sems.filter(s => !S.escalas[s]);
+  for (const s of faltam) {
+    const ok = await acaoGerar(s, { semConfirmar: true, silencioso: true });
+    if (!ok) return;
+    // garante que a próxima semana veja esta no histórico (modo nuvem atualiza por snapshot)
+    await new Promise(r => setTimeout(r, 120));
+  }
+  toast(faltam.length + ' semana(s) gerada(s) em rascunho.');
+}
+
+/* ---------------- EXPORTAÇÕES ---------------- */
+const libs = {};
+function carregarScript(src) {
+  if (libs[src]) return libs[src];
+  const emb = document.getElementById('lib:' + src);
+  if (emb) { // versão independente: bibliotecas embutidas no próprio arquivo
+    libs[src] = new Promise((res, rej) => { try { const s = document.createElement('script'); s.src = URL.createObjectURL(new Blob([emb.textContent], { type: 'text/javascript' })); s.onload = res; s.onerror = () => rej(new Error('Falha ao carregar ' + src)); document.head.appendChild(s); } catch (e) { rej(e); } });
+    return libs[src];
+  }
+  libs[src] = new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { delete libs[src]; rej(new Error('Falha ao carregar ' + src)); }; document.head.appendChild(s); });
+  return libs[src];
+}
+async function salvarArquivo(nome, data) {
+  if (DL) {
+    try { await DL.save({ filename: nome, data }); toast('Arquivo salvo.'); return; }
+    catch (e) { if (e && e.code === 'declined') { toast('Download cancelado.'); return; } if (e && e.code === 'rate_limited') { toast('Aguarde um instante e tente de novo.'); return; } }
+  }
+  try {
+    const blob = data instanceof Blob ? data : new Blob([data]);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  } catch (e) { modalMsg('Download indisponível', '<p>Este ambiente não permite baixar arquivos.</p>'); }
+}
+/** Modelo da folha conforme as opções da tela Exportar */
+function dadosExport() {
+  const p = periodoFolha(UI.expPeriodo);
+  const o = Object.assign(p, {});
+  if (UI.expEscopo === 'setor') o.setorId = UI.expSetor || (setoresOrd()[0] || {}).id;
+  if (UI.expEscopo === 'func') o.funcId = UI.expFunc || (S.funcionarios[0] || {}).id;
+  const m = folhaModelo(o);
+  if (UI.expEscopo === 'setor' && m.grupos[0]) m.titulo += ' — ' + m.grupos[0].nome.toUpperCase();
+  if (UI.expEscopo === 'func' && m.linhas[0]) m.titulo += ' — ' + m.linhas[0].nome.toUpperCase();
+  return m;
+}
+function nomeArq(ext, m) { return ('escala de folga ' + (UI.expPeriodo === 'semana' ? UI.semana : UI.mes) + (UI.expEscopo === 'setor' && m.grupos[0] ? ' ' + m.grupos[0].nome : '') + (UI.expEscopo === 'func' && m.linhas[0] ? ' ' + m.linhas[0].nome : '')).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext; }
+const rgb = hex => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
+async function exportarPDF(paraImprimir) {
+  try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
+  catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
+  const m = dadosExport(); if (!m.linhas.length) return toast('Nada para exportar.');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const n = m.cols.length, mes = n > 7;
+  const preto = [0, 0, 0], branco = [255, 255, 255], verm = rgb(COR_TITULO);
+  const fer = i => m.feriados[i] ? rgb(COR_FERIADO) : null;
+  const head = [
+    [{ content: m.titulo, colSpan: n + 1, styles: { fontSize: 15, textColor: verm, fontStyle: 'bold', fillColor: branco } }],
+    [{ content: m.sub, colSpan: n + 1, styles: { fontSize: 11, textColor: verm, fontStyle: 'bold', fillColor: branco } }],
+    [{ content: 'FUNCIONÁRIOS', rowSpan: 2, styles: { valign: 'middle', halign: 'center', fillColor: branco } }].concat(m.cols.map((d, i) => ({ content: String(+d.slice(8)), styles: { fillColor: fer(i) || branco } }))),
+    m.cols.map((d, i) => ({ content: C.DIAS_CURTO[C.diaSemana(d)].toUpperCase(), styles: { fillColor: fer(i) || branco, fontSize: mes ? 5.5 : 8 } }))
+  ];
+  const body = [];
+  m.grupos.forEach((g, gi) => {
+    if (gi > 0) body.push([{ content: '', styles: { fillColor: branco } }].concat(m.cols.map((d, i) => ({ content: '', styles: { fillColor: fer(i) || branco } }))));
+    g.linhas.forEach(l => {
+      const row = [{ content: l.nome.toUpperCase(), styles: { fillColor: rgb(g.cor), halign: 'left' } }];
+      segmentos(l.cel).forEach(sg => {
+        if (sg.tipo === 'V') row.push({ content: 'FÉRIAS', colSpan: sg.n, styles: { fillColor: rgb(COR_FERIAS), textColor: preto } });
+        else row.push({ content: sg.tipo === 'F' ? 'F' : '', styles: { fillColor: fer(sg.i) || (sg.tipo === '-' ? [243, 244, 246] : rgb(g.cor)) } });
+      });
+      body.push(row);
+    });
+  });
+  const nomeW = mes ? 30 : 60;
+  const diaW = (W - 16 - nomeW) / n;
+  const colStyles = { 0: { cellWidth: nomeW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: diaW };
+  doc.autoTable({
+    head, body, startY: 10, theme: 'grid', margin: { left: 8, right: 8 },
+    styles: { font: 'helvetica', fontSize: mes ? 7.5 : 10, fontStyle: 'bold', halign: 'center', valign: 'middle', cellPadding: mes ? 1 : 2, lineColor: preto, lineWidth: 0.2, textColor: preto, minCellHeight: mes ? 7 : 9 },
+    headStyles: { textColor: preto, fontStyle: 'bold' },
+    columnStyles: colStyles, tableLineColor: preto, tableLineWidth: 0.5
+  });
+  // quadro IMPORTANTE
+  let y = doc.lastAutoTable.finalY;
+  const linhasTxt = (S.config.textoImportante || '').split('\n').filter(Boolean);
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+  const quebradas = []; linhasTxt.forEach(t => quebradas.push(...doc.splitTextToSize(t, W - 26)));
+  const altura = 14 + quebradas.length * 4.6 + 4;
+  if (y + altura + 16 > H) { doc.addPage(); y = 10; }
+  doc.setDrawColor(0); doc.setLineWidth(0.5); doc.rect(8, y, W - 16, altura);
+  doc.setTextColor(...verm); doc.setFont('helvetica', 'bold'); doc.setFontSize(24); doc.text('IMPORTANTE', W / 2, y + 10, { align: 'center' });
+  doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  quebradas.forEach((t, i) => doc.text(t, W / 2, y + 16 + i * 4.6, { align: 'center' }));
+  y += altura + 5;
+  doc.setLineWidth(0.3); doc.rect(20, y, 9, 6); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('F', 24.5, y + 4.3, { align: 'center' }); doc.text('FOLGA SEMANAL', 31, y + 4.3);
+  if (m.pend) { doc.setFontSize(8); doc.setTextColor(160, 98, 7); doc.text('Atenção: contém semana em rascunho, ainda não aprovada.', W - 8, y + 4.3, { align: 'right' }); }
+  await salvarArquivo(nomeArq('pdf', m).replace('.pdf', paraImprimir ? '-impressao.pdf' : '.pdf'), doc.output('blob'));
+}
+async function exportarExcel() {
+  try { await carregarScript('libs/exceljs.min.js'); } catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de Excel.</p>'); }
+  const m = dadosExport(); if (!m.linhas.length) return toast('Nada para exportar.');
+  const n = m.cols.length, nCols = n + 1;
+  const argb = hex => 'FF' + hex.replace('#', '').toUpperCase();
+  const wb = new ExcelJS.Workbook(); wb.creator = S.config.nomeHotel || 'Escalas';
+  const ws = wb.addWorksheet((m.sub || 'Escala').replace(/[\[\]:*?\/\\]/g, '-').slice(0, 31), { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 1, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } }, views: [{ showGridLines: false }] });
+  const fino = { style: 'thin', color: { argb: 'FF000000' } }, grosso = { style: 'medium', color: { argb: 'FF000000' } };
+  const borda = { top: fino, left: fino, bottom: fino, right: fino };
+  const fill = hex => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: argb(hex) } });
+  const center = { horizontal: 'center', vertical: 'middle' };
+  const fer = i => m.feriados[i] ? COR_FERIADO : null;
+  ws.mergeCells(1, 1, 1, nCols); Object.assign(ws.getCell(1, 1), { value: m.titulo, font: { name: 'Calibri', bold: true, size: 18, color: { argb: argb(COR_TITULO) } }, alignment: center });
+  ws.mergeCells(2, 1, 2, nCols); Object.assign(ws.getCell(2, 1), { value: m.sub, font: { name: 'Calibri', bold: true, size: 12, color: { argb: argb(COR_TITULO) } }, alignment: center });
+  ws.mergeCells(3, 1, 4, 1); Object.assign(ws.getCell(3, 1), { value: 'FUNCIONÁRIOS', font: { name: 'Calibri', bold: true, size: 11 }, alignment: Object.assign({ wrapText: true }, center) });
+  m.cols.forEach((d, i) => {
+    const c1 = ws.getCell(3, i + 2), c2 = ws.getCell(4, i + 2);
+    c1.value = +d.slice(8); c2.value = C.DIAS_CURTO[C.diaSemana(d)].toUpperCase();
+    [c1, c2].forEach(c => { c.font = { name: 'Calibri', bold: true, size: 9 }; c.alignment = center; if (fer(i)) c.fill = fill(fer(i)); });
+  });
+  let r = 5;
+  m.grupos.forEach((g, gi) => {
+    if (gi > 0) { m.cols.forEach((d, i) => { if (fer(i)) ws.getCell(r, i + 2).fill = fill(fer(i)); }); r++; }
+    g.linhas.forEach(l => {
+      Object.assign(ws.getCell(r, 1), { value: l.nome.toUpperCase(), font: { name: 'Calibri', bold: true, size: 10 }, fill: fill(g.cor), alignment: { vertical: 'middle' } });
+      segmentos(l.cel).forEach(sg => {
+        const c = ws.getCell(r, sg.i + 2);
+        if (sg.tipo === 'V') { if (sg.n > 1) ws.mergeCells(r, sg.i + 2, r, sg.i + 1 + sg.n); Object.assign(c, { value: 'FÉRIAS', fill: fill(COR_FERIAS), font: { name: 'Calibri', bold: true, size: 10 }, alignment: center }); }
+        else Object.assign(c, { value: sg.tipo === 'F' ? 'F' : null, fill: fill(fer(sg.i) || (sg.tipo === '-' ? '#F3F4F6' : g.cor)), font: { name: 'Calibri', bold: true, size: 11 }, alignment: center });
+      });
+      r++;
+    });
+  });
+  const ultima = r - 1;
+  for (let rr = 1; rr <= ultima; rr++) for (let cc = 1; cc <= nCols; cc++) {
+    const c = ws.getCell(rr, cc);
+    c.border = { top: rr === 1 ? grosso : fino, bottom: rr === ultima ? grosso : fino, left: cc === 1 ? grosso : fino, right: cc === nCols ? grosso : fino };
+  }
+  // IMPORTANTE
+  r = ultima + 1;
+  ws.mergeCells(r, 1, r, nCols); Object.assign(ws.getCell(r, 1), { value: 'IMPORTANTE', font: { name: 'Calibri', bold: true, size: 28, color: { argb: argb(COR_TITULO) } }, alignment: center }); ws.getRow(r).height = 38;
+  const ini = r;
+  (S.config.textoImportante || '').split('\n').filter(Boolean).forEach(t => { r++; ws.mergeCells(r, 1, r, nCols); Object.assign(ws.getCell(r, 1), { value: t, font: { name: 'Calibri', size: 11 }, alignment: Object.assign({ wrapText: true }, center) }); ws.getRow(r).height = Math.max(16, Math.ceil(t.length / 150) * 16); });
+  for (let rr = ini; rr <= r; rr++) { ws.getCell(rr, 1).border = { top: rr === ini ? grosso : undefined, bottom: rr === r ? grosso : undefined, left: grosso, right: grosso }; }
+  r += 2;
+  Object.assign(ws.getCell(r, 2), { value: 'F', font: { name: 'Calibri', bold: true, size: 12 }, alignment: center, border: borda });
+  ws.mergeCells(r, 3, r, 10); Object.assign(ws.getCell(r, 3), { value: 'FOLGA SEMANAL', font: { name: 'Calibri', bold: true, size: 12 } });
+  ws.getColumn(1).width = n > 7 ? 14 : 28; for (let i = 2; i <= nCols; i++) ws.getColumn(i).width = n > 7 ? 5.2 : 9;
+  for (let rr = 3; rr <= ultima; rr++) if (!ws.getRow(rr).height) ws.getRow(rr).height = 18;
+  const buf = await wb.xlsx.writeBuffer();
+  await salvarArquivo(nomeArq('xlsx', m), new Blob([buf]));
+}
+function textoWhatsApp() {
+  const m = dadosExport();
+  let t = '*' + (S.config.nomeHotel || '') + '*\n*' + m.titulo + '*\n' + m.sub + '\n';
+  if (m.pend) t += '_(escala em rascunho, sujeita a alteração)_\n';
+  m.grupos.forEach(g => {
+    t += '\n*' + g.nome + '*\n';
+    g.linhas.forEach(l => {
+      const fol = m.cols.filter((x, i) => l.cel[i] === 'F');
+      const fer = m.cols.filter((x, i) => l.cel[i] === 'V');
+      let linha = '• ' + l.nome + ': ';
+      const juntar = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1] : l.join('');
+      if (UI.expPeriodo === 'semana') linha += fol.length ? 'folga ' + juntar(fol.map(x => C.DIAS[C.diaSemana(x)].toLowerCase() + ' (' + C.dataBR(x).slice(0, 5) + ')')) : 'sem folga nesta semana';
+      else linha += fol.length ? fol.map(x => C.DIAS_CURTO[C.diaSemana(x)].toLowerCase() + ' ' + C.dataBR(x).slice(0, 5)).join(', ') : 'sem folgas no período';
+      if (fer.length) linha += ' · férias ' + C.dataBR(fer[0]).slice(0, 5) + ' a ' + C.dataBR(fer[fer.length - 1]).slice(0, 5);
+      t += linha + '\n';
+    });
+  });
+  const fs = m.cols.map((d, i) => m.feriados[i] ? C.dataBR(d).slice(0, 5) + ' ' + m.feriados[i].nome : null).filter(Boolean);
+  if (fs.length) t += '\nFeriados: ' + fs.join('; ');
+  t += '\nSexta e sábado: todos trabalham.';
+  if (S.config.textoImportante) t += '\n\n*IMPORTANTE:* ' + S.config.textoImportante.replace(/\n/g, ' ');
+  return t;
+}
+function abrirWhatsApp() {
+  const t = textoWhatsApp();
+  const w = abrirModal(`<div class="mh">Compartilhar pelo WhatsApp</div><div class="mbd"><textarea id="waTxt" style="min-height:260px">${esc(t)}</textarea>
+  <p class="small muted">Você pode editar o texto antes de enviar.</p></div><div class="mf"><button class="btn" data-x="c">Fechar</button><button class="btn" data-x="cp">${ic('copy')} Copiar texto</button><a class="btn wa" id="waLink" href="https://wa.me/?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">${ic('wa')} Abrir no WhatsApp</a></div>`);
+  const ta = w.querySelector('#waTxt'), ln = w.querySelector('#waLink');
+  ta.oninput = () => { ln.href = 'https://wa.me/?text=' + encodeURIComponent(ta.value); };
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=cp]').onclick = async () => { try { await navigator.clipboard.writeText(ta.value); toast('Texto copiado.'); } catch (e) { ta.select(); toast('Selecione e copie o texto manualmente.'); } };
+}
+
+/* ---------------- BACKUP / RESTAURAÇÃO ---------------- */
+async function baixarBackup() {
+  const dados = { sistema: 'escalas-hotel', versao: 1, exportadoEm: agoraISO(), config: S.config, setores: S.setores, funcionarios: S.funcionarios, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria };
+  await salvarArquivo('backup-escalas-' + C.hojeISO() + '.json', JSON.stringify(dados, null, 1));
+  try { localStorage.setItem('escalas_ultimo_backup', agoraISO()); } catch (e) { }
+  log('sistema', 'Backup baixado');
+}
+async function restaurar(file) {
+  let d;
+  try { d = JSON.parse(await file.text()); } catch (e) { return modalMsg('Arquivo inválido', '<p>Não foi possível ler o arquivo de backup.</p>'); }
+  if (!d || d.sistema !== 'escalas-hotel' || !Array.isArray(d.setores) || !Array.isArray(d.funcionarios)) return modalMsg('Arquivo inválido', '<p>Este arquivo não é um backup deste sistema.</p>');
+  const ok = await confirmar('Restaurar backup?', `<p>Backup de <b>${dtHora(d.exportadoEm)}</b>: ${d.setores.length} setor(es), ${d.funcionarios.length} funcionário(s), ${Object.keys(d.escalas || {}).length} escala(s).</p><div class="alert w"><span class="ic">!</span><div>Todos os dados atuais serão <b>substituídos</b>. Recomendo baixar um backup dos dados atuais antes.</div></div>`, 'Restaurar', true);
+  if (!ok) return;
+  try {
+    const ids = { setores: new Set(d.setores.map(x => x.id)), funcionarios: new Set(d.funcionarios.map(x => x.id)), escalas: new Set(Object.keys(d.escalas || {})) };
+    for (const s of S.setores.slice()) if (!ids.setores.has(s.id)) await Store.del('setores', s.id);
+    for (const f of S.funcionarios.slice()) if (!ids.funcionarios.has(f.id)) await Store.del('funcionarios', f.id);
+    for (const k of Object.keys(S.escalas).concat(Object.keys(S.escalasAntigas))) if (!ids.escalas.has(k)) await Store.del('escalas', k);
+    for (const s of d.setores) await Store.set('setores', s.id, s);
+    for (const f of d.funcionarios) await Store.set('funcionarios', f.id, f);
+    for (const k of Object.keys(d.escalas || {})) await Store.set('escalas', k, d.escalas[k]);
+    if (d.config) await Store.set('config', 'geral', d.config);
+    const existentes = new Set(S.auditoria.map(a => a.id));
+    if (S.modo === 'db') { for (const a of (d.auditoria || []).slice(0, 500)) if (!existentes.has(a.id)) await Store.set('auditoria', a.id, a); }
+    else { S.auditoria = (d.auditoria || []).concat(S.auditoria.filter(a => !(d.auditoria || []).some(b => b.id === a.id))); Store.salvarLocal(); }
+    log('sistema', 'Backup restaurado (arquivo de ' + dtHora(d.exportadoEm) + ')');
+    toast('Backup restaurado.');
+  } catch (e) { }
+}
+
+/* =====================================================================
+   EVENTOS
+   ===================================================================== */
+function irRota() {
+  const h = (location.hash || '').replace('#', '');
+  UI.rota = ROTAS.some(r => r[0] === h) ? h : 'painel';
+  document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on');
+  render(); window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', irRota);
+document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
+document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
+
+document.addEventListener('click', async ev => {
+  const el = ev.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  const sem = UI.semana;
+  switch (act) {
+    case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
+    case 'irGerar': UI.semana = el.dataset.sem; return;
+    case 'irExport': UI.expPeriodo = 'semana'; return;
+    case 'semAnt': UI.semana = C.addDias(sem, -7); return render();
+    case 'semProx': UI.semana = C.addDias(sem, 7); return render();
+    case 'semHoje': UI.semana = C.inicioSemana(C.hojeISO()); return render();
+    case 'mesAnt': case 'mesProx': { let [y, m] = UI.mes.split('-').map(Number); m += act === 'mesAnt' ? -1 : 1; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } UI.mes = y + '-' + String(m).padStart(2, '0'); return render(); }
+    case 'gerar': return acaoGerar(sem);
+    case 'gerarMes': return gerarMes();
+    case 'aprovar': {
+      const e = S.escalas[sem]; const v = C.validarEscala(e, S.funcionarios, S.setores, historicoArr());
+      if (v.erros.length) return modalMsg('Não é possível aprovar', '<p>A escala viola regras obrigatórias:</p>' + listaProblemas(v.erros, []));
+      try { await Store.set('escalas', sem, Object.assign({}, e, { status: 'aprovada', aprovadaEm: agoraISO(), alteracoes: (e.alteracoes || []).concat([{ ts: agoraISO(), texto: 'Escala aprovada' }]).slice(-200) })); log('escala', 'Escala aprovada', sem); toast('Escala aprovada.'); } catch (x) { }
+      return;
+    }
+    case 'reabrir': {
+      const e = S.escalas[sem];
+      if (!await confirmar('Reabrir escala?', '<p>A escala volta para <b>rascunho</b> para permitir alterações. Depois, aprove novamente.</p>', 'Reabrir')) return;
+      try { await Store.set('escalas', sem, Object.assign({}, e, { status: 'rascunho', alteracoes: (e.alteracoes || []).concat([{ ts: agoraISO(), texto: 'Escala reaberta para edição' }]).slice(-200) })); log('escala', 'Escala reaberta para edição', sem); } catch (x) { }
+      return;
+    }
+    case 'excluirEscala':
+      if (!await confirmar('Excluir escala?', `<p>A escala de <b>${semanaLabel(sem)}</b> será excluída e deixará de contar no histórico de rodízio.</p>`, 'Excluir', true)) return;
+      try { await Store.del('escalas', sem); log('escala', 'Escala excluída', sem); toast('Escala excluída.'); } catch (x) { }
+      return;
+    case 'bloq': {
+      const e = S.escalas[sem]; const at = clone(e.atribuicoes); at[id].bloq = !at[id].bloq;
+      return salvarAlteracao(sem, at, (at[id].bloq ? 'Bloqueada' : 'Desbloqueada') + ' a combinação de ' + (funcPorId(id) || at[id]).nome + ' (' + C.GRUPOS[at[id].g].nome + ')');
+    }
+    case 'trocar': return trocarFolgas(id);
+    case 'completar': return completarEscala();
+    case 'novoFunc': if (!S.setores.length) return modalMsg('Cadastre um setor', '<p>Antes de cadastrar funcionários, crie pelo menos um setor.</p>'); return abrirFormFunc(null);
+    case 'importarFunc': return abrirImportFunc();
+    case 'editFunc': return abrirFormFunc(funcPorId(id));
+    case 'transfFunc': {
+      const f = funcPorId(id);
+      const w = abrirModal(`<div class="mh">Transferir ${esc(f.nome)}</div><div class="mbd"><p>Setor atual: <b>${esc(nomeSetor(f.setorId))}</b></p><label class="f">Novo setor</label><select id="tSet" style="width:100%">${setoresOrd().filter(s => s.id !== f.setorId).map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('')}</select>
+      <p class="small muted mt">Escalas já geradas são conferidas novamente com o novo setor. Se houver conflito de domingo, um alerta aparecerá na escala.</p></div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Transferir</button></div>`);
+      w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+      w.querySelector('[data-x=s]').onclick = async () => { const ns = w.querySelector('#tSet').value; if (!ns) return; try { await Store.set('funcionarios', f.id, Object.assign({}, f, { setorId: ns, atualizadoEm: agoraISO() })); log('funcionario', 'Transferência: ' + f.nome + ' de ' + nomeSetor(f.setorId) + ' para ' + nomeSetor(ns)); fecharModal(w); toast('Funcionário transferido.'); } catch (e) { } };
+      return;
+    }
+    case 'delFunc': {
+      const f = funcPorId(id);
+      const ok = await modalMsg('Excluir ' + esc(f.nome) + '?', '<p>O cadastro será excluído. As escalas anteriores continuam com o nome dele no histórico.</p><p class="muted">Se a pessoa apenas saiu da empresa, prefira marcar como <b>Inativo</b> (mantém o cadastro).</p>', [{ t: 'Cancelar', v: 0 }, { t: 'Marcar como inativo', v: 1 }, { t: 'Excluir definitivamente', c: 'danger', v: 2 }]);
+      try {
+        if (ok === 1) { await Store.set('funcionarios', f.id, Object.assign({}, f, { ativo: false, atualizadoEm: agoraISO() })); log('funcionario', 'Inativado: ' + f.nome); }
+        if (ok === 2) { await Store.del('funcionarios', f.id); log('funcionario', 'Excluído: ' + f.nome + ' (' + nomeSetor(f.setorId) + ')'); toast('Funcionário excluído.'); }
+      } catch (e) { }
+      return;
+    }
+    case 'novoSetor': return abrirFormSetor(null);
+    case 'editSetor': return abrirFormSetor(setorPorId(id));
+    case 'setorMover': return moverSetor(id, +el.dataset.d);
+    case 'delSetor': {
+      const s = setorPorId(id); const n = S.funcionarios.filter(f => f.setorId === id).length;
+      if (n) return modalMsg('Setor com funcionários', `<p>O setor <b>${esc(s.nome)}</b> tem ${n} funcionário(s) cadastrado(s) (ativos ou inativos). Transfira-os para outro setor antes de excluir.</p>`);
+      if (!await confirmar('Excluir setor?', `<p>Excluir o setor <b>${esc(s.nome)}</b>?</p>`, 'Excluir', true)) return;
+      try { await Store.del('setores', id); log('setor', 'Setor excluído: ' + s.nome); } catch (e) { }
+      return;
+    }
+    case 'addSug': try { const o = S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1; await Store.set('setores', uid('s'), { nome: el.dataset.n, ordem: o, cor: PALETA[o % PALETA.length], criadoEm: agoraISO() }); log('setor', 'Setor criado: ' + el.dataset.n); } catch (e) { } return;
+    case 'histTab': UI.histTab = el.dataset.t; return render();
+    case 'mesPDF': case 'mesXLS': case 'mesPrint': case 'mesWA':
+      UI.expPeriodo = 'mes'; UI.expEscopo = UI.filtroSetor ? 'setor' : 'completa'; UI.expSetor = UI.filtroSetor;
+      return act === 'mesPDF' ? exportarPDF(false) : act === 'mesXLS' ? exportarExcel() : act === 'mesPrint' ? exportarPDF(true) : abrirWhatsApp();
+    case 'delAntigas':
+      if (!await confirmar('Excluir escalas antigas?', `<p>${Object.keys(S.escalasAntigas).length} escala(s) no formato antigo (segunda a domingo) serão excluídas.</p>`, 'Excluir', true)) return;
+      try { for (const k of Object.keys(S.escalasAntigas)) await Store.del('escalas', k); log('sistema', 'Escalas no formato antigo excluídas'); toast('Excluídas.'); } catch (e) { }
+      return;
+    case 'ferAdd': {
+      const d = document.getElementById('ferData').value, n = document.getElementById('ferNome').value.trim();
+      if (!d) return toast('Escolha a data.');
+      const l = feriadosLista().filter(f => f.data !== d).concat([{ data: d, nome: n || 'Feriado' }]).sort((a, b) => a.data.localeCompare(b.data));
+      try { await Store.set('config', 'geral', Object.assign({}, S.config, { feriados: l })); log('sistema', 'Feriado adicionado: ' + C.dataBR(d) + ' ' + (n || '')); } catch (e) { }
+      return;
+    }
+    case 'ferDel': { const l = feriadosLista().filter(f => f.data !== el.dataset.d); try { await Store.set('config', 'geral', Object.assign({}, S.config, { feriados: l })); log('sistema', 'Feriado removido: ' + C.dataBR(el.dataset.d)); } catch (e) { } return; }
+    case 'ferNac': {
+      const y = +document.getElementById('ferAno').value; if (!y) return;
+      const atual = feriadosLista(); const novos = C.feriadosNacionais(y).filter(f => !atual.some(a => a.data === f.data));
+      try { await Store.set('config', 'geral', Object.assign({}, S.config, { feriados: atual.concat(novos).sort((a, b) => a.data.localeCompare(b.data)) })); toast(novos.length + ' feriado(s) nacional(is) de ' + y + ' adicionado(s).'); } catch (e) { }
+      return;
+    }
+    case 'reconectar': ev.preventDefault(); try { await Nuvem.carregarTudo(); toast('Conectado.'); } catch (e) { toast('Ainda sem conexão.'); } return;
+    case 'sairNuvem': if (await confirmar('Sair?', '<p>Você precisará da senha para entrar de novo neste aparelho.</p>', 'Sair')) Nuvem.sair(false); return;
+    case 'trocarSenha': {
+      const at = document.getElementById('snAtual').value, nv = document.getElementById('snNova').value;
+      if (nv.length < 6) return toast('A nova senha precisa ter pelo menos 6 caracteres.');
+      try { await Nuvem.rpc('esc_trocar_senha', { p_atual: at, p_nova: nv }); document.getElementById('snAtual').value = ''; document.getElementById('snNova').value = ''; log('sistema', 'Senha alterada'); modalMsg('Senha alterada', '<p>A senha foi trocada. Os outros aparelhos precisarão entrar com a nova senha.</p>'); }
+      catch (e) { toast(e.code === 'SENHA_INCORRETA' ? 'Senha atual incorreta.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão.' : 'Erro: ' + e.message); }
+      return;
+    }
+    case 'listarBk': {
+      try { const l = await Nuvem.rpc('esc_listar_backups', {}); document.getElementById('bkAuto').innerHTML = l.length ? '<ul class="list-sm">' + l.map(b => `<li><span>${dtHora(b.em)}</span><button class="btn sm" data-act="baixarBk" data-id="${b.id}">Baixar</button></li>`).join('') + '</ul>' : '<p class="muted">O primeiro backup automático é feito na madrugada de hoje para amanhã (3h).</p>'; }
+      catch (e) { toast('Não foi possível listar.'); }
+      return;
+    }
+    case 'baixarBk': {
+      try {
+        const b = await Nuvem.rpc('esc_obter_backup', { p_id: +id });
+        const d = { sistema: 'escalas-hotel', versao: 1, exportadoEm: b.feito_em, config: CONFIG_PADRAO, setores: [], funcionarios: [], escalas: {}, auditoria: [] };
+        (b.docs || []).forEach(x => { const o = Object.assign({ id: x.i }, x.d); if (x.c === 'escalas') d.escalas[x.i] = Object.assign({}, x.d, { semana: x.i }); else if (x.c === 'config') { if (x.i === 'geral') d.config = x.d; } else d[x.c].push(o); });
+        await salvarArquivo('backup-automatico-' + String(b.feito_em).slice(0, 10) + '.json', JSON.stringify(d, null, 1));
+      } catch (e) { toast('Não foi possível baixar.'); }
+      return;
+    }
+    case 'expPDF': return exportarPDF(false);
+    case 'expPrint': return exportarPDF(true);
+    case 'expXLS': return exportarExcel();
+    case 'expWA': return abrirWhatsApp();
+    case 'backup': return baixarBackup();
+    case 'salvarCfg': { const n = document.getElementById('cfgNome').value.trim(), t = document.getElementById('cfgTitulo').value.trim(), imp = document.getElementById('cfgImp').value.trim(); try { await Store.set('config', 'geral', Object.assign({}, S.config, { nomeHotel: n, tituloFolha: t || 'ESCALA DE FOLGA', textoImportante: imp, feriados: feriadosLista() })); log('sistema', 'Configurações alteradas'); toast('Configurações salvas.'); } catch (e) { } return; }
+  }
+});
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
+  else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
+  else if (t.id === 'fSetor') { UI.filtroSetor = t.value; render(); }
+  else if (t.id === 'fSit') { UI.situacao = t.value; render(); }
+  else if (t.id === 'expPeriodo') { UI.expPeriodo = t.value; render(); }
+  else if (t.id === 'expEscopo') { UI.expEscopo = t.value; if (t.value === 'setor' && !UI.expSetor) UI.expSetor = (setoresOrd()[0] || {}).id; if (t.value === 'func' && !UI.expFunc) UI.expFunc = (S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome))[0] || {}).id; render(); }
+  else if (t.id === 'expSetor') { UI.expSetor = t.value; render(); }
+  else if (t.id === 'expFunc') { UI.expFunc = t.value; render(); }
+  else if (t.id === 'inRestore' && t.files[0]) { restaurar(t.files[0]); t.value = ''; }
+  else if (t.dataset.act === 'mudarGrupo') mudarGrupo(t.dataset.id, +t.value);
+});
+document.addEventListener('input', ev => {
+  if (ev.target.id === 'busca') { UI.busca = ev.target.value; const l = document.getElementById('listaFunc'); if (l) l.innerHTML = listaFuncHTML(); }
+});
+// toque longo no nome (celular) abre ações
+let lp = null;
+document.addEventListener('touchstart', ev => {
+  const td = ev.target.closest('.esc td.nm'); if (!td || UI.rota !== 'escala') return;
+  const tr = td.parentElement; const sel = tr.querySelector('select[data-act=mudarGrupo]'); const lockBtn = tr.querySelector('[data-act=bloq]');
+  const id = (sel && sel.dataset.id) || (lockBtn && lockBtn.dataset.id); if (!id) return;
+  lp = setTimeout(async () => {
+    const e = S.escalas[UI.semana]; const a = e.atribuicoes[id];
+    const r = await modalMsg(esc((funcPorId(id) || a).nome), '<p>Escolha uma ação:</p>', [{ t: 'Cancelar', v: 0 }, { t: a.bloq ? 'Desbloquear' : 'Bloquear combinação', v: 1 }, { t: 'Trocar folgas', c: 'pri', v: 2 }]);
+    if (r === 1) { const at = clone(e.atribuicoes); at[id].bloq = !at[id].bloq; salvarAlteracao(UI.semana, at, (at[id].bloq ? 'Bloqueada' : 'Desbloqueada') + ' a combinação de ' + (funcPorId(id) || at[id]).nome); }
+    if (r === 2) trocarFolgas(id);
+  }, 600);
+}, { passive: true });
+['touchend', 'touchmove', 'touchcancel'].forEach(n => document.addEventListener(n, () => clearTimeout(lp), { passive: true }));
+
+irRota();
+Store.init();
+</script>
+</body>
+</html>
