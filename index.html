@@ -244,7 +244,7 @@ const MENU_DE={a_fazer:'a_atividades',p_turma:'p_turmas',p_editor:'p_atividades'
 function go(v,p){S.view=v;S.p=p||{};render();try{window.scrollTo(0,0)}catch(e){}}
 let rid=0;
 function shell(){
-  const u=S.u;const menu=(MENUS[u.perfil]||[]).filter(([k])=>S.iaAtiva||['p_ia','a_tutor'].indexOf(k)<0);const ativo=MENU_DE[S.view]||S.view;
+  const u=S.u;const menu=(MENUS[u.perfil]||[]).filter(([k])=>(k!=='p_ia'||S.iaAtiva)&&(k!=='a_tutor'||S.iaTutor));const ativo=MENU_DE[S.view]||S.view;
   if(!$('#app')){
     $('#root').innerHTML=`<div id="app"><header class="top"><div class="top-in"><div class="logo"><div class="mk">🎓</div><div><b id="pnome"></b></div></div><div class="who" id="who"></div></div></header><div class="shell"><nav class="nav" id="nav"></nav><main id="main"></main></div></div>`;
   }
@@ -430,7 +430,7 @@ VIEWS.a_fazer=async function(p){
   else if(!r.podeEnviar)h+=`<div class="note">O prazo desta atividade terminou e ela não aceita entregas atrasadas.</div>`;
   else if(r.situacao==='atrasada')h+=`<div class="note">O prazo terminou, mas o professor aceita entrega atrasada.</div>`;
   if(a.instrucoes)h+=`<div class="apoio">${linkify(a.instrucoes)}</div>`;
-  if(S.iaAtiva)h+=`<button class="btn sm" style="margin-bottom:12px" data-go="a_tutor" data-p="${P({atividade:a.id})}">🤖 Pedir ajuda ao Tutor IA</button>`;
+  if(S.iaTutor)h+=`<button class="btn sm" style="margin-bottom:12px" data-go="a_tutor" data-p="${P({atividade:a.id})}">🤖 Pedir ajuda ao Tutor IA</button>`;
   a.questoes.forEach((q,i)=>h+=htmlQuestaoAluno(q,i,lib?e:null,enviado||!r.podeEnviar));
   if(!enviado&&r.podeEnviar)h+=`<div class="savebar"><span class="st" id="svst">${PL.salvoEm?'Rascunho salvo às '+new Date(PL.salvoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'Suas respostas são salvas automaticamente'}</span><button class="btn" data-a="salvarAgora">Salvar</button><button class="btn pri" data-a="enviarAtiv">Enviar ✓</button></div>`;
   return {html:h,depois:()=>{bindPlayer()}};
@@ -769,7 +769,7 @@ MENUS.professor.splice(3,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(4,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(MENUS.admin.length-1,0,['ad_ia','🤖','IA: uso e custos']);
 MENUS.aluno.splice(4,0,['a_tutor','🤖','Tutor IA']);
-async function iaVerificar(){try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
+async function iaVerificar(){try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;S.iaTutor=!!r.tutor;S.iaFotoTutor=!!r.fotoTutor;S.iaProv=r.provedor;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
 function mdSimples(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^\s*[-•]\s+/gm,'• ').replace(/\n/g,'<br>')}
 function lerArquivo(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Não foi possível ler '+f.name));r.readAsDataURL(f)})}
 
@@ -780,6 +780,7 @@ VIEWS.p_ia=async function(){
   const lista=()=>GER.arquivos.map((a,i)=>`<div class="ft" style="width:110px;height:110px">${a.tipo==='pdf'?`<div style="display:grid;place-items:center;height:100%;font-size:13px;font-weight:800;text-align:center;padding:6px">📄<br>${esc(a.nome.slice(0,28))}</div>`:`<img src="${a.url}">`}<button class="x" data-a="iaRm" data-i="${i}">✕</button></div>`).join('');
   return {html:`<div class="ph"><div><h1>✨ Gerar atividade com IA</h1><p>Fotografe páginas do livro ou envie PDFs. A IA lê o conteúdo e cria as questões com gabarito. Você revisa antes de publicar.</p></div></div>
   ${st&&!st.ativa?'<div class="note">A IA está desligada nas configurações da plataforma.</div>':''}
+  ${st&&st.provedor==='gemini'?'<div class="note">🔒 O material é enviado ao Google Gemini (cota gratuita), que pode usá-lo para melhorar os produtos dele. <b>Não envie fotos com nomes, rostos ou dados de alunos</b>: só páginas de livros e materiais de aula.</div>':''}
   ${st?`<div class="info">Usos hoje: <b>${st.usados}</b> de ${st.limite}.</div>`:''}
   <div class="card"><h3 style="margin-bottom:10px">1. Material</h3>
    <div class="fbtns" style="margin-top:0"><label class="btn" style="margin:0">📷 Tirar foto<input type="file" accept="image/*" capture="environment" data-iaf="img" hidden></label>
@@ -843,12 +844,13 @@ VIEWS.a_tutor=async function(p){
   <div class="card" id="tutChat" style="min-height:240px;max-height:60vh;overflow:auto;background:#f7f8fc">
    ${TUT.msgs.length?TUT.msgs.map(bolha).join(''):`<div class="empty" style="padding:14px"><div class="e">👋</div><h3>Oi! Eu sou o seu tutor.</h3><p>Pergunte, por exemplo:<br>“Me explica o que são números primos?”<br>“Me dá uma dica para a questão 3?”<br>“Faz um exemplo de verbo no futuro?”</p></div>`}</div>
   <div id="tutPrev"></div>
-  <div style="display:flex;gap:8px;align-items:flex-end"><label class="btn" style="margin:0;min-width:48px" title="Enviar foto da dúvida">📷<input type="file" accept="image/*" id="tutFoto" hidden></label>
+  ${st&&st.provedor==='gemini'?'<div class="note">🔒 <b>Atenção:</b> suas perguntas são enviadas ao serviço de IA do Google (Gemini), que pode usá-las para melhorar os produtos dele. <b>Nunca escreva seu nome, endereço, telefone ou outros dados pessoais.</b> E-mails, telefones e CPF são apagados automaticamente antes do envio.</div>':''}
+  <div style="display:flex;gap:8px;align-items:flex-end">${st&&st.fotoTutor?'<label class="btn" style="margin:0;min-width:48px" title="Enviar foto da dúvida">📷<input type="file" accept="image/*" id="tutFoto" hidden></label>':''}
   <textarea id="tutTxt" rows="2" style="margin:0;flex:1;min-height:48px" placeholder="Escreva sua dúvida…"></textarea><button class="btn pri" data-a="tutEnviar" style="min-height:48px">Enviar</button></div>
   <p class="small muted" style="margin-top:8px">O tutor é uma inteligência artificial e pode errar: confira com seu professor. Não escreva dados pessoais (endereço, telefone). As conversas não ficam salvas.${st?` • Perguntas hoje: ${st.usados}/${st.limite}`:''}</p>`,
   depois(){const c=$('#tutChat');c.scrollTop=c.scrollHeight;
     $('#tutAtiv').onchange=e=>{TUT.ativ=e.target.value};
-    $('#tutFoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{TUT.img=await comprimir(f);$('#tutPrev').innerHTML=`<div class="ft" style="margin-bottom:8px"><img src="${TUT.img}"><button class="x" data-a="tutSemFoto">✕</button></div>`}catch(x){toast(x.message)}};
+    if($('#tutFoto'))$('#tutFoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{TUT.img=await comprimir(f);$('#tutPrev').innerHTML=`<div class="ft" style="margin-bottom:8px"><img src="${TUT.img}"><button class="x" data-a="tutSemFoto">✕</button></div>`}catch(x){toast(x.message)}};
     $('#tutTxt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ACOES.tutEnviar({},$('[data-a="tutEnviar"]'))}});}};
 };
 ACOES.tutSemFoto=()=>{TUT.img=null;$('#tutPrev').innerHTML=''};
@@ -873,13 +875,15 @@ VIEWS.ad_ia=async function(){
   <div class="stat"><b style="font-size:16px">${u.porModo.map(m=>`${m.modo==='gerar'?'✨ Gerador':'🤖 Tutor'}: ${m.chamadas} • US$ ${m.usd.toFixed(3)}`).join('<br>')}</b><span>Por ferramenta</span></div></div>
   <div class="card"><h3 style="margin-bottom:10px">Configurações</h3><form id="fIa">
    <label class="chk"><input type="checkbox" name="iaAtiva" ${c.iaAtiva?'checked':''}><span>IA ativada (gerador para professores e tutor para alunos)</span></label>
+   <label>Serviço de IA<select name="iaProvedor"><option value="gemini" ${c.iaProvedor!=='claude'?'selected':''}>Google Gemini – cota gratuita (R$ 0; o Google pode usar o conteúdo)</option><option value="claude" ${c.iaProvedor==='claude'?'selected':''}>Claude (Anthropic) – pago; conteúdo não usado para treino</option></select></label>
    <div class="row2"><label>Limite por professor por dia<input type="number" name="iaLimiteProfDia" min="0" max="500" value="${esc(c.iaLimiteProfDia)}"></label><label>Limite por aluno por dia<input type="number" name="iaLimiteAlunoDia" min="0" max="500" value="${esc(c.iaLimiteAlunoDia)}"></label></div>
    <div class="err" id="err"></div><button class="btn pri">Salvar</button></form></div>
   <div class="card small"><h3 style="margin-bottom:8px">Quanto custa (estimativa)</h3>
+   <p>• <b>Google Gemini (cota gratuita): R$ 0.</b> Tem limite de usos por dia definido pelo Google; quando acaba, volta no dia seguinte. O Google pode usar o conteúdo enviado para melhorar os produtos dele.</p>
    <p>• <b>Gerar atividade</b> (modelo Claude Sonnet 5.5): cerca de US$ 0,05 a 0,20 por geração (≈ R$ 0,30 a R$ 1,10), conforme o número de páginas e de questões.</p>
    <p>• <b>Tutor</b> (modelo Claude Haiku 5.5): cerca de US$ 0,0005 por pergunta (≈ R$ 0,003). 1.000 perguntas ≈ R$ 3.</p>
    <p class="muted">Valores em reais aproximados (US$ 1 ≈ R$ 5,60). A cobrança é feita pela Anthropic, nos créditos que você comprar no console dela. Defina um limite de gastos lá para nunca ser surpreendido.</p></div>`,
-  depois(){const f=$('#fIa');f.onsubmit=async ev=>{ev.preventDefault();await busy(f.querySelector('.pri'),async()=>{try{await api('iaConfigSalvar',{iaAtiva:f.elements.iaAtiva.checked,iaLimiteProfDia:f.elements.iaLimiteProfDia.value,iaLimiteAlunoDia:f.elements.iaLimiteAlunoDia.value});toast('Configurações salvas ✓')}catch(e){$('#err').textContent=e.message}})}}};
+  depois(){const f=$('#fIa');f.onsubmit=async ev=>{ev.preventDefault();await busy(f.querySelector('.pri'),async()=>{try{await api('iaConfigSalvar',{iaAtiva:f.elements.iaAtiva.checked,iaProvedor:f.elements.iaProvedor.value,iaLimiteProfDia:f.elements.iaLimiteProfDia.value,iaLimiteAlunoDia:f.elements.iaLimiteAlunoDia.value});toast('Configurações salvas ✓')}catch(e){$('#err').textContent=e.message}})}}};
 };
 
 /* =================== INÍCIO =================== */

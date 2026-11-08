@@ -2,10 +2,15 @@
 import { criarAmbiente } from './ambiente.mjs'; import { JSDOM } from 'jsdom'; import fs from 'fs';
 let ok = 0, falhas = 0; const t = (n, c, x) => { if (c) ok++; else { falhas++; console.log('❌ ' + n, x !== undefined ? String(x).slice(0, 300) : ''); } };
 const E = await criarAmbiente(); await E.instalar();
-E.ia.resposta = corpo => corpo.tools ? { status: 200, corpo: { usage: { input_tokens: 4000, output_tokens: 2500 }, content: [{ type: 'tool_use', input: { titulo: 'Rochas (IA)', disciplina: 'Ciências', resumo: 'Resumo do livro sobre rochas.', questoes: [
+const _orig = corpo => corpo.tools ? { status: 200, corpo: { usage: { input_tokens: 4000, output_tokens: 2500 }, content: [{ type: 'tool_use', input: { titulo: 'Rochas (IA)', disciplina: 'Ciências', resumo: 'Resumo do livro sobre rochas.', questoes: [
   { tipo: 'mc', enunciado: 'O granito é uma rocha:', opcoes: ['Sedimentar', 'Magmática', 'Metamórfica', 'Fóssil'], correta_indice: 1, explicacao: 'Vem do magma.' },
   { tipo: 'vf', enunciado: 'Fósseis aparecem em rochas sedimentares.', correta_vf: true, explicacao: 'Sim.' }] } }] } }
   : { status: 200, corpo: { usage: { input_tokens: 800, output_tokens: 120 }, content: [{ type: 'text', text: 'Boa pergunta! **Números primos** têm só dois divisores.\n- 2\n- 3' }] } };
+E.ia.resposta = (corpo, url) => {
+  if (!/generativelanguage/.test(url)) return _orig(corpo);
+  if (corpo.generationConfig && corpo.generationConfig.responseMimeType) { const r = _orig({ tools: 1 }); return { status: 200, corpo: { candidates: [{ content: { parts: [{ text: JSON.stringify(r.corpo.content[0].input) }] } }] } }; }
+  const r = _orig({}); return { status: 200, corpo: { candidates: [{ content: { parts: [{ text: r.corpo.content[0].text }] } }] } };
+};
 const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8'); const sleep = ms => new Promise(r => setTimeout(r, ms));
 function abrir() { const erros = [];
   const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://sala.test/', beforeParse(w) {
@@ -23,6 +28,7 @@ const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() =>
 t('menu do professor tem "Gerar com IA"', !!P.$('#nav [data-go="p_ia"]'));
 P.click('#nav [data-go="p_ia"]'); await P.espera(() => P.$('[data-a="iaGerar"]'));
 t('tela do gerador com foto, galeria e PDF', P.$$('[data-iaf]').length === 3 && /Usos hoje/.test(P.txt('#main')));
+t('aviso para não enviar dados de alunos', /Não envie fotos com nomes/.test(P.txt('#main')));
 P.click('[data-a="iaGerar"]'); await P.espera(() => P.txt('#iaErr'));
 t('exige material', /Envie pelo menos/.test(P.txt('#iaErr')));
 const inp = P.$('[data-iaf="img"][multiple]'); Object.defineProperty(inp, 'files', { value: [{ name: 'pag1.jpg', type: 'image/jpeg', size: 10 }, { name: 'pag2.jpg', type: 'image/jpeg', size: 10 }] });
@@ -33,7 +39,7 @@ t('remove foto', P.$$('#iaLista .ft').length === 1);
 P.set('#iaQtd', '5'); P.set('#iaDisc', 'Ciências'); P.set('#iaSerie', '6º ano');
 P.click('[data-a="iaGerar"]'); await P.espera(() => P.$('#edw [data-e=titulo]'), 4000);
 t('abre o editor com as questões geradas', P.$('#edw [data-e=titulo]') && P.$('#edw [data-e=titulo]').value === 'Rochas (IA)', P.txt('#main').slice(0, 300));
-t('aviso de revisão e custo', /2 questões geradas pela IA/.test(P.txt('#main')) && /Custo desta geração/.test(P.txt('#main')));
+t('aviso de revisão', /2 questões geradas pela IA/.test(P.txt('#main')));
 t('gabarito carregado no editor', P.$('#edw [data-a="qCor"][data-i="0"][data-j="1"]').checked && P.$('#edw [data-qo="0"][data-j="1"]').value === 'Magmática');
 P.set('#edw [data-qe="0"][data-f=enunciado]', 'O granito (rocha do magma) é:');
 P.click(P.$$('#edw [data-turma]')[0]); P.$$('#edw [data-turma]')[0].checked = true; P.$$('#edw [data-turma]')[0].dispatchEvent(new P.w.Event('change', { bubbles: true }));
@@ -50,12 +56,14 @@ A.click('#main [data-go="a_tutor"]'); await A.espera(() => A.$('#tutTxt'));
 t('tutor abre já na atividade', A.$('#tutAtiv').selectedOptions[0].textContent.includes('Rochas'));
 A.set('#tutTxt', 'O que são números primos?'); A.click('[data-a="tutEnviar"]'); await A.espera(() => /só dois divisores/.test(A.txt('#tutChat')), 3000);
 t('tutor responde no chat com formatação', /só dois divisores/.test(A.txt('#tutChat')) && !!A.$('#tutChat b'));
-t('aviso de privacidade', /não ficam salvas/.test(A.txt('#main')));
+t('aviso de privacidade', /não ficam salvas/.test(A.txt('#main')) && /Google \(Gemini\)/.test(A.txt('#main')) && /Nunca escreva seu nome/.test(A.txt('#main')));
+t('tutor sem botão de foto no Gemini', !A.$('#tutFoto'));
 // admin
 const D = abrir(); await D.login('admin', 'Admin@2026'); await D.espera(() => D.$('#fTs'));
 D.set('#fTs [name=atual]', 'Admin@2026'); D.set('#fTs [name=nova]', 'Adm#2026x'); D.set('#fTs [name=nova2]', 'Adm#2026x'); D.$('#fTs').dispatchEvent(new D.w.Event('submit', { bubbles: true, cancelable: true }));
 await D.espera(() => D.$('#nav [data-go="ad_ia"]'));
 D.click('#nav [data-go="ad_ia"]'); await D.espera(() => /Custo no mês/.test(D.txt('#main')));
+t('admin vê serviço Gemini selecionado', D.$('[name=iaProvedor]').value === 'gemini');
 t('admin vê uso e custos da IA', /Custo no mês/.test(D.txt('#main')) && /Gerador: 1/.test(D.txt('#main')) && /Tutor: 1/.test(D.txt('#main')), D.txt('#main').slice(0, 300));
 // IA desligada: botões somem
 const tkD = D.w.localStorage.getItem('sd_token'); await E.api(tkD, 'iaConfigSalvar', { iaAtiva: false, iaLimiteProfDia: 20, iaLimiteAlunoDia: 40 });

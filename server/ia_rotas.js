@@ -4,7 +4,7 @@
 const IA_MODELO_GERAR = 'claude-sonnet-5-5';
 const IA_MODELO_TUTOR = 'claude-haiku-5-5';
 const IA_PRECO = { 'claude-sonnet-5-5': { in: 2, out: 10 }, 'claude-haiku-5-5': { in: 0.10, out: 0.50 } }; // US$ por milhão de tokens
-CFG_PADRAO.iaAtiva = true; CFG_PADRAO.iaLimiteProfDia = 20; CFG_PADRAO.iaLimiteAlunoDia = 40;
+CFG_PADRAO.iaAtiva = true; CFG_PADRAO.iaProvedor = 'gemini'; CFG_PADRAO.iaLimiteProfDia = 20; CFG_PADRAO.iaLimiteAlunoDia = 40;
 
 function hojeChave_() { const d = new Date(Date.now() - 3 * 3600e3); return d.toISOString().slice(0, 10); }
 function iaContar_(u, limite) {
@@ -18,7 +18,7 @@ function iaLigada_() { if (!cfg_().iaAtiva) erro_('A Inteligência Artificial es
 rota_('iaStatus', TODOS, false, u => {
   const c = cfg_(); const lim = u.perfil === 'aluno' ? Number(c.iaLimiteAlunoDia) : Number(c.iaLimiteProfDia);
   const usados = Number(CacheService.getScriptCache().get('ia_' + hojeChave_() + '_' + u.id) || 0);
-  return { ativa: !!c.iaAtiva, limite: lim, usados: usados, restantes: Math.max(0, lim - usados) };
+  return { ativa: !!c.iaAtiva, tutor: !!c.iaAtiva, fotoTutor: c.iaProvedor === 'claude', provedor: c.iaProvedor, limite: lim, usados: usados, restantes: Math.max(0, lim - usados) };
 });
 
 const IA_SCHEMA_QUESTOES = {
@@ -71,7 +71,9 @@ rota_('iaGerarQuestoes', PROF, true, (u, d) => {
     'para cada questão escreva uma explicação curta e didática. Se o material estiver ilegível ou sem conteúdo escolar, gere questões só sobre o que for possível ler e explique no resumo. ' +
     'Responda chamando a ferramenta salvar_questoes.';
   blocos.push({ type: 'text', text: pedido });
-  return { __ia: { modo: 'gerar', usuarioId: u.id, modelo: IA_MODELO_GERAR, max_tokens: Math.min(20000, 1500 + qtd * 600),
+  const gem = cfg_().iaProvedor !== 'claude';
+  if (gem) blocos[blocos.length - 1].text += '\n\nResponda SOMENTE com um objeto JSON (sem texto antes ou depois) no formato: {"titulo": string, "disciplina": string, "resumo": string, "questoes": [{"tipo": "mc"|"vf"|"disc", "enunciado": string, "textoApoio": string, "opcoes": [4 strings, só para mc], "correta_indice": inteiro 0-3 (só mc), "correta_vf": true|false (só vf), "explicacao": string}]}';
+  return { __ia: { provedor: gem ? 'gemini' : 'claude', modo: 'gerar', usuarioId: u.id, modelo: gem ? 'gemini' : IA_MODELO_GERAR, max_tokens: Math.min(20000, 1500 + qtd * 600),
     sistema: 'Você é um assistente pedagógico de professores brasileiros. Lê fotos de livros, cadernos e PDFs e cria questões de avaliação de alta qualidade, fiéis ao conteúdo, com gabarito e explicação. Nunca invente fatos que não estejam no material ou no conhecimento escolar consolidado.',
     conteudo: blocos, ferramenta: { name: 'salvar_questoes', description: 'Salva as questões geradas', input_schema: IA_SCHEMA_QUESTOES },
     meta: { quantidade: qtd, disciplina: txt_(d.disciplina, 60), tipos: tipos } } };
@@ -102,9 +104,12 @@ function iaLimparQuestoes_(saida, meta) {
 
 rota_('iaTutor', ALU, true, (u, d) => {
   iaLigada_();
-  const pergunta = txt_(d.pergunta, 2000);
+  const gem = cfg_().iaProvedor !== 'claude';
+  if (gem && d.imagem) erro_('O envio de fotos no tutor está desligado. Digite sua dúvida.');
+  const limpaPessoal = x => String(x || '').replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[e-mail removido]').replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, '[CPF removido]').replace(/(\(?\d{2}\)?\s?)?9?\d{4}[-\s]?\d{4}\b/g, '[telefone removido]');
+  const pergunta = limpaPessoal(txt_(d.pergunta, 2000));
   if (pergunta.length < 2) erro_('Escreva sua pergunta.');
-  const hist = (Array.isArray(d.historico) ? d.historico : []).slice(-10).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: txt_(m.texto, 4000) })).filter(m => m.content);
+  const hist = (Array.isArray(d.historico) ? d.historico : []).slice(-10).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: limpaPessoal(txt_(m.texto, 4000)) })).filter(m => m.content);
   // contexto escolar do próprio aluno (sem nome, sem dados pessoais)
   const idade = idade_(u.nascimento);
   const minhas = turmasAluno_(u.id);
@@ -136,7 +141,7 @@ rota_('iaTutor', ALU, true, (u, d) => {
     ' Não peça nem guarde dados pessoais (nome completo, endereço, telefone, fotos do rosto). Não fale de assuntos impróprios para a idade.' +
     ' Se o aluno falar de algo pessoal sério (tristeza profunda, violência, abuso, vontade de se machucar), responda com acolhimento, incentive a conversar com um adulto de confiança (família, professor, coordenação) e informe o CVV pelo telefone 188 (ligação gratuita, 24 horas).' +
     ' Se não souber algo, diga que não tem certeza e sugira confirmar com o professor.' + ctxAtiv;
-  return { __ia: { modo: 'tutor', usuarioId: u.id, modelo: IA_MODELO_TUTOR, max_tokens: 800, sistema: sistema, historico: hist, conteudo: conteudo } };
+  return { __ia: { provedor: gem ? 'gemini' : 'claude', modo: 'tutor', usuarioId: u.id, modelo: gem ? 'gemini' : IA_MODELO_TUTOR, max_tokens: 800, sistema: sistema, historico: hist, conteudo: conteudo } };
 });
 
 rota_('iaUso', ADM, false, () => {
@@ -150,6 +155,7 @@ rota_('iaUso', ADM, false, () => {
 
 rota_('iaConfigSalvar', ADM, true, (u, d) => {
   setCfg_('iaAtiva', !!d.iaAtiva);
+  if (d.iaProvedor === 'gemini' || d.iaProvedor === 'claude') setCfg_('iaProvedor', d.iaProvedor);
   setCfg_('iaLimiteProfDia', Math.max(0, Math.min(500, Number(d.iaLimiteProfDia) || 0)));
   setCfg_('iaLimiteAlunoDia', Math.max(0, Math.min(500, Number(d.iaLimiteAlunoDia) || 0)));
   log_(u, 'ia_config', JSON.stringify(d).slice(0, 200)); return cfg_();

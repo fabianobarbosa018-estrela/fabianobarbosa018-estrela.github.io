@@ -12,6 +12,8 @@ const S = criarServidor({
   rpc: async (f: string, args: Record<string, unknown>) => { const { error } = await sb.rpc(f, args || {}); if (error) throw new Error(error.message); },
   fetch: (u: string, o: RequestInit) => fetch(u, { ...o, signal: AbortSignal.timeout(140000) }),
   chaveIA: Deno.env.get("ANTHROPIC_API_KEY") || "",
+  chaveGemini: Deno.env.get("GEMINI_API_KEY") || "",
+  modeloGemini: Deno.env.get("GEMINI_MODEL") || "",
   enviar: async (u: { caminho: string; mime: string; b64: string }) => {
     const { error } = await sb.storage.from(BUCKET).upload(u.caminho, Buffer.from(u.b64, "base64"), { contentType: u.mime, upsert: false });
     if (error) throw new Error(error.message);

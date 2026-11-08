@@ -49,7 +49,49 @@ export function criarServidor(io) {
     m.push({ role: 'user', content: spec.conteudo });
     return m;
   }
+  // ---- Google Gemini (cota gratuita) ----
+  const GEMINI_MODELOS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite'];
+  async function executarGemini(spec) {
+    if (!io.chaveGemini) return { ok: false, erro: 'A Inteligência Artificial ainda não foi ativada pelo administrador (falta configurar a chave do Google Gemini).' };
+    const partes = spec.conteudo.map(b => b.type === 'text' ? { text: b.text } : { inline_data: { mime_type: b.source.media_type, data: b.source.data } });
+    const tutor = spec.modo === 'tutor';
+    const contents = tutor ? mensagens(spec).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: typeof m.content === 'string' ? [{ text: m.content }] : partes })) : [{ role: 'user', parts: partes }];
+    const corpo = { systemInstruction: { parts: [{ text: spec.sistema }] }, contents: contents,
+      generationConfig: tutor ? { maxOutputTokens: 1024, temperature: 0.6 } : { responseMimeType: 'application/json', maxOutputTokens: Math.max(8192, spec.max_tokens), temperature: 0.4 } };
+    const modelos = io.modeloGemini ? [io.modeloGemini].concat(GEMINI_MODELOS) : GEMINI_MODELOS;
+    let r, j, usado = '';
+    for (const m of modelos) {
+      try {
+        r = await io.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent', { method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': io.chaveGemini }, body: JSON.stringify(corpo) });
+        j = await r.json();
+      } catch (e) { return { ok: false, erro: 'Não foi possível falar com o serviço de IA agora. Tente de novo em instantes.' }; }
+      usado = m;
+      if (r.status !== 404) break;   // modelo inexistente: tenta o próximo
+    }
+    if (!r.ok) {
+      const msg = String((j && j.error && (j.error.message + ' ' + j.error.status)) || '');
+      if (typeof console !== 'undefined') console.error('Gemini', r.status, msg);
+      if (/API_KEY|API key|PERMISSION_DENIED/i.test(msg) || r.status === 401 || r.status === 403) return { ok: false, erro: 'A chave do Google Gemini é inválida. Avise o administrador.' };
+      if (r.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(msg)) return { ok: false, erro: 'A cota gratuita de IA do dia acabou. Tente de novo mais tarde ou amanhã.' };
+      if (r.status === 413 || /too large|exceeds|size/i.test(msg)) return { ok: false, erro: 'O material é grande demais para uma vez só. Envie menos páginas.' };
+      if (r.status >= 500) return { ok: false, erro: 'O serviço de IA está ocupado. Tente de novo em instantes.' };
+      return { ok: false, erro: 'A IA não conseguiu processar este pedido. Verifique os arquivos e tente de novo.' };
+    }
+    const um = j.usageMetadata || {};
+    try { await io.rpc('sd_ia_registrar', { p_mes: new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7), p_modo: spec.modo, p_usd: 0, p_in: um.promptTokenCount || 0, p_out: um.candidatesTokenCount || 0 }); } catch (e) { }
+    const texto = (((j.candidates || [])[0] || {}).content || { parts: [] }).parts.map(p => p.text || '').join('').trim();
+    if (tutor) return { ok: true, d: { resposta: texto || 'Desculpe, não consegui responder agora. Tente perguntar de outro jeito.' } };
+    let saida = null;
+    try { saida = JSON.parse(texto.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')); }
+    catch (e) { const a = texto.indexOf('{'), b = texto.lastIndexOf('}'); try { saida = JSON.parse(texto.slice(a, b + 1)); } catch (e2) { } }
+    const res = N.limparIA(saida, spec.meta);
+    if (!res.questoes.length) return { ok: false, erro: 'A IA não conseguiu criar questões com este material. Tente fotos mais nítidas ou outro trecho.' };
+    res.custoUSD = 0; res.pedidas = spec.meta.quantidade; res.modelo = usado;
+    return { ok: true, d: res };
+  }
   async function executarIA(spec) {
+    if (spec.provedor === 'gemini') return executarGemini(spec);
     if (!io.chaveIA) return { ok: false, erro: 'A Inteligência Artificial ainda não foi ativada pelo administrador (falta configurar a chave do serviço de IA).' };
     const corpo = { model: spec.modelo, max_tokens: spec.max_tokens, system: spec.sistema, messages: mensagens(spec) };
     if (spec.ferramenta) { corpo.tools = [spec.ferramenta]; corpo.tool_choice = { type: 'tool', name: spec.ferramenta.name }; }
