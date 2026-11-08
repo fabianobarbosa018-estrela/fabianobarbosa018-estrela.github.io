@@ -827,13 +827,13 @@ function listaFuncHTML() {
   </tbody></table></div><p class="small muted mt">${fs.length} funcionário(s) listado(s).</p>`;
 }
 function formFunc(f) {
-  f = f || { ativo: true, dataEntrada: C.hojeISO(), setorId: UI.filtroSetor || '' };
+  f = f || { ativo: true, dataEntrada: '', setorId: UI.filtroSetor || '' };
   return `<div class="mh">${f.id ? 'Editar funcionário' : 'Novo funcionário'}</div><form class="mbd" id="fFunc">
   <div class="fld"><label class="f">Nome completo *</label><input type="text" name="nome" required value="${esc(f.nome || '')}" maxlength="120"></div>
   <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Setor *</label><select name="setorId" required><option value="">Selecione…</option>${setoresOrd().map(s => `<option value="${s.id}" ${f.setorId === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>
   <div class="fld"><label class="f">Função</label><input type="text" name="funcao" value="${esc(f.funcao || '')}" maxlength="80"></div>
   <div class="fld"><label class="f">Situação</label><select name="ativo"><option value="1" ${f.ativo ? 'selected' : ''}>Ativo</option><option value="0" ${!f.ativo ? 'selected' : ''}>Inativo</option></select></div>
-  <div class="fld"><label class="f">Data de entrada</label><input type="date" name="dataEntrada" value="${esc(f.dataEntrada || '')}"></div></div>
+  <div class="fld"><label class="f">Data de entrada <span class="muted small">(deixe em branco se já trabalha no hotel)</span></label><input type="date" name="dataEntrada" value="${esc(f.dataEntrada || '')}"></div></div>
   <div class="fld"><label class="f">Férias</label><div id="ferLista">${(f.ferias || []).map(feriasRow).join('')}</div><button type="button" class="btn sm" data-x="addFer">${ic('plus')} Adicionar período de férias</button>
   <div class="small muted" style="margin-top:4px">Na semana em que houver férias, o funcionário não recebe folgas; os dias de férias aparecem em vermelho na folha.</div></div>
   <div class="fld"><label class="f">Observações</label><textarea name="obs" maxlength="1000">${esc(f.obs || '')}</textarea></div>
@@ -895,7 +895,7 @@ function abrirImportFunc() {
       for (const x of l) {
         let sid = mapa[x.setor.toLowerCase()];
         if (!sid) { sid = uid('s'); mapa[x.setor.toLowerCase()] = sid; const o = baseOrdem + Object.keys(novosSet).length; novosSet[sid] = 1; await Store.set('setores', sid, { nome: x.setor, ordem: o, cor: PALETA[o % PALETA.length], criadoEm: agoraISO() }); }
-        await Store.set('funcionarios', uid('f'), { nome: x.nome, setorId: sid, funcao: x.funcao, ativo: true, dataEntrada: x.data || C.hojeISO(), obs: '', criadoEm: agoraISO() });
+        await Store.set('funcionarios', uid('f'), { nome: x.nome, setorId: sid, funcao: x.funcao, ativo: true, dataEntrada: x.data || '', obs: '', criadoEm: agoraISO() });
       }
       log('funcionario', 'Cadastro em lote: ' + l.length + ' funcionário(s)');
       fecharModal(w); toast(l.length + ' funcionário(s) cadastrado(s).');
