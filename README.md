@@ -12,3 +12,9 @@ Plataforma educacional (Professor • Aluno • Administrador).
 - **IA:** gerador de atividades por foto/PDF e Tutor IA. Serviço padrão: Google Gemini (cota gratuita, segredo `GEMINI_API_KEY`); alternativa paga: Claude (segredo `ANTHROPIC_API_KEY`). As chaves ficam só nos segredos do Supabase.
 
 Este repositório é público: não contém senhas nem chaves. As senhas iniciais são geradas aleatoriamente no primeiro acesso.
+
+## Banco de Atividades
+- 8 disciplinas, 112 assuntos e 672 questões originais (múltipla escolha, V/F e discursivas), com texto de apoio, gabarito e explicação, organizadas por nível (Fundamental I, Fundamental II e Médio).
+- O conteúdo fica **criptografado** em `server/banco.enc.txt` (AES-256-GCM). A chave fica só no banco de dados do Supabase, então os gabaritos não ficam expostos neste repositório público.
+- Só professores e administradores acessam o banco. O aluno recebe a atividade sem gabarito e só vê as explicações depois da correção, quando o professor libera as notas.
+- A IA também cria atividades só a partir do assunto e do nível (Educação Infantil, Fundamental I e II, Médio e cursos livres).

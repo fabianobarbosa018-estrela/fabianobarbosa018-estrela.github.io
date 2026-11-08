@@ -201,7 +201,7 @@ async function api(acao,d){
   }
   if(r&&r.ok)return r.d;
   if(r&&r.sessao){sairLocal();toast('Sua sessão expirou. Entre novamente.')}
-  if(r&&r.trocar){S.u&&(S.u.trocarSenha=true);go('trocarSenha')}
+  if(r&&r.trocar){S.u&&(S.u.trocarSenha=true);if(S.view!=='trocarSenha')go('trocarSenha')}
   throw new Error((r&&r.erro)||'Erro inesperado.');
 }
 async function busy(btn,fn){if(btn){btn.disabled=true;btn.dataset.t=btn.innerHTML;btn.innerHTML='Aguarde…'}try{return await fn()}finally{if(btn&&document.body.contains(btn)){btn.disabled=false;btn.innerHTML=btn.dataset.t}}}
@@ -605,7 +605,7 @@ function drawEditor(){
   const uniq=[...new Map(alunosSel.map(x=>[x.id,x])).values()];
   const total=a.questoes.reduce((s,q)=>s+(Number(q.pontos)||0),0);
   let h=`<button class="back" data-go="p_atividades">← Atividades</button><div class="ph"><div><h1>${a.id?'Editar atividade':'Nova atividade'}</h1><p>${pl(a.questoes.length,'questão','questões')} · ${pts(total)} pontos${a.id?' · '+(a.status==='publicada'?'Publicada':'Rascunho'):''}</p></div></div>
-  ${ED.ia?`<div class="info">✨ <b>${ED.a.questoes.length} questões geradas pela IA</b>${ED.ia.pedidas&&ED.ia.pedidas>ED.a.questoes.length?` (de ${ED.ia.pedidas} pedidas)`:''}. Revise com atenção, corrija o que precisar, escolha a turma e salve ou publique. Custo desta geração: US$ ${(ED.ia.custo||0).toFixed(3)}.</div>`:''}
+  ${ED.ia&&ED.ia.origem==='banco'?`<div class="info">📚 <b>${ED.a.questoes.length} questões do Banco de Atividades</b>${ED.ia.pedidas>ED.a.questoes.length?` (só havia ${ED.a.questoes.length} com esses filtros)`:''}. Revise, ajuste o que quiser, escolha a turma e salve ou publique.</div>`:ED.ia?`<div class="info">✨ <b>${ED.a.questoes.length} questões geradas pela IA</b>${ED.ia.pedidas&&ED.ia.pedidas>ED.a.questoes.length?` (de ${ED.ia.pedidas} pedidas)`:''}. Revise com atenção, corrija o que precisar, escolha a turma e salve ou publique.${ED.ia.custo?` Custo desta geração: US$ ${ED.ia.custo.toFixed(3)}.`:''}</div>`:''}
   <div class="card"><label>Título<input data-e="titulo" value="${esc(a.titulo)}" placeholder="Ex.: Prova – Frações e decimais"></label>
   <div class="row2"><label>Tipo<select data-e="tipo">${Object.entries(TIPO).map(([k,v])=>`<option value="${k}" ${a.tipo===k?'selected':''}>${v}</option>`).join('')}</select></label>
   <label>Disciplina<input data-e="disciplina" value="${esc(a.disciplina)}" list="dlD" placeholder="Ex.: Matemática"></label></div><datalist id="dlD">${Object.keys(DISC_IC).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
@@ -769,7 +769,7 @@ MENUS.professor.splice(3,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(4,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(MENUS.admin.length-1,0,['ad_ia','🤖','IA: uso e custos']);
 MENUS.aluno.splice(4,0,['a_tutor','🤖','Tutor IA']);
-async function iaVerificar(){try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;S.iaTutor=!!r.tutor;S.iaFotoTutor=!!r.fotoTutor;S.iaProv=r.provedor;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
+async function iaVerificar(){if(!S.u||S.u.trocarSenha)return;try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;S.iaTutor=!!r.tutor;S.iaFotoTutor=!!r.fotoTutor;S.iaProv=r.provedor;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
 function mdSimples(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^\s*[-•]\s+/gm,'• ').replace(/\n/g,'<br>')}
 function lerArquivo(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Não foi possível ler '+f.name));r.readAsDataURL(f)})}
 
@@ -778,18 +778,22 @@ let GER={arquivos:[]};
 VIEWS.p_ia=async function(){
   const st=await api('iaStatus').catch(()=>null);
   const lista=()=>GER.arquivos.map((a,i)=>`<div class="ft" style="width:110px;height:110px">${a.tipo==='pdf'?`<div style="display:grid;place-items:center;height:100%;font-size:13px;font-weight:800;text-align:center;padding:6px">📄<br>${esc(a.nome.slice(0,28))}</div>`:`<img src="${a.url}">`}<button class="x" data-a="iaRm" data-i="${i}">✕</button></div>`).join('');
-  return {html:`<div class="ph"><div><h1>✨ Gerar atividade com IA</h1><p>Fotografe páginas do livro ou envie PDFs. A IA lê o conteúdo e cria as questões com gabarito. Você revisa antes de publicar.</p></div></div>
+  return {html:`<div class="ph"><div><h1>✨ Gerar atividade com IA</h1><p>Informe o assunto e o nível, ou envie fotos e PDFs do material. A IA cria as questões com gabarito e explicação. Você revisa antes de publicar.</p></div></div>
   ${st&&!st.ativa?'<div class="note">A IA está desligada nas configurações da plataforma.</div>':''}
   ${st&&st.provedor==='gemini'?'<div class="note">🔒 O material é enviado ao Google Gemini (cota gratuita), que pode usá-lo para melhorar os produtos dele. <b>Não envie fotos com nomes, rostos ou dados de alunos</b>: só páginas de livros e materiais de aula.</div>':''}
   ${st?`<div class="info">Usos hoje: <b>${st.usados}</b> de ${st.limite}.</div>`:''}
-  <div class="card"><h3 style="margin-bottom:10px">1. Material</h3>
+  <div class="card"><h3 style="margin-bottom:10px">1. Assunto e nível</h3>
+   <div class="row2"><label>Assunto<input id="iaAssunto" placeholder="Ex.: Frações, Ciclo da água, Independência do Brasil" value="${esc(GER.assunto||'')}"></label>
+   <label>Nível de ensino<select id="iaNivel"><option value="">Escolha…</option>${[['infantil','Educação Infantil'],['f1','Ensino Fundamental I (1º ao 5º ano)'],['f2','Ensino Fundamental II (6º ao 9º ano)'],['em','Ensino Médio'],['livre','Curso livre']].map(([v,t])=>`<option value="${v}" ${GER.nivel===v?'selected':''}>${t}</option>`).join('')}</select></label></div>
+   <p class="small muted" style="margin:0">Só com o assunto a IA já cria a atividade, com um texto de apoio original. Se quiser, envie também o seu material abaixo.</p></div>
+  <div class="card"><h3 style="margin-bottom:10px">2. Material <span class="opt">(opcional)</span></h3>
    <div class="fbtns" style="margin-top:0"><label class="btn" style="margin:0">📷 Tirar foto<input type="file" accept="image/*" capture="environment" data-iaf="img" hidden></label>
    <label class="btn" style="margin:0">🖼️ Fotos da galeria<input type="file" accept="image/*" multiple data-iaf="img" hidden></label>
    <label class="btn" style="margin:0">📄 PDF<input type="file" accept="application/pdf" multiple data-iaf="pdf" hidden></label></div>
    <div class="fotos" id="iaLista">${lista()}</div>
    <label style="margin-top:12px">Ou cole um texto <span class="opt">(opcional)</span><textarea id="iaTexto" rows="3" placeholder="Cole aqui um trecho do livro, resumo da aula…">${esc(GER.texto||'')}</textarea></label>
    <p class="small muted" style="margin:0">Até 12 arquivos • fotos são comprimidas automaticamente • PDF até 10 MB</p></div>
-  <div class="card"><h3 style="margin-bottom:10px">2. Como devem ser as questões</h3>
+  <div class="card"><h3 style="margin-bottom:10px">3. Como devem ser as questões</h3>
    <div class="row2"><label>Quantidade<select id="iaQtd">${[5,10,15,20,30].map(n=>`<option ${n===(GER.qtd||10)?'selected':''}>${n}</option>`).join('')}</select></label>
    <label>Dificuldade<select id="iaDif"><option value="facil">Fácil</option><option value="medio" selected>Média</option><option value="dificil">Difícil</option><option value="misto">Misturada</option></select></label></div>
    <label>Tipos de questão</label><div style="display:flex;gap:14px;flex-wrap:wrap;margin:-4px 0 12px">
@@ -818,13 +822,13 @@ VIEWS.p_ia=async function(){
 ACOES.iaRm=d=>{GER.arquivos.splice(+d.i,1);render()};
 ACOES.iaGerar=async(d,b)=>{
   $('#iaErr').textContent='';
-  GER.texto=$('#iaTexto').value;GER.qtd=+$('#iaQtd').value;GER.disc=$('#iaDisc').value;GER.serie=$('#iaSerie').value;GER.obs=$('#iaObs').value;
+  GER.texto=$('#iaTexto').value;GER.assunto=$('#iaAssunto').value.trim();GER.nivel=$('#iaNivel').value;GER.qtd=+$('#iaQtd').value;GER.disc=$('#iaDisc').value;GER.serie=$('#iaSerie').value;GER.obs=$('#iaObs').value;
   const tipos=$$('.iaTipo').filter(x=>x.checked).map(x=>x.value);
-  if(!GER.arquivos.length&&!GER.texto.trim()){$('#iaErr').textContent='Envie pelo menos uma foto, um PDF ou cole um texto.';return}
+  if(!GER.arquivos.length&&!GER.texto.trim()&&!GER.assunto){$('#iaErr').textContent='Escreva o assunto ou envie uma foto, um PDF ou um texto.';return}
   if(!tipos.length){$('#iaErr').textContent='Escolha pelo menos um tipo de questão.';return}
-  modal(`<div class="center"><div class="spin" style="margin:20px auto"></div><h2>A IA está lendo o material…</h2><p class="muted">Isso costuma levar de 20 segundos a 1 minuto. Não feche esta tela.</p></div>`);
+  modal(`<div class="center"><div class="spin" style="margin:20px auto"></div><h2>${GER.arquivos.length?'A IA está lendo o material…':'A IA está criando as questões…'}</h2><p class="muted">Isso costuma levar de 20 segundos a 1 minuto. Não feche esta tela.</p></div>`);
   try{
-    const r=await api('iaGerarQuestoes',{arquivos:GER.arquivos.map(a=>a.url),texto:GER.texto,quantidade:GER.qtd,dificuldade:$('#iaDif').value,tipos,disciplina:GER.disc,serie:GER.serie,observacoes:GER.obs});
+    const r=await api('iaGerarQuestoes',{arquivos:GER.arquivos.map(a=>a.url),texto:GER.texto,quantidade:GER.qtd,dificuldade:$('#iaDif').value,tipos,disciplina:GER.disc,serie:GER.serie,observacoes:GER.obs,assunto:GER.assunto,nivelEnsino:GER.nivel});
     fechar();
     S.rascunhoIA={titulo:r.titulo,disciplina:r.disciplina||GER.disc,instrucoes:r.resumo||'',questoes:r.questoes,custo:r.custoUSD,pedidas:r.pedidas};
     GER={arquivos:[]};toast(r.questoes.length+' questões geradas ✓');go('p_editor',{ia:1});
@@ -884,6 +888,71 @@ VIEWS.ad_ia=async function(){
    <p>• <b>Tutor</b> (modelo Claude Haiku 5.5): cerca de US$ 0,0005 por pergunta (≈ R$ 0,003). 1.000 perguntas ≈ R$ 3.</p>
    <p class="muted">Valores em reais aproximados (US$ 1 ≈ R$ 5,60). A cobrança é feita pela Anthropic, nos créditos que você comprar no console dela. Defina um limite de gastos lá para nunca ser surpreendido.</p></div>`,
   depois(){const f=$('#fIa');f.onsubmit=async ev=>{ev.preventDefault();await busy(f.querySelector('.pri'),async()=>{try{await api('iaConfigSalvar',{iaAtiva:f.elements.iaAtiva.checked,iaProvedor:f.elements.iaProvedor.value,iaLimiteProfDia:f.elements.iaLimiteProfDia.value,iaLimiteAlunoDia:f.elements.iaLimiteAlunoDia.value});toast('Configurações salvas ✓')}catch(e){$('#err').textContent=e.message}})}}};
+};
+
+/* =================== BANCO DE ATIVIDADES =================== */
+MENUS.professor.splice(3,0,['p_banco','📚','Banco de Atividades']);
+MENUS.admin.splice(4,0,['p_banco','📚','Banco de Atividades']);
+let BAN={disc:'',sel:{},nivel:'',idx:null};
+const BAN_NIVEL={F1:'Fund. I',F2:'Fund. II',EM:'Médio'};
+VIEWS.p_banco=async function(){
+  if(!BAN.idx){try{BAN.idx=await api('bancoIndice')}catch(e){return {html:`<div class="ph"><div><h1>📚 Banco de Atividades</h1></div></div><div class="empty"><div class="e">📚</div><h3>Banco indisponível</h3><p>${esc(e.message)}</p><button class="btn" data-a="banRecarregar">Tentar de novo</button></div>`}}}
+  const I=BAN.idx;const D=I.disciplinas.find(d=>d.id===BAN.disc);
+  const total=I.disciplinas.reduce((s,d)=>s+d.assuntos.reduce((x,a)=>x+a.total,0),0);
+  let h=`<div class="ph"><div><h1>📚 Banco de Atividades</h1><p>${I.disciplinas.length} disciplinas • ${total} questões originais com gabarito e explicação. Escolha a disciplina, os assuntos e monte a atividade em segundos.</p></div></div>
+  <div class="card"><h3 style="margin-bottom:10px">1. Disciplina</h3><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+  ${I.disciplinas.map(d=>`<button class="btn ${d.id===BAN.disc?'pri':''}" style="margin:0;min-height:58px;white-space:normal;line-height:1.25;text-align:center;flex-direction:column;padding:8px 6px" data-a="banDisc" data-id="${d.id}">${d.icone} ${esc(d.nome)}<br><span class="small" style="opacity:.8">${d.assuntos.length} assuntos</span></button>`).join('')}</div></div>`;
+  if(D){
+    const lista=D.assuntos.filter(a=>!BAN.nivel||a.nivel===BAN.nivel);
+    const nSel=Object.keys(BAN.sel).filter(k=>BAN.sel[k]).length;
+    h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h3>2. Assuntos de ${esc(D.nome)}</h3>
+     <label style="margin:0;min-width:180px">Nível<select id="banNivel"><option value="">Todos os níveis</option>${Object.entries(I.niveis).map(([k,v])=>`<option value="${k}" ${BAN.nivel===k?'selected':''}>${esc(v)}</option>`).join('')}</select></label></div>
+     <div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn sm" data-a="banTodos">Marcar todos</button><button class="btn sm" data-a="banNenhum">Limpar</button></div>
+     <div class="list">${lista.length?lista.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)">
+       <label class="chk" style="margin:0;flex:1"><input type="checkbox" class="banA" value="${a.i}" ${BAN.sel[a.i]?'checked':''}><span><b>${esc(a.nome)}</b><br><span class="small muted">${a.total} questões: ${a.tipos.mc} múltipla escolha, ${a.tipos.vf} V/F, ${a.tipos.disc} discursiva${a.tipos.disc>1?'s':''}</span></span></label>
+       <span class="pill" style="flex:none">${BAN_NIVEL[a.nivel]||a.nivel}</span><button class="btn sm" style="flex:none" data-a="banTexto" data-i="${a.i}">📄 Texto</button></div>`).join(''):'<p class="muted">Nenhum assunto neste nível. Escolha outro nível ou use “Gerar com IA”.</p>'}</div>
+     <p class="small muted" style="margin:8px 0 0">${nSel} assunto${nSel===1?'':'s'} selecionado${nSel===1?'':'s'}.</p></div>
+    <div class="card"><h3 style="margin-bottom:10px">3. Como deve ser a atividade</h3>
+     <div class="row2"><label>Quantidade de questões<input type="number" id="banQtd" min="1" max="60" value="${BAN.qtd||10}"></label>
+     <label>Dificuldade<select id="banDif">${[['misto','Misturada'],['facil','Fácil'],['medio','Média'],['dificil','Difícil']].map(([v,t])=>`<option value="${v}" ${BAN.dif===v?'selected':''}>${t}</option>`).join('')}</select></label></div>
+     <label>Tipos de questão</label><div style="display:flex;gap:14px;flex-wrap:wrap;margin:-4px 0 12px">
+      ${[['mc','Múltipla escolha'],['vf','Verdadeiro ou falso'],['disc','Discursiva']].map(([v,t])=>`<label class="chk" style="margin:0"><input type="checkbox" class="banTipo" value="${v}" ${!BAN.tipos||BAN.tipos.includes(v)?'checked':''}><span>${t}</span></label>`).join('')}</div>
+     <label class="chk"><input type="checkbox" id="banTxt" ${BAN.txt===false?'':'checked'}><span>Incluir o texto de apoio nas instruções (até 3 assuntos)</span></label></div>
+    <div class="err" id="banErr"></div>
+    <button class="btn pri full" data-a="banMontar" style="min-height:52px;font-size:17px">📚 Montar atividade</button>
+    ${S.iaAtiva?`<button class="btn full" data-a="banIA" style="margin-top:10px;white-space:normal;line-height:1.3">✨ Criar questões novas com IA sobre o assunto marcado</button>`:''}
+    <p class="small muted center">A atividade abre no editor para você revisar, escolher a turma e publicar. O aluno só vê o gabarito e as explicações depois da correção, quando você liberar as notas.</p>`;
+  }else h+=`<div class="empty"><div class="e">👆</div><h3>Escolha uma disciplina para começar</h3></div>`;
+  return {html:h,depois(){
+    const n=$('#banNivel');if(n)n.addEventListener('change',()=>{BAN.nivel=n.value;banGuardar();render()});
+    $$('.banA').forEach(c=>c.addEventListener('change',()=>{BAN.sel[c.value]=c.checked;}));
+  }};
+};
+function banGuardar(){const q=$('#banQtd');if(!q)return;BAN.qtd=+q.value;BAN.dif=$('#banDif').value;BAN.tipos=$$('.banTipo').filter(x=>x.checked).map(x=>x.value);BAN.txt=$('#banTxt').checked}
+ACOES.banRecarregar=()=>{BAN.idx=null;render()};
+ACOES.banDisc=d=>{if(BAN.disc!==d.id){BAN.disc=d.id;BAN.sel={}}render()};
+ACOES.banTodos=()=>{banGuardar();const D=BAN.idx.disciplinas.find(x=>x.id===BAN.disc);D.assuntos.filter(a=>!BAN.nivel||a.nivel===BAN.nivel).forEach(a=>BAN.sel[a.i]=true);render()};
+ACOES.banNenhum=()=>{banGuardar();BAN.sel={};render()};
+ACOES.banTexto=async(d,b)=>{await busy(b,async()=>{try{const r=await api('bancoTexto',{disciplina:BAN.disc,assunto:+d.i});
+  modal(`<div class="hd"><h2>📄 ${esc(r.assunto)}</h2><button class="x" data-a="fechar">✕</button></div><p class="small muted">${esc(r.disciplina)} • ${esc(r.nivel)}</p><div class="apoio" style="white-space:pre-wrap">${esc(r.texto)}</div>`)}catch(e){toast(e.message)}})};
+ACOES.banMontar=async(d,b)=>{
+  banGuardar();$('#banErr').textContent='';
+  const assuntos=Object.keys(BAN.sel).filter(k=>BAN.sel[k]).map(Number);
+  if(!assuntos.length){$('#banErr').textContent='Marque pelo menos um assunto.';return}
+  if(!BAN.tipos.length){$('#banErr').textContent='Escolha pelo menos um tipo de questão.';return}
+  if(!(BAN.qtd>=1&&BAN.qtd<=60)){$('#banErr').textContent='A quantidade deve ser de 1 a 60.';return}
+  await busy(b,async()=>{try{
+    const r=await api('bancoMontar',{disciplina:BAN.disc,assuntos,quantidade:BAN.qtd,dificuldade:BAN.dif,tipos:BAN.tipos,incluirTexto:BAN.txt});
+    S.rascunhoIA={origem:'banco',titulo:r.titulo,disciplina:r.disciplina,instrucoes:r.instrucoes,questoes:r.questoes,custo:0,pedidas:r.pedidas,disponiveis:r.disponiveis};
+    toast(r.questoes.length+' questões prontas ✓');go('p_editor',{ia:1});
+  }catch(e){$('#banErr').textContent=e.message;toast(e.message)}});
+};
+ACOES.banIA=()=>{
+  banGuardar();const D=BAN.idx.disciplinas.find(x=>x.id===BAN.disc);
+  const marc=D.assuntos.filter(a=>BAN.sel[a.i]);
+  if(marc.length!==1){$('#banErr').textContent='Para criar com IA, marque exatamente um assunto.';return}
+  GER=Object.assign({arquivos:[]},{assunto:marc[0].nome,disc:D.nome.split(' / ')[0],nivel:({F1:'f1',F2:'f2',EM:'em'})[marc[0].nivel]||'',qtd:[5,10,15,20,30].includes(BAN.qtd)?BAN.qtd:10});
+  go('p_ia');
 };
 
 /* =================== INÍCIO =================== */

@@ -30,7 +30,7 @@ P.click('#nav [data-go="p_ia"]'); await P.espera(() => P.$('[data-a="iaGerar"]')
 t('tela do gerador com foto, galeria e PDF', P.$$('[data-iaf]').length === 3 && /Usos hoje/.test(P.txt('#main')));
 t('aviso para não enviar dados de alunos', /Não envie fotos com nomes/.test(P.txt('#main')));
 P.click('[data-a="iaGerar"]'); await P.espera(() => P.txt('#iaErr'));
-t('exige material', /Envie pelo menos/.test(P.txt('#iaErr')));
+t('exige material', /Escreva o assunto ou envie/.test(P.txt('#iaErr')));
 const inp = P.$('[data-iaf="img"][multiple]'); Object.defineProperty(inp, 'files', { value: [{ name: 'pag1.jpg', type: 'image/jpeg', size: 10 }, { name: 'pag2.jpg', type: 'image/jpeg', size: 10 }] });
 inp.dispatchEvent(new P.w.Event('change', { bubbles: true })); await P.espera(() => P.$$('#iaLista .ft').length === 2);
 t('pré-visualiza as fotos', P.$$('#iaLista .ft').length === 2);

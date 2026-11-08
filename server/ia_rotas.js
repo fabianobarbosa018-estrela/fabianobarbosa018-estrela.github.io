@@ -43,7 +43,11 @@ const IA_SCHEMA_QUESTOES = {
 rota_('iaGerarQuestoes', PROF, true, (u, d) => {
   iaLigada_();
   const arqs = Array.isArray(d.arquivos) ? d.arquivos : [];
-  if (!arqs.length && !txt_(d.texto, 20000)) erro_('Envie pelo menos uma foto, um PDF ou cole um texto.');
+  const assunto = txt_(d.assunto, 200);
+  if (!arqs.length && !txt_(d.texto, 20000) && !assunto) erro_('Informe o assunto ou envie uma foto, um PDF ou um texto.');
+  const NIVEIS = { infantil: 'Educação Infantil (crianças de 4 a 5 anos: linguagem muito simples, frases curtas, sem leitura longa)', f1: 'Ensino Fundamental I (1º ao 5º ano)', f2: 'Ensino Fundamental II (6º ao 9º ano)', em: 'Ensino Médio', livre: 'Curso livre (jovens e adultos)' };
+  const nivelEnsino = NIVEIS[d.nivelEnsino] || '';
+  const temMaterial = arqs.length > 0 || !!txt_(d.texto, 20000);
   if (arqs.length > 12) erro_('Envie no máximo 12 arquivos por vez.');
   let total = 0; const blocos = [];
   arqs.forEach((a, i) => {
@@ -60,11 +64,12 @@ rota_('iaGerarQuestoes', PROF, true, (u, d) => {
   if (!tipos.length) erro_('Escolha pelo menos um tipo de questão.');
   const nomeTipo = { mc: 'múltipla escolha (4 alternativas, 1 correta)', vf: 'verdadeiro ou falso', disc: 'discursiva (resposta escrita)' };
   iaContar_(u, Number(cfg_().iaLimiteProfDia) || 20);
-  log_(u, 'ia_gerar', qtd + ' questões, ' + arqs.length + ' arquivo(s)');
-  const pedido = 'Gere EXATAMENTE ' + qtd + ' questões em português do Brasil, baseadas SOMENTE no material enviado.\n' +
+  log_(u, 'ia_gerar', qtd + ' questões, ' + arqs.length + ' arquivo(s)' + (assunto ? ', assunto: ' + assunto.slice(0, 60) : ''));
+  const pedido = 'Gere EXATAMENTE ' + qtd + ' questões em português do Brasil, ' + (temMaterial ? 'baseadas SOMENTE no material enviado' + (assunto ? ' (assunto: ' + assunto + ')' : '') + '.\n' :
+      'sobre o assunto "' + assunto + '", usando apenas conhecimento escolar consolidado e correto. Escreva um texto de apoio ORIGINAL e curto (até 120 palavras, sem copiar livros) e coloque-o em textoApoio das questões de interpretação; inclua também questões contextualizadas no cotidiano.\n') +
     'Tipos permitidos (distribua de forma equilibrada): ' + tipos.map(t => nomeTipo[t]).join('; ') + '.\n' +
     'Nível de dificuldade: ' + nivel + '.\n' +
-    'Público: ' + (txt_(d.serie, 60) || 'Ensino Fundamental') + (txt_(d.disciplina, 60) ? ' — disciplina: ' + txt_(d.disciplina, 60) : '') + '.\n' +
+    'Público: ' + (nivelEnsino || txt_(d.serie, 60) || 'Ensino Fundamental') + (nivelEnsino && txt_(d.serie, 60) ? ' — ' + txt_(d.serie, 60) : '') + (txt_(d.disciplina, 60) ? ' — disciplina: ' + txt_(d.disciplina, 60) : '') + '.\n' +
     (txt_(d.observacoes, 1000) ? 'Orientações do professor: ' + txt_(d.observacoes, 1000) + '\n' : '') +
     (txt_(d.texto, 20000) ? '\nTexto colado pelo professor:\n"""' + txt_(d.texto, 20000) + '"""\n' : '') +
     'Regras: enunciados claros e adequados à idade; alternativas plausíveis; apenas uma correta; sem pegadinhas injustas; ' +
@@ -74,7 +79,7 @@ rota_('iaGerarQuestoes', PROF, true, (u, d) => {
   const gem = cfg_().iaProvedor !== 'claude';
   if (gem) blocos[blocos.length - 1].text += '\n\nResponda SOMENTE com um objeto JSON (sem texto antes ou depois) no formato: {"titulo": string, "disciplina": string, "resumo": string, "questoes": [{"tipo": "mc"|"vf"|"disc", "enunciado": string, "textoApoio": string, "opcoes": [4 strings, só para mc], "correta_indice": inteiro 0-3 (só mc), "correta_vf": true|false (só vf), "explicacao": string}]}';
   return { __ia: { provedor: gem ? 'gemini' : 'claude', modo: 'gerar', usuarioId: u.id, modelo: gem ? 'gemini' : IA_MODELO_GERAR, max_tokens: Math.min(20000, 1500 + qtd * 600),
-    sistema: 'Você é um assistente pedagógico de professores brasileiros. Lê fotos de livros, cadernos e PDFs e cria questões de avaliação de alta qualidade, fiéis ao conteúdo, com gabarito e explicação. Nunca invente fatos que não estejam no material ou no conhecimento escolar consolidado.',
+    sistema: 'Você é um assistente pedagógico de professores brasileiros. Lê fotos de livros, cadernos e PDFs, ou parte de um assunto indicado, e cria questões de avaliação de alta qualidade, fiéis ao conteúdo, com gabarito e explicação. Nunca invente fatos que não estejam no material ou no conhecimento escolar consolidado. Todo texto que você escrever deve ser original: não reproduza trechos de livros didáticos ou obras protegidas.',
     conteudo: blocos, ferramenta: { name: 'salvar_questoes', description: 'Salva as questões geradas', input_schema: IA_SCHEMA_QUESTOES },
     meta: { quantidade: qtd, disciplina: txt_(d.disciplina, 60), tipos: tipos } } };
 });

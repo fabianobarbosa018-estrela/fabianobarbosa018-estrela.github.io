@@ -50,16 +50,18 @@ troca('sessões que expiram, bloqueio após tentativas erradas, registro de aç�
 # registro como "app" (tela inicial do celular)
 troca('/* =================== INÍCIO =================== */', """/* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}""")
+# não redesenha a tela de troca de senha se ela já está aberta (evita apagar o que foi digitado)
+troca("if(r&&r.trocar){S.u&&(S.u.trocarSenha=true);go('trocarSenha')}", "if(r&&r.trocar){S.u&&(S.u.trocarSenha=true);if(S.view!=='trocarSenha')go('trocarSenha')}")
 # ---- Inteligência Artificial ----
 troca("  const u=S.u;const menu=MENUS[u.perfil]||[];", "  const u=S.u;const menu=(MENUS[u.perfil]||[]).filter(([k])=>(k!=='p_ia'||S.iaAtiva)&&(k!=='a_tutor'||S.iaTutor));")
 troca("function entrou(r){S.token=r.token;", "function entrou(r){S.iaAtiva=false;setTimeout(iaVerificar,50);S.token=r.token;")
 troca("  if(S.token){try{const r=await api('eu');S.u=r.usuario;S.cfg=r.cfg}catch(e){S.token=null;LS.del('sd_token')}}", "  if(S.token){try{const r=await api('eu');S.u=r.usuario;S.cfg=r.cfg;iaVerificar()}catch(e){S.token=null;LS.del('sd_token')}}")
 troca("  ED={a:JSON.parse(JSON.stringify(a)),turmas,abrirApoio:{}};",
       "  if(p.ia&&S.rascunhoIA){Object.assign(a,{titulo:S.rascunhoIA.titulo,disciplina:S.rascunhoIA.disciplina||a.disciplina,instrucoes:S.rascunhoIA.instrucoes,questoes:JSON.parse(JSON.stringify(S.rascunhoIA.questoes))})}\n  ED={a:JSON.parse(JSON.stringify(a)),turmas,abrirApoio:{},ia:(p.ia&&S.rascunhoIA)||null};")
-troca('''  <div class="card"><label>Título<input data-e="titulo"''','''  ${ED.ia?`<div class="info">✨ <b>${ED.a.questoes.length} questões geradas pela IA</b>${ED.ia.pedidas&&ED.ia.pedidas>ED.a.questoes.length?` (de ${ED.ia.pedidas} pedidas)`:''}. Revise com atenção, corrija o que precisar, escolha a turma e salve ou publique. Custo desta geração: US$ ${(ED.ia.custo||0).toFixed(3)}.</div>`:''}
+troca('''  <div class="card"><label>Título<input data-e="titulo"''','''  ${ED.ia&&ED.ia.origem==='banco'?`<div class="info">📚 <b>${ED.a.questoes.length} questões do Banco de Atividades</b>${ED.ia.pedidas>ED.a.questoes.length?` (só havia ${ED.a.questoes.length} com esses filtros)`:''}. Revise, ajuste o que quiser, escolha a turma e salve ou publique.</div>`:ED.ia?`<div class="info">✨ <b>${ED.a.questoes.length} questões geradas pela IA</b>${ED.ia.pedidas&&ED.ia.pedidas>ED.a.questoes.length?` (de ${ED.ia.pedidas} pedidas)`:''}. Revise com atenção, corrija o que precisar, escolha a turma e salve ou publique.${ED.ia.custo?` Custo desta geração: US$ ${ED.ia.custo.toFixed(3)}.`:''}</div>`:''}
   <div class="card"><label>Título<input data-e="titulo"''')
 troca("  if(a.instrucoes)h+=`<div class=\"apoio\">${linkify(a.instrucoes)}</div>`;",
       "  if(a.instrucoes)h+=`<div class=\"apoio\">${linkify(a.instrucoes)}</div>`;\n  if(S.iaTutor)h+=`<button class=\"btn sm\" style=\"margin-bottom:12px\" data-go=\"a_tutor\" data-p=\"${P({atividade:a.id})}\">🤖 Pedir ajuda ao Tutor IA</button>`;")
-troca('/* =================== INÍCIO =================== */', open('/home/claude/supa/web_ia.js').read() + '\n/* =================== INÍCIO =================== */')
+troca('/* =================== INÍCIO =================== */', open('/home/claude/supa/web_ia.js').read() + '\n' + open('/home/claude/supa/web_banco.js').read() + '\n/* =================== INÍCIO =================== */')
 open('/home/claude/supa/web/index.html', 'w').write(h)
 print('ok', API)
