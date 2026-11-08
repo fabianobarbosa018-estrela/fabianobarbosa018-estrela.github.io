@@ -201,7 +201,9 @@ table.folha.vt{min-width:0;width:auto}
 table.folha.vt th,table.folha.vt td{font-size:11.5px;min-width:64px;white-space:nowrap;height:20px;padding:1px 4px}
 table.folha.vt th{white-space:normal;line-height:1.15}
 table.folha.vt .fnm{min-width:62px;background:#fff;font-weight:700}
-table.folha.vt .vts{font-weight:500;font-size:10px;color:#1f4ea0}
+table.folha.vt .vts{font-weight:800;font-size:12px;color:#1f4ea0}
+table.folha.vt thead tr:nth-child(3) th:not(.fnm):not(.vtt){font-size:13.5px;font-weight:800;padding:4px}
+table.folha.vt thead tr:nth-child(4) th,table.folha.vt thead tr:nth-child(5) th{padding:3px 4px}
 table.folha.vt td.vtc{font-weight:500;cursor:pointer;text-align:right;padding-right:6px}
 table.folha.vt td.vt-folga,table.folha.vt td.vt-semvt,table.folha.vt td.vt-faltaJ,table.folha.vt td.vt-afast{color:#6b7280;text-align:center;font-weight:700}
 table.folha.vt td.vt-falta{color:#b91c1c;text-align:center;font-weight:800}
@@ -2186,7 +2188,7 @@ function vtValorPer(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[v
 function vtValorTxt(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[vtFaixa(per, m.dim)[1] - 1]); if (v && v.fixo) return 'FIXO ' + (per === 'mes' ? brl(v.q1) + ' + ' + brl(v.q2) : brl(v[per])); const t = v ? v.total : l.valorDia; return t ? 'R$ ' + brl(t) : ''; }
 function vtTot(l, per) { return per === 'mes' ? l.mes : l[per]; }
 function vtPago(l, per) { return per === 'mes' ? l.pago.q1 + l.pago.q2 : l.pago[per]; }
-const vtCelTxt = c => c.fixoQ ? brl(c.valor) + (c.tipo === 'trab' ? '' : ' ' + c.cod) : c.tipo === 'trab' ? (c.valor > 0 ? brl(c.valor) : c.fixoDia ? '•' : '0,00') : c.cod;
+const vtCelTxt = c => c.fixoQ ? brl(c.valor) + (c.tipo === 'trab' ? '' : ' ' + c.cod) : c.tipo === 'trab' ? (c.valor > 0 ? brl(c.valor) : c.fixoDia ? '•' : '—') : c.cod;
 const vtCelTitulo = (l, c) => {
   const base = { trab: 'trabalho', folga: 'folga', ferias: 'férias', semEscala: 'semana sem escala gerada', fora: 'fora do período de trabalho' }[c.base];
   let t = l.nome + ' — ' + C.dataBR(c.d) + ': ' + (c.ajuste ? C.VT_TIPOS[c.ajuste.t].nome + ' (ajuste manual; pela escala: ' + base + ')' : 'pela escala: ' + base);
@@ -2469,8 +2471,8 @@ async function vtPDF(per, imprimir) {
   const head = [
     [{ content: 'VALE TRANSPORTE  ' + vtTituloPer(m, per), colSpan: n + 1, styles: { fontSize: 13, fillColor: verde } }],
     [{ content: 'DATA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }].concat(L.map((l, i) => hc(l.nome.toUpperCase(), i))),
-    L.map((l, i) => hc(nomeSetor(l.setorId).toUpperCase(), i, { textColor: azul, fontStyle: 'normal', fontSize: 5.5 })),
-    L.map((l, i) => hc(vtValorTxt(m, l, per) || '-', i, { textColor: azul, fontStyle: 'normal' }))
+    L.map((l, i) => hc(nomeSetor(l.setorId).toUpperCase(), i, { textColor: azul, fontStyle: 'bold', fontSize: n > 14 ? 6 : 6.8 })),
+    L.map((l, i) => hc(vtValorTxt(m, l, per) || '-', i, { textColor: azul, fontStyle: 'bold', fontSize: n > 14 ? 6.5 : 7.5 }))
   ];
   const body = [], linhaSub = (q, rot) => [{ content: rot, styles: { fillColor: verde } }].concat(L.map((l, i) => hc(l[q].valor ? brl(l[q].valor) : '-', i, { fontStyle: 'bold' })));
   for (let k = ini; k <= fim; k++) {
@@ -2493,7 +2495,7 @@ async function vtPDF(per, imprimir) {
   doc.autoTable({
     head, body, foot, startY: 6, theme: 'grid', margin: { left: 6, right: 6 }, showFoot: 'lastPage',
     styles: { font: 'helvetica', fontSize: n > 14 ? 6 : 7, halign: 'center', valign: 'middle', cellPadding: nl > 20 ? 0.6 : 1.2, lineColor: preto, lineWidth: 0.15, textColor: preto, minCellHeight: nl > 20 ? 4.1 : 6, overflow: 'linebreak' },
-    headStyles: { textColor: preto, fontStyle: 'bold', fontSize: n > 14 ? 5.8 : 6.8 }, footStyles: { textColor: preto, fontStyle: 'bold' },
+    headStyles: { textColor: preto, fontStyle: 'bold', fontSize: n > 14 ? 7 : 8 }, footStyles: { textColor: preto, fontStyle: 'bold' },
     columnStyles: colStyles
   });
   let y = doc.lastAutoTable.finalY + 3;
@@ -2524,9 +2526,9 @@ async function vtExcel() {
   cel(2, 1, 'DATA', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } }); ws.mergeCells(2, 1, 4, 1);
   L.forEach((l, i) => {
     const c = i + 2, f = fill(VT_COR[i % 2]);
-    cel(2, c, l.nome.toUpperCase(), { fill: f, font: { name: 'Calibri', bold: true, size: 10 }, alignment: Object.assign({ wrapText: true }, center) });
-    cel(3, c, nomeSetor(l.setorId).toUpperCase(), { fill: f, font: { name: 'Calibri', size: 8, color: { argb: 'FF1F4EA0' } } });
-    cel(4, c, l.fixo ? 'FIXO ' + brl(l.fixo.q1) + ' + ' + brl(l.fixo.q2) : l.valorDia, { fill: f, numFmt: '"R$" #,##0.00', font: { name: 'Calibri', size: 9, color: { argb: 'FF1F4EA0' } } });
+    cel(2, c, l.nome.toUpperCase(), { fill: f, font: { name: 'Calibri', bold: true, size: 12 }, alignment: Object.assign({ wrapText: true }, center) });
+    cel(3, c, nomeSetor(l.setorId).toUpperCase(), { fill: f, font: { name: 'Calibri', bold: true, size: 10, color: { argb: 'FF1F4EA0' } } });
+    cel(4, c, l.fixo ? 'FIXO ' + brl(l.fixo.q1) + ' + ' + brl(l.fixo.q2) : l.valorDia, { fill: f, numFmt: '"R$" #,##0.00', font: { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF1F4EA0' } } });
   });
   const r0 = 5; let r = r0; const linhaQ = {};
   m.dias.forEach((d, k) => {
