@@ -219,6 +219,9 @@ table.folha.vt tfoot tr.vtv td{border-top:2px solid #000;font-size:12.5px;font-w
 table.folha.vt .big2{font-size:14px!important}
 table.folha.vt .edit-click{cursor:pointer}
 .readonly table.folha.vt td.vtc,.readonly table.folha.vt .edit-click{cursor:default;pointer-events:none}
+.vtq{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-family:Calibri,Carlito,Arial,sans-serif}
+.vtq div{border:2px solid #000;background:#C4D79B;padding:6px 14px;display:flex;gap:12px;align-items:center}
+.vtq span{font-weight:700;font-size:13px}.vtq b{font-size:17px}
 .vtres td.r,.vtres th.r,table.list td.r,table.list th.r{text-align:right;white-space:nowrap}
 .vtres tfoot td{background:#f3f7e9;border-top:2px solid var(--line)}
 </style>
@@ -2236,13 +2239,13 @@ function vtTabelaHTML(m, per) {
   const [ini, fim] = vtFaixa(per, m.dim), L = m.linhas, n = L.length;
   const thN = (l, i, cont, extra) => `<th style="background:${VT_COR[i % 2]}" ${extra || ''}>${cont}</th>`;
   let h = `<div class="folha-wrap"><table class="folha vt"><thead>
-  <tr><th colspan="${n + 2}" class="ft1" style="background:#C4D79B;color:#000"><span>VALE TRANSPORTE</span></th></tr>
-  <tr><th colspan="${n + 2}" class="ft2" style="background:#C4D79B;color:#000"><span>${vtTituloPer(m, per)}</span></th></tr>
-  <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(l.nome.toUpperCase()))).join('')}<th rowspan="3" class="vtt">TOTAL DO DIA</th></tr>
+  <tr><th colspan="${n + 1}" class="ft1" style="background:#C4D79B;color:#000"><span>VALE TRANSPORTE</span></th></tr>
+  <tr><th colspan="${n + 1}" class="ft2" style="background:#C4D79B;color:#000"><span>${vtTituloPer(m, per)}</span></th></tr>
+  <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(l.nome.toUpperCase()))).join('')}</tr>
   <tr>${L.map((l, i) => thN(l, i, `<span class="vts">${esc(nomeSetor(l.setorId).toUpperCase())}</span>`)).join('')}</tr>
   <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorTxt(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorTxt(m, l, per) || 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(l.nome)}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
   </thead><tbody>`;
-  const sub = (q, rot) => `<tr class="vtsub"><td class="fnm">${rot}</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${l[q].valor ? brl(l[q].valor) : '-'}</td>`).join('')}<td class="vtt">${brl(L.reduce((a, l) => a + l[q].valor, 0))}</td></tr>`;
+  const sub = (q, rot) => `<tr class="vtsub"><td class="fnm">${rot}</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${l[q].valor ? brl(l[q].valor) : '-'}</td>`).join('')}</tr>`;
   for (let k = ini; k <= fim; k++) {
     const d = m.dias[k - 1], fer = feriadoEm(d);
     h += `<tr><td class="fnm" ${fer ? `style="background:${COR_FERIADO}" title="Feriado: ${esc(fer.nome)}"` : ''}>${k} ${C.DIAS_CURTO[C.diaSemana(d)].toUpperCase()}</td>`;
@@ -2251,17 +2254,18 @@ function vtTabelaHTML(m, per) {
       const cls = ['vtc', c.tipo === 'trab' ? '' : 'vt-' + c.tipo, c.ajuste || c.fixoEditado ? 'aj' : ''].join(' ');
       h += `<td class="${cls}" style="${c.tipo === 'ferias' ? '' : 'background:' + VT_COR[i % 2]}" data-act="vtDia" data-id="${l.id}" data-d="${d}" title="${esc(vtCelTitulo(l, c))}">${vtCelTxt(c)}</td>`;
     });
-    h += `<td class="vtt">${m.porDia[k - 1] ? brl(m.porDia[k - 1]) : ''}</td></tr>`;
+    h += `</tr>`;
     if (per === 'mes' && k === 15) h += sub('q1', '1ª QUINZ.');
   }
   if (per === 'mes') h += sub('q2', '2ª QUINZ.');
   const totP = L.reduce((a, l) => a + vtTot(l, per).valor, 0), pagoP = L.reduce((a, l) => a + vtPago(l, per), 0);
   h += `</tbody><tfoot>
-  <tr class="vtv"><td class="fnm">VALOR</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-'}</td>`).join('')}<td class="vtt big2">${brl(totP)}</td></tr>
-  <tr><td class="fnm">DIAS</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${vtTot(l, per).dias}</td>`).join('')}<td class="vtt">${L.reduce((a, l) => a + vtTot(l, per).dias, 0)}</td></tr>
-  <tr><td class="fnm">PAGO</td>${L.map((l, i) => { const p = vtPago(l, per); const pg = (vtDoc(m.mes).pagamentos || {})[l.id] || {}; const info = ['q1', 'q2'].filter(q => (per === 'mes' || per === q) && pg[q]).map(q => VT_PER[q] + ': ' + rs(pg[q].valor) + (pg[q].data ? ' em ' + C.dataBR(pg[q].data) : '') + (pg[q].forma ? ' (' + pg[q].forma + ')' : '')).join(' · '); return `<td style="background:${VT_COR[i % 2]}" class="edit-click" data-act="vtPag" data-id="${l.id}" title="${esc(info || 'Registrar pagamento de ' + l.nome)}">${p ? brl(p) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="vtt">${brl(pagoP)}</td></tr>
-  <tr class="vtsaldo"><td class="fnm">SALDO</td>${L.map((l, i) => { const s = Math.round((vtTot(l, per).valor - vtPago(l, per)) * 100) / 100; return `<td style="background:${VT_COR[i % 2]};color:${s > 0 ? '#C00000' : s < 0 ? '#1d4ed8' : '#000'}">${s ? brl(s) : '-'}</td>`; }).join('')}<td class="vtt">${brl(totP - pagoP)}</td></tr>
-  </tfoot></table></div>`;
+  <tr class="vtv"><td class="fnm">VALOR</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-'}</td>`).join('')}</tr>
+  <tr><td class="fnm">DIAS</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${vtTot(l, per).dias}</td>`).join('')}</tr>
+  <tr><td class="fnm">PAGO</td>${L.map((l, i) => { const p = vtPago(l, per); const pg = (vtDoc(m.mes).pagamentos || {})[l.id] || {}; const info = ['q1', 'q2'].filter(q => (per === 'mes' || per === q) && pg[q]).map(q => VT_PER[q] + ': ' + rs(pg[q].valor) + (pg[q].data ? ' em ' + C.dataBR(pg[q].data) : '') + (pg[q].forma ? ' (' + pg[q].forma + ')' : '')).join(' · '); return `<td style="background:${VT_COR[i % 2]}" class="edit-click" data-act="vtPag" data-id="${l.id}" title="${esc(info || 'Registrar pagamento de ' + l.nome)}">${p ? brl(p) : '<span class="muted">—</span>'}</td>`; }).join('')}</tr>
+  <tr class="vtsaldo"><td class="fnm">SALDO</td>${L.map((l, i) => { const s = Math.round((vtTot(l, per).valor - vtPago(l, per)) * 100) / 100; return `<td style="background:${VT_COR[i % 2]};color:${s > 0 ? '#C00000' : s < 0 ? '#1d4ed8' : '#000'}">${s ? brl(s) : '-'}</td>`; }).join('')}</tr>
+  </tfoot></table>
+  <div class="vtq">${(per === 'mes' ? ['q1', 'q2'] : [per]).map(q => `<div><span>TOTAL ${q === 'q1' ? '1ª' : '2ª'} QUINZENA</span><b>${rs(m.totais[q])}</b></div>`).join('')}${per === 'mes' ? `<div><span>TOTAL DO MÊS</span><b>${rs(m.totais.mes)}</b></div>` : ''}</div></div>`;
   return h;
 }
 
@@ -2463,29 +2467,28 @@ async function vtPDF(per, imprimir) {
   const verde = rgb('#C4D79B'), cor = i => rgb(VT_COR[i % 2]), preto = [0, 0, 0], branco = [255, 255, 255], azul = [31, 78, 160];
   const hc = (t, i, extra) => ({ content: t, styles: Object.assign({ fillColor: cor(i) }, extra || {}) });
   const head = [
-    [{ content: 'VALE TRANSPORTE  ' + vtTituloPer(m, per), colSpan: n + 2, styles: { fontSize: 13, fillColor: verde } }],
-    [{ content: 'DATA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }].concat(L.map((l, i) => hc(l.nome.toUpperCase(), i))).concat([{ content: 'TOTAL DO DIA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }]),
+    [{ content: 'VALE TRANSPORTE  ' + vtTituloPer(m, per), colSpan: n + 1, styles: { fontSize: 13, fillColor: verde } }],
+    [{ content: 'DATA', rowSpan: 3, styles: { fillColor: verde, valign: 'middle' } }].concat(L.map((l, i) => hc(l.nome.toUpperCase(), i))),
     L.map((l, i) => hc(nomeSetor(l.setorId).toUpperCase(), i, { textColor: azul, fontStyle: 'normal', fontSize: 5.5 })),
     L.map((l, i) => hc(vtValorTxt(m, l, per) || '-', i, { textColor: azul, fontStyle: 'normal' }))
   ];
-  const body = [], linhaSub = (q, rot) => [{ content: rot, styles: { fillColor: verde } }].concat(L.map((l, i) => hc(l[q].valor ? brl(l[q].valor) : '-', i))).concat([{ content: brl(L.reduce((a, l) => a + l[q].valor, 0)), styles: { fillColor: verde } }]);
+  const body = [], linhaSub = (q, rot) => [{ content: rot, styles: { fillColor: verde } }].concat(L.map((l, i) => hc(l[q].valor ? brl(l[q].valor) : '-', i, { fontStyle: 'bold' })));
   for (let k = ini; k <= fim; k++) {
     const d = m.dias[k - 1], fer = feriadoEm(d);
     body.push([{ content: k + ' ' + C.DIAS_CURTO[C.diaSemana(d)].toUpperCase(), styles: { halign: 'left', fillColor: fer ? rgb(COR_FERIADO) : branco } }]
-      .concat(L.map((l, i) => { const c = l.cel[k - 1]; return { content: vtCelTxt(c), styles: { fillColor: c.tipo === 'ferias' ? rgb(COR_FERIAS) : cor(i), textColor: c.tipo === 'trab' ? preto : [110, 110, 110], fontStyle: c.tipo === 'trab' ? 'normal' : 'bold' } }; }))
-      .concat([{ content: m.porDia[k - 1] ? brl(m.porDia[k - 1]) : '', styles: { fillColor: branco } }]));
+      .concat(L.map((l, i) => { const c = l.cel[k - 1]; return { content: vtCelTxt(c), styles: { fillColor: c.tipo === 'ferias' ? rgb(COR_FERIAS) : cor(i), textColor: c.tipo === 'trab' ? preto : [110, 110, 110], fontStyle: c.tipo === 'trab' ? 'normal' : 'bold' } }; })));
     if (per === 'mes' && k === 15) body.push(linhaSub('q1', '1ª QUINZ.'));
   }
   if (per === 'mes') body.push(linhaSub('q2', '2ª QUINZ.'));
   const totP = L.reduce((a, l) => a + vtTot(l, per).valor, 0), pagoP = L.reduce((a, l) => a + vtPago(l, per), 0);
   const foot = [
-    [{ content: 'VALOR', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-', i, { fontStyle: 'bold' }))).concat([{ content: brl(totP), styles: { fillColor: verde, fontStyle: 'bold', fontSize: 8 } }]),
-    [{ content: 'DIAS', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(String(vtTot(l, per).dias), i))).concat([{ content: String(L.reduce((a, l) => a + vtTot(l, per).dias, 0)), styles: { fillColor: verde } }]),
-    [{ content: 'PAGO', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtPago(l, per) ? brl(vtPago(l, per)) : '', i))).concat([{ content: brl(pagoP), styles: { fillColor: verde } }]),
-    [{ content: 'SALDO', styles: { fillColor: verde } }].concat(L.map((l, i) => { const s = vtTot(l, per).valor - vtPago(l, per); return hc(Math.abs(s) > 0.004 ? brl(s) : '-', i, { textColor: s > 0.004 ? [192, 0, 0] : preto, fontStyle: 'bold' }); })).concat([{ content: brl(totP - pagoP), styles: { fillColor: verde, fontStyle: 'bold' } }])
+    [{ content: 'VALOR', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-', i, { fontStyle: 'bold' }))),
+    [{ content: 'DIAS', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(String(vtTot(l, per).dias), i))),
+    [{ content: 'PAGO', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtPago(l, per) ? brl(vtPago(l, per)) : '', i))),
+    [{ content: 'SALDO', styles: { fillColor: verde } }].concat(L.map((l, i) => { const s = vtTot(l, per).valor - vtPago(l, per); return hc(Math.abs(s) > 0.004 ? brl(s) : '-', i, { textColor: s > 0.004 ? [192, 0, 0] : preto, fontStyle: 'bold' }); }))
   ];
-  const dataW = 15, totW = 17, colW = (W - 12 - dataW - totW) / n;
-  const colStyles = { 0: { cellWidth: dataW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: colW }; colStyles[n + 1] = { cellWidth: totW };
+  const dataW = 15, colW = (W - 12 - dataW) / n;
+  const colStyles = { 0: { cellWidth: dataW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: colW };
   const nl = fim - ini + 1 + (per === 'mes' ? 2 : 0);
   doc.autoTable({
     head, body, foot, startY: 6, theme: 'grid', margin: { left: 6, right: 6 }, showFoot: 'lastPage',
@@ -2493,9 +2496,15 @@ async function vtPDF(per, imprimir) {
     headStyles: { textColor: preto, fontStyle: 'bold', fontSize: n > 14 ? 5.8 : 6.8 }, footStyles: { textColor: preto, fontStyle: 'bold' },
     columnStyles: colStyles
   });
-  const y = doc.lastAutoTable.finalY + 4;
+  let y = doc.lastAutoTable.finalY + 3;
+  const H = doc.internal.pageSize.getHeight();
+  const caixas = (per === 'mes' ? ['q1', 'q2', 'mes'] : [per]).map(q => [q === 'mes' ? 'TOTAL DO MÊS' : 'TOTAL ' + (q === 'q1' ? '1ª' : '2ª') + ' QUINZENA', 'R$ ' + brl(m.totais[q])]);
+  if (y + 9 > H - 5) { doc.addPage(); y = 8; }
+  let x = 6; doc.setFont('helvetica', 'bold');
+  caixas.forEach(([t, v]) => { doc.setFontSize(9); const w = doc.getTextWidth(t) + 8; doc.setFontSize(11); const w2 = doc.getTextWidth(v) + 6; doc.setFillColor(...verde); doc.setDrawColor(0); doc.setLineWidth(0.4); doc.rect(x, y, w + w2, 8, 'FD'); doc.setTextColor(0); doc.setFontSize(9); doc.text(t, x + 3, y + 5.4); doc.setFontSize(11); doc.text(v, x + w + 1, y + 5.6); x += w + w2 + 4; });
+  y += 12; doc.setFont('helvetica', 'normal');
   doc.setFontSize(7); doc.setTextColor(90);
-  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AT atestado · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, doc.internal.pageSize.getHeight() - 4));
+  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AT atestado · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, H - 4));
   const blob = doc.output('blob'), nome = vtNomeArq(per, 'pdf');
   if (imprimir) { try { const u = URL.createObjectURL(blob), win = window.open(u, '_blank'); if (win) { setTimeout(() => URL.revokeObjectURL(u), 60000); return; } } catch (e) { } }
   await salvarArquivo(imprimir ? nome.replace('.pdf', '-impressao.pdf') : nome, blob);
@@ -2510,10 +2519,9 @@ async function vtExcel() {
   const colL = c => { let s = ''; while (c > 0) { const r = (c - 1) % 26; s = String.fromCharCode(65 + r) + s; c = Math.floor((c - 1) / 26); } return s; };
   const wb = new ExcelJS.Workbook(); wb.creator = S.config.nomeHotel || 'Escalas';
   const ws = wb.addWorksheet('VT ' + UI.vtMes.slice(5) + '-' + UI.vtMes.slice(0, 4), { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 1, margins: { left: 0.2, right: 0.2, top: 0.3, bottom: 0.3, header: 0.1, footer: 0.1 } }, views: [{ state: 'frozen', xSplit: 1, ySplit: 5, showGridLines: false }] });
-  const nc = n + 2, cel = (r, c, v, st) => { const x = ws.getCell(r, c); x.value = v; Object.assign(x, Object.assign({ border: borda, alignment: center, font: { name: 'Calibri', size: 10 } }, st || {})); return x; };
+  const nc = n + 1, cel = (r, c, v, st) => { const x = ws.getCell(r, c); x.value = v; Object.assign(x, Object.assign({ border: borda, alignment: center, font: { name: 'Calibri', size: 10 } }, st || {})); return x; };
   ws.mergeCells(1, 1, 1, nc); cel(1, 1, 'VALE TRANSPORTE ' + vtTituloPer(m, 'mes'), { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true, size: 16 } });
   cel(2, 1, 'DATA', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } }); ws.mergeCells(2, 1, 4, 1);
-  cel(2, nc, 'TOTAL DO DIA', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true, size: 9 }, alignment: Object.assign({ wrapText: true }, center) }); ws.mergeCells(2, nc, 4, nc);
   L.forEach((l, i) => {
     const c = i + 2, f = fill(VT_COR[i % 2]);
     cel(2, c, l.nome.toUpperCase(), { fill: f, font: { name: 'Calibri', bold: true, size: 10 }, alignment: Object.assign({ wrapText: true }, center) });
@@ -2525,30 +2533,34 @@ async function vtExcel() {
     const fer = feriadoEm(d);
     cel(r, 1, (k + 1) + ' ' + C.DIAS_CURTO[C.diaSemana(d)].toUpperCase(), { alignment: { horizontal: 'left', vertical: 'middle' }, fill: fer ? fill(COR_FERIADO) : undefined, font: { name: 'Calibri', bold: true, size: 10 } });
     L.forEach((l, i) => { const c = l.cel[k]; cel(r, i + 2, c.fixoQ || c.tipo === 'trab' ? (c.valor > 0 ? c.valor : null) : (c.cod || null), { fill: fill(c.tipo === 'ferias' ? COR_FERIAS : VT_COR[i % 2]), numFmt: moeda, font: { name: 'Calibri', size: 10, bold: c.tipo !== 'trab', color: { argb: c.tipo === 'trab' ? 'FF000000' : 'FF6E6E6E' } } }); });
-    cel(r, nc, { formula: `SUM(B${r}:${colL(nc - 1)}${r})`, result: m.porDia[k] }, { numFmt: moeda, font: { name: 'Calibri', bold: true, size: 10 } });
     if (k === 14) linhaQ.q1f = r;
     r++;
   });
   const rFim = r - 1;
   const somaLinha = (rot, a, b, q) => {
     cel(r, 1, rot, { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
-    for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `SUM(${L1}${a}:${L1}${b})`, result: l ? l[q].valor : m.totais[q] }, { numFmt: moeda, fill: c === nc ? fill('#C4D79B') : fill(VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true } }); }
+    for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `SUM(${L1}${a}:${L1}${b})`, result: l ? l[q].valor : m.totais[q] }, { numFmt: moeda, fill: fill(VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true } }); }
     return r++;
   };
   const rq1 = somaLinha('1ª QUINZENA', r0, linhaQ.q1f, 'q1'), rq2 = somaLinha('2ª QUINZENA', linhaQ.q1f + 1, rFim, 'q2');
   cel(r, 1, 'TOTAL DO MÊS', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
-  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `${L1}${rq1}+${L1}${rq2}`, result: l ? l.mes.valor : m.totais.mes }, { numFmt: moeda, fill: fill(c === nc ? '#C4D79B' : VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true, size: 11 } }); }
+  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `${L1}${rq1}+${L1}${rq2}`, result: l ? l.mes.valor : m.totais.mes }, { numFmt: moeda, fill: fill(VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true, size: 11 } }); }
   const rTot = r++;
   cel(r, 1, 'DIAS', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
-  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: c === nc ? `SUM(B${r}:${colL(nc - 1)}${r})` : `COUNT(${L1}${r0}:${L1}${rFim})`, result: l ? l.mes.dias : m.linhas.reduce((x, y) => x + y.mes.dias, 0) }, { fill: fill(c === nc ? '#C4D79B' : VT_COR[(c - 2) % 2]) }); }
+  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `COUNT(${L1}${r0}:${L1}${rFim})`, result: l ? l.mes.dias : m.linhas.reduce((x, y) => x + y.mes.dias, 0) }, { fill: fill(VT_COR[(c - 2) % 2]) }); }
   r++;
   cel(r, 1, 'PAGO', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
   L.forEach((l, i) => cel(r, i + 2, l.pago.q1 + l.pago.q2, { numFmt: moeda, fill: fill(VT_COR[i % 2]) }));
-  cel(r, nc, { formula: `SUM(B${r}:${colL(nc - 1)}${r})`, result: m.totais.pago }, { numFmt: moeda, fill: fill('#C4D79B') });
   const rPago = r++;
   cel(r, 1, 'SALDO', { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true } });
-  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `${L1}${rTot}-${L1}${rPago}`, result: l ? l.saldo.mes : m.totais.mes - m.totais.pago }, { numFmt: moeda, fill: fill(c === nc ? '#C4D79B' : VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true, color: { argb: 'FFC00000' } } }); }
-  ws.getColumn(1).width = 14; for (let c = 2; c < nc; c++) ws.getColumn(c).width = 11.5; ws.getColumn(nc).width = 12;
+  for (let c = 2; c <= nc; c++) { const L1 = colL(c), l = L[c - 2]; cel(r, c, { formula: `${L1}${rTot}-${L1}${rPago}`, result: l ? l.saldo.mes : m.totais.mes - m.totais.pago }, { numFmt: moeda, fill: fill(VT_COR[(c - 2) % 2]), font: { name: 'Calibri', bold: true, color: { argb: 'FFC00000' } } }); }
+  r += 2;
+  [['TOTAL 1ª QUINZENA', rq1, m.totais.q1], ['TOTAL 2ª QUINZENA', rq2, m.totais.q2], ['TOTAL DO MÊS', rTot, m.totais.mes]].forEach(([t, rr, v]) => {
+    ws.mergeCells(r, 1, r, 3); cel(r, 1, t, { fill: fill('#C4D79B'), font: { name: 'Calibri', bold: true, size: 12 }, alignment: { horizontal: 'left', vertical: 'middle' } });
+    ws.mergeCells(r, 4, r, 5); cel(r, 4, { formula: `SUM(B${rr}:${colL(nc)}${rr})`, result: v }, { fill: fill('#C4D79B'), numFmt: '"R$" #,##0.00', font: { name: 'Calibri', bold: true, size: 12 } });
+    r++;
+  });
+  ws.getColumn(1).width = 14; for (let c = 2; c <= nc; c++) ws.getColumn(c).width = 11.5;
   ws.getRow(2).height = 30;
   // resumo
   const rs2 = wb.addWorksheet('Resumo', { views: [{ showGridLines: false }] });
