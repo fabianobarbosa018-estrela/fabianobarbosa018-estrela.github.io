@@ -689,6 +689,7 @@
     folga: { cod: 'F', nome: 'Folga', paga: false },
     falta: { cod: 'FI', nome: 'Falta não justificada', paga: false },
     faltaJ: { cod: 'FJ', nome: 'Falta justificada', paga: false },
+    atestado: { cod: 'AT', nome: 'Atestado médico', paga: false },
     afast: { cod: 'AF', nome: 'Afastamento', paga: false },
     semvt: { cod: 'SV', nome: 'Não precisou de transporte', paga: false }
   };
@@ -721,10 +722,13 @@
       });
       // valor fixo por quinzena: lançado no último dia da quinzena (dia 15 e último dia do mês), se trabalhou ao menos 1 dia nela
       [[1, 15, 'q1'], [16, dim, 'q2']].forEach(function (q) {
-        var vq = vtValorEm(f, dias[q[1] - 1]); if (!vq || !vq.fixo || !(vq[q[2]] > 0)) return;
+        var vq = vtValorEm(f, dias[q[1] - 1]); if (!vq || !vq.fixo) return;
+        var ov = doc.fixos && doc.fixos[f.id] ? doc.fixos[f.id][q[2]] : null, editado = ov != null && ov !== '';
         var trabalhou = cel.some(function (c, i) { return i + 1 >= q[0] && i + 1 <= q[1] && c.tipo === 'trab'; });
-        if (!trabalhou) return;
-        var c = cel[q[1] - 1]; c.fixoQ = vq[q[2]]; c.valor = r2(c.valor + vq[q[2]]);
+        var val = editado ? +ov || 0 : (trabalhou ? vq[q[2]] : 0);
+        var c = cel[q[1] - 1]; c.fixoPadrao = vq[q[2]]; c.fixoEditado = editado;
+        if (!(val > 0)) { if (editado) c.fixoZerado = true; return; }
+        c.fixoQ = val; c.valor = r2(c.valor + val);
       });
       var conta = function (c) { return c.tipo === 'trab' || c.fixoQ; };
       var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate) { if (c.tipo === 'trab' && (c.valor > 0 || c.fixoDia)) n++; if (conta(c)) v += c.valor; } }); return { dias: n, valor: r2(v) }; };

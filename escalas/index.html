@@ -930,6 +930,7 @@ table.folha.vt .edit-click{cursor:pointer}
     folga: { cod: 'F', nome: 'Folga', paga: false },
     falta: { cod: 'FI', nome: 'Falta não justificada', paga: false },
     faltaJ: { cod: 'FJ', nome: 'Falta justificada', paga: false },
+    atestado: { cod: 'AT', nome: 'Atestado médico', paga: false },
     afast: { cod: 'AF', nome: 'Afastamento', paga: false },
     semvt: { cod: 'SV', nome: 'Não precisou de transporte', paga: false }
   };
@@ -962,10 +963,13 @@ table.folha.vt .edit-click{cursor:pointer}
       });
       // valor fixo por quinzena: lançado no último dia da quinzena (dia 15 e último dia do mês), se trabalhou ao menos 1 dia nela
       [[1, 15, 'q1'], [16, dim, 'q2']].forEach(function (q) {
-        var vq = vtValorEm(f, dias[q[1] - 1]); if (!vq || !vq.fixo || !(vq[q[2]] > 0)) return;
+        var vq = vtValorEm(f, dias[q[1] - 1]); if (!vq || !vq.fixo) return;
+        var ov = doc.fixos && doc.fixos[f.id] ? doc.fixos[f.id][q[2]] : null, editado = ov != null && ov !== '';
         var trabalhou = cel.some(function (c, i) { return i + 1 >= q[0] && i + 1 <= q[1] && c.tipo === 'trab'; });
-        if (!trabalhou) return;
-        var c = cel[q[1] - 1]; c.fixoQ = vq[q[2]]; c.valor = r2(c.valor + vq[q[2]]);
+        var val = editado ? +ov || 0 : (trabalhou ? vq[q[2]] : 0);
+        var c = cel[q[1] - 1]; c.fixoPadrao = vq[q[2]]; c.fixoEditado = editado;
+        if (!(val > 0)) { if (editado) c.fixoZerado = true; return; }
+        c.fixoQ = val; c.valor = r2(c.valor + val);
       });
       var conta = function (c) { return c.tipo === 'trab' || c.fixoQ; };
       var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate) { if (c.tipo === 'trab' && (c.valor > 0 || c.fixoDia)) n++; if (conta(c)) v += c.valor; } }); return { dias: n, valor: r2(v) }; };
@@ -2184,6 +2188,7 @@ const vtCelTitulo = (l, c) => {
   const base = { trab: 'trabalho', folga: 'folga', ferias: 'férias', semEscala: 'semana sem escala gerada', fora: 'fora do período de trabalho' }[c.base];
   let t = l.nome + ' — ' + C.dataBR(c.d) + ': ' + (c.ajuste ? C.VT_TIPOS[c.ajuste.t].nome + ' (ajuste manual; pela escala: ' + base + ')' : 'pela escala: ' + base);
   if (c.ajuste && c.ajuste.obs) t += ' — ' + c.ajuste.obs;
+  if (c.fixoEditado) t += ' — VT fixo da quinzena alterado à mão: ' + rs(c.fixoQ || 0) + ' (normal ' + rs(c.fixoPadrao) + ')';
   return t;
 };
 /** diferenças entre o fechamento guardado e o cálculo atual */
@@ -2223,7 +2228,7 @@ function vVT() {
   if (!m.linhas.length && UI.vtTab !== 'cadastro') return h + `<div class="card empty"><b>Ninguém com vale-transporte neste mês</b>Cadastre o valor da passagem de cada funcionário na aba <a href="#" data-act="vtTab" data-t="cadastro">Valores por funcionário</a>.</div>`;
   if (UI.vtTab === 'resumo') return h + vtResumoHTML(m);
   if (UI.vtTab === 'cadastro') return h + vtCadastroHTML(m);
-  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AF</b> afastamento</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><b>•</b> dia trabalhado de quem tem VT fixo por quinzena</span><span><i style="background:#fff;border-color:#e9a23b;border-width:2px"></i>dia ajustado à mão</span></div>
+  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AT</b> atestado</span><span><b>AF</b> afastamento</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><b>•</b> dia trabalhado de quem tem VT fixo por quinzena</span><span><i style="background:#fff;border-color:#e9a23b;border-width:2px"></i>dia ajustado à mão</span></div>
   <p class="small muted edit-only">Toque em um dia para corrigir (falta, afastamento, não precisou de transporte, valor diferente). Toque em <b>PAGO</b> para registrar o pagamento.</p>`;
 }
 
@@ -2243,7 +2248,7 @@ function vtTabelaHTML(m, per) {
     h += `<tr><td class="fnm" ${fer ? `style="background:${COR_FERIADO}" title="Feriado: ${esc(fer.nome)}"` : ''}>${k} ${C.DIAS_CURTO[C.diaSemana(d)].toUpperCase()}</td>`;
     L.forEach((l, i) => {
       const c = l.cel[k - 1];
-      const cls = ['vtc', c.tipo === 'trab' ? '' : 'vt-' + c.tipo, c.ajuste ? 'aj' : ''].join(' ');
+      const cls = ['vtc', c.tipo === 'trab' ? '' : 'vt-' + c.tipo, c.ajuste || c.fixoEditado ? 'aj' : ''].join(' ');
       h += `<td class="${cls}" style="${c.tipo === 'ferias' ? '' : 'background:' + VT_COR[i % 2]}" data-act="vtDia" data-id="${l.id}" data-d="${d}" title="${esc(vtCelTitulo(l, c))}">${vtCelTxt(c)}</td>`;
     });
     h += `<td class="vtt">${m.porDia[k - 1] ? brl(m.porDia[k - 1]) : ''}</td></tr>`;
@@ -2314,6 +2319,8 @@ async function vtSalvarDoc(ym, mut, texto) {
 function vtEditarDia(fid, d) {
   const ym = d.slice(0, 7), m = vtModelo(ym), l = m.linhas.find(x => x.id === fid); if (!l) return;
   const c = l.cel[+d.slice(8) - 1], a = c.ajuste || {};
+  const qd = +d.slice(8) <= 15 ? 'q1' : 'q2', cf = l.cel[(qd === 'q1' ? 15 : m.dim) - 1];
+  const fx = l.fixo ? { padrao: cf.fixoPadrao || 0, editado: !!cf.fixoEditado, atual: cf.fixoQ || 0 } : null;
   const base = { trab: 'Trabalho', folga: 'Folga', ferias: 'Férias', semEscala: 'Semana sem escala', fora: 'Fora do período' }[c.base];
   const w = abrirModal(`<div class="mh">${esc(l.nome)} — ${C.DIAS[C.diaSemana(d)].toLowerCase()}, ${C.dataBR(d)}</div><div class="mbd">
   <p>Pela escala: <b>${base}</b> · valor diário ${rs(l.valorDia)}</p>
@@ -2321,6 +2328,8 @@ function vtEditarDia(fid, d) {
   <div class="fld" id="vtVBox"><label class="f">Valor do VT neste dia <span class="muted small">(em branco = valor diário normal)</span></label><input type="text" inputmode="decimal" id="vtV" value="${a.v != null && a.v !== '' ? brl(a.v) : ''}" placeholder="${brl(l.valorDia)}"></div>
   <div class="fld"><label class="f">Aplicar até o dia <span class="muted small">(para afastamentos de vários dias)</span></label><input type="date" id="vtAte" value="${d}" min="${d}" max="${m.dias[m.dim - 1]}"></div>
   <div class="fld"><label class="f">Observação</label><input type="text" id="vtObs" value="${esc(a.obs || '')}" maxlength="200" style="width:100%"></div>
+  ${fx ? `<div class="fld" style="border-top:1px dashed var(--line);padding-top:10px"><label class="f">VT fixo da ${VT_PER[qd]} <span class="muted small">(normal ${rs(fx.padrao)}; em branco = valor normal)</span></label><input type="text" inputmode="decimal" id="vtFx" value="${fx.editado ? brl(fx.atual) : ''}" placeholder="${brl(fx.padrao)}">
+  <div class="small muted" style="margin-top:4px">Use para descontar faltas ou atestados da quinzena. Ex.: digite 80,00 para pagar R$ 80,00 em vez de ${rs(fx.padrao)}.</div></div>` : ''}
   </div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
   const vb = w.querySelector('#vtVBox'), sel = w.querySelector('#vtT');
   const upd = () => { vb.style.display = sel.value === 'trab' ? '' : 'none'; }; upd(); sel.onchange = upd;
@@ -2331,12 +2340,18 @@ function vtEditarDia(fid, d) {
     if (t === 'trab' && vs.trim()) { v = numBR(vs); if (!(v >= 0)) return toast('Valor inválido.'); }
     if (ate < d || ate.slice(0, 7) !== ym) return toast('O "até o dia" precisa ser no mesmo mês, a partir de ' + C.dataBR(d) + '.');
     const dias = m.dias.filter(x => x >= d && x <= ate);
-    const txt = l.nome + ', ' + (dias.length > 1 ? C.dataBR(d).slice(0, 5) + ' a ' + C.dataBR(ate).slice(0, 5) : C.dataBR(d).slice(0, 5)) + ': ' + (t ? C.VT_TIPOS[t].nome + (v != null ? ' (' + rs(v) + ')' : '') : 'voltou a seguir a escala') + (obs ? ' — ' + obs : '');
+    let fxNovo; // undefined = sem mudança; null = voltar ao normal
+    if (fx) { const s = w.querySelector('#vtFx').value.trim(); if (s) { fxNovo = numBR(s); if (!(fxNovo >= 0)) return toast('VT fixo inválido.'); fxNovo = Math.round(fxNovo * 100) / 100; } else fxNovo = null; if ((fxNovo === null && !fx.editado) || (fxNovo !== null && fx.editado && fxNovo === fx.atual)) fxNovo = undefined; }
+    const mudouDia = (t || '') !== (a.t || '') || (t === 'trab' && (v ?? null) !== (a.v ?? null)) || obs !== (a.obs || '') || dias.length > 1;
+    if (!mudouDia && fxNovo === undefined) { fecharModal(w); return; }
+    const txtFx = fxNovo === undefined ? '' : l.nome + ': VT fixo da ' + VT_PER[qd] + (fxNovo === null ? ' voltou ao normal (' + rs(fx.padrao) + ')' : ' alterado para ' + rs(fxNovo) + ' (normal ' + rs(fx.padrao) + ')') + (obs ? ' — ' + obs : '');
+    const txt = !mudouDia ? txtFx : l.nome + ', ' + (dias.length > 1 ? C.dataBR(d).slice(0, 5) + ' a ' + C.dataBR(ate).slice(0, 5) : C.dataBR(d).slice(0, 5)) + ': ' + (t ? C.VT_TIPOS[t].nome + (v != null ? ' (' + rs(v) + ')' : '') : 'voltou a seguir a escala') + (obs ? ' — ' + obs : '');
     const ok = await vtSalvarDoc(ym, doc => {
       doc.ajustes = doc.ajustes || {}; const aj = doc.ajustes[fid] = doc.ajustes[fid] || {};
-      dias.forEach(x => { if (t) aj[x] = Object.assign({ t, obs, em: agoraISO() }, v != null ? { v } : {}); else delete aj[x]; });
+      if (mudouDia) dias.forEach(x => { if (t) aj[x] = Object.assign({ t, obs, em: agoraISO() }, v != null ? { v } : {}); else delete aj[x]; });
       if (!Object.keys(aj).length) delete doc.ajustes[fid];
-    }, txt);
+      if (fxNovo !== undefined) { doc.fixos = doc.fixos || {}; const o = doc.fixos[fid] = Object.assign({}, doc.fixos[fid]); if (fxNovo === null) delete o[qd]; else o[qd] = fxNovo; if (!Object.keys(o).length) delete doc.fixos[fid]; }
+    }, txt + (mudouDia && txtFx ? '; ' + txtFx : ''));
     if (ok) { fecharModal(w); toast('Ajuste salvo.'); }
   };
 }
@@ -2480,7 +2495,7 @@ async function vtPDF(per, imprimir) {
   });
   const y = doc.lastAutoTable.finalY + 4;
   doc.setFontSize(7); doc.setTextColor(90);
-  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, doc.internal.pageSize.getHeight() - 4));
+  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AT atestado · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, doc.internal.pageSize.getHeight() - 4));
   const blob = doc.output('blob'), nome = vtNomeArq(per, 'pdf');
   if (imprimir) { try { const u = URL.createObjectURL(blob), win = window.open(u, '_blank'); if (win) { setTimeout(() => URL.revokeObjectURL(u), 60000); return; } } catch (e) { } }
   await salvarArquivo(imprimir ? nome.replace('.pdf', '-impressao.pdf') : nome, blob);
