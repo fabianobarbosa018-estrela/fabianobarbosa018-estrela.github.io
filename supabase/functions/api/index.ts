@@ -9,7 +9,9 @@ const BUCKET = "sala-digital";
 const S = criarServidor({
   carregar: async () => { const { data, error } = await sb.rpc("sd_carregar"); if (error) throw new Error(error.message); return data; },
   aplicar: async (ops: unknown) => { const { error } = await sb.rpc("sd_aplicar", { ops }); if (error) throw new Error(error.message); },
-  rpc: async (f: string) => { const { error } = await sb.rpc(f); if (error) throw new Error(error.message); },
+  rpc: async (f: string, args: Record<string, unknown>) => { const { error } = await sb.rpc(f, args || {}); if (error) throw new Error(error.message); },
+  fetch: (u: string, o: RequestInit) => fetch(u, { ...o, signal: AbortSignal.timeout(140000) }),
+  chaveIA: Deno.env.get("ANTHROPIC_API_KEY") || "",
   enviar: async (u: { caminho: string; mime: string; b64: string }) => {
     const { error } = await sb.storage.from(BUCKET).upload(u.caminho, Buffer.from(u.b64, "base64"), { contentType: u.mime, upsert: false });
     if (error) throw new Error(error.message);

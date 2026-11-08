@@ -223,7 +223,7 @@ r = (await api(tkAd, 'atividadeObter', { id: r.d.id })); t('lê atividade grande
 // fórmula maliciosa vira texto
 r = (await api(tkAd, 'turmaSalvar', { nome: '=IMPORTXML("http://x")' })); t('texto com = salvo como texto', r.ok && (await api(tkAd, 'turmas')).d.some(x => x.nome.startsWith('=IMPORTXML')));
 
-t('banco sem acesso pela chave pública (RLS)', (await E.q("select count(*)::int n from pg_tables where tablename like 'sd_%' and rowsecurity"))[0].n === 10);
+t('banco sem acesso pela chave pública (RLS)', (await E.q("select count(*)::int n from pg_tables where tablename like 'sd_%' and rowsecurity"))[0].n === 11);
 
 t('sem erros internos', E.erros.length === 0, E.erros);
 console.log(`\nBACK-END: ${ok} testes OK, ${falhas} falha(s)`);

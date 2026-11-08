@@ -195,5 +195,8 @@ assert 'Utilities.base64Encode(Utilities.computeDigest(' in src
 src = src.replace("Utilities.getUuid()", "Utilities.getUuid()")
 for proib in ['SpreadsheetApp', 'DriveApp', 'MailApp', 'LockService', 'ScriptApp', 'HtmlService', 'Session.']:
     if proib in src: print('ATENÇÃO resta', proib, [m.start() for m in re.finditer(re.escape(proib), src)][:3])
-open('/home/claude/supa/server/core.js', 'w').write(wrapper.replace('/*CODIGO*/', src))
+ia = open('/home/claude/supa/server/ia_rotas.js').read()
+ia = "TAB.IaUso = ['mes', 'modo', 'chamadas', 'usd'];\n" + ia
+wrapper = wrapper.replace("    instalar(dados) {", "    limparIA(saida, meta) { return iaLimparQuestoes_(saida, meta); },\n    instalar(dados) {")
+open('/home/claude/supa/server/core.js', 'w').write(wrapper.replace('/*CODIGO*/', src + '\n' + ia))
 print('core.js', len(src))

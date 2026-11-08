@@ -13,6 +13,7 @@ create table if not exists sd_config     (id text primary key, data jsonb not nu
 create table if not exists sd_arquivos   (id text primary key, data jsonb not null, atualizado timestamptz not null default now());
 create table if not exists sd_log        (id text primary key, data jsonb not null, atualizado timestamptz not null default now());
 create table if not exists sd_kv         (k text primary key, v text not null, expira timestamptz);
+create table if not exists sd_ia_uso     (mes text not null, modo text not null, chamadas int not null default 0, usd numeric not null default 0, tin bigint not null default 0, tout bigint not null default 0, primary key (mes, modo));
 create table if not exists sd_backups    (id bigserial primary key, criado timestamptz not null default now(), dados jsonb not null);
 
 -- integridade
@@ -40,6 +41,7 @@ create or replace function sd_carregar() returns jsonb language sql security def
     'Config',     coalesce((select jsonb_agg(data) from sd_config), '[]'),
     'Arquivos',   coalesce((select jsonb_agg(data) from sd_arquivos), '[]'),
     'Log',        coalesce((select jsonb_agg(data order by (data->>'data')::bigint) from (select data from sd_log order by (data->>'data')::bigint desc limit 200) x), '[]'),
+    'IaUso',      coalesce((select jsonb_agg(jsonb_build_object('mes', mes, 'modo', modo, 'chamadas', chamadas, 'usd', usd)) from sd_ia_uso), '[]'),
     'kv',         coalesce((select jsonb_object_agg(k, v) from sd_kv where expira is null or expira > now()), '{}'),
     'kvExp',      coalesce((select jsonb_object_agg(k, (extract(epoch from expira) * 1000)::bigint) from sd_kv where expira > now()), '{}')
   );
@@ -91,3 +93,13 @@ grant select, insert, update, delete on sd_usuarios, sd_turmas, sd_matriculas, s
 grant usage, select on sequence sd_backups_id_seq to service_role;
 grant execute on function sd_carregar(), sd_aplicar(jsonb), sd_backup() to service_role;
 revoke all on sd_usuarios, sd_turmas, sd_matriculas, sd_atividades, sd_entregas, sd_config, sd_arquivos, sd_log, sd_kv, sd_backups from anon, authenticated;
+
+alter table sd_ia_uso enable row level security;
+create or replace function sd_ia_registrar(p_mes text, p_modo text, p_usd numeric, p_in bigint, p_out bigint) returns void language sql security definer set search_path = public as $$
+  insert into sd_ia_uso(mes, modo, chamadas, usd, tin, tout) values (p_mes, p_modo, 1, p_usd, p_in, p_out)
+  on conflict (mes, modo) do update set chamadas = sd_ia_uso.chamadas + 1, usd = sd_ia_uso.usd + excluded.usd, tin = sd_ia_uso.tin + excluded.tin, tout = sd_ia_uso.tout + excluded.tout;
+$$;
+revoke all on function sd_ia_registrar(text, text, numeric, bigint, bigint) from public, anon, authenticated;
+grant execute on function sd_ia_registrar(text, text, numeric, bigint, bigint) to service_role;
+grant select, insert, update on sd_ia_uso to service_role;
+revoke all on sd_ia_uso from anon, authenticated;
