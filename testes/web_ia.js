@@ -3,6 +3,7 @@ MENUS.professor.splice(3,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(4,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(MENUS.admin.length-1,0,['ad_ia','🤖','IA: uso e custos']);
 MENUS.aluno.splice(4,0,['a_tutor','🤖','Tutor IA']);
+async function iaVerificar(){try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
 function mdSimples(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^\s*[-•]\s+/gm,'• ').replace(/\n/g,'<br>')}
 function lerArquivo(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Não foi possível ler '+f.name));r.readAsDataURL(f)})}
 

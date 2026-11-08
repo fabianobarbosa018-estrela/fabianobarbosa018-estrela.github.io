@@ -19,7 +19,7 @@ function abrir() { const erros = [];
   const login = async (u, s) => { await espera(() => $('#fLogin')); set('#fLogin [name=login]', u); set('#fLogin [name=senha]', s); $('#fLogin').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await espera(() => $('#main') && !$('#main .spin')); };
   return { w, d, $, $$, txt, click, set, espera, login, erros }; }
 // professor
-const P = abrir(); await P.login('professor', 'Prof@2026');
+const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() => P.$('#nav [data-go="p_ia"]'));
 t('menu do professor tem "Gerar com IA"', !!P.$('#nav [data-go="p_ia"]'));
 P.click('#nav [data-go="p_ia"]'); await P.espera(() => P.$('[data-a="iaGerar"]'));
 t('tela do gerador com foto, galeria e PDF', P.$$('[data-iaf]').length === 3 && /Usos hoje/.test(P.txt('#main')));
@@ -40,11 +40,11 @@ P.click(P.$$('#edw [data-turma]')[0]); P.$$('#edw [data-turma]')[0].checked = tr
 P.click('#edw [data-a="edSalvar"][data-s="publicada"]'); await P.espera(() => /Entregaram/.test(P.txt('#main')), 3000);
 t('publica a atividade gerada (com edição)', /Rochas \(IA\)/.test(P.txt('#main')), P.txt('#edErr'));
 // aluno
-const A = abrir(); await A.login('aluno', 'Aluno@2026');
+const A = abrir(); await A.login('aluno', 'Aluno@2026'); await A.espera(() => A.$('#nav [data-go="a_tutor"]'));
 t('menu do aluno tem "Tutor IA"', !!A.$('#nav [data-go="a_tutor"]') && !A.$('#nav [data-go="p_ia"]'));
 A.click('#nav [data-go="a_atividades"]'); await A.espera(() => /Rochas \(IA\)/.test(A.txt('#main')));
 t('aluno vê a atividade gerada', /Rochas \(IA\)/.test(A.txt('#main')));
-A.click(A.$$('#main .it').find(x => /Rochas \(IA\)/.test(x.textContent))); await A.espera(() => A.$('#main [data-go="a_tutor"]'));
+A.click(A.$$('#main .it').find(x => /Rochas \(IA\)/.test(x.textContent))); await A.espera(() => A.$('#main [data-go="a_tutor"]'), 3000);
 t('atividade tem botão do tutor', !!A.$('#main [data-go="a_tutor"]'));
 A.click('#main [data-go="a_tutor"]'); await A.espera(() => A.$('#tutTxt'));
 t('tutor abre já na atividade', A.$('#tutAtiv').selectedOptions[0].textContent.includes('Rochas'));
@@ -57,5 +57,14 @@ D.set('#fTs [name=atual]', 'Admin@2026'); D.set('#fTs [name=nova]', 'Adm#2026x')
 await D.espera(() => D.$('#nav [data-go="ad_ia"]'));
 D.click('#nav [data-go="ad_ia"]'); await D.espera(() => /Custo no mês/.test(D.txt('#main')));
 t('admin vê uso e custos da IA', /Custo no mês/.test(D.txt('#main')) && /Gerador: 1/.test(D.txt('#main')) && /Tutor: 1/.test(D.txt('#main')), D.txt('#main').slice(0, 300));
-const todos = [P, A, D].flatMap(b => b.erros); t('sem erros de JavaScript', !todos.length, todos.join(' | '));
+// IA desligada: botões somem
+const tkD = D.w.localStorage.getItem('sd_token'); await E.api(tkD, 'iaConfigSalvar', { iaAtiva: false, iaLimiteProfDia: 20, iaLimiteAlunoDia: 40 });
+const A2 = abrir(); await A2.login('aluno', 'Aluno@2026'); await sleep(200);
+t('IA desligada: aluno não vê Tutor', !A2.$('#nav [data-go="a_tutor"]'));
+A2.click('#nav [data-go="a_atividades"]'); await A2.espera(() => A2.$('#main .it')); A2.click(A2.$$('#main .it')[0]); await A2.espera(() => A2.$('.savebar'));
+t('IA desligada: sem botão do tutor na atividade', !A2.$('#main [data-go="a_tutor"]'));
+const P2 = abrir(); await P2.login('professor', 'Prof@2026'); await sleep(200);
+t('IA desligada: professor não vê Gerar com IA', !P2.$('#nav [data-go="p_ia"]'));
+t('IA desligada: admin ainda vê a tela para religar', !!D.$('#nav [data-go="ad_ia"]'));
+const todos = [P, A, D, A2, P2].flatMap(b => b.erros); t('sem erros de JavaScript', !todos.length, todos.join(' | '));
 console.log(`\nIA (telas): ${ok} testes OK, ${falhas} falha(s)`); process.exit(0);

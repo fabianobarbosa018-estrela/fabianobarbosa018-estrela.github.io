@@ -244,7 +244,7 @@ const MENU_DE={a_fazer:'a_atividades',p_turma:'p_turmas',p_editor:'p_atividades'
 function go(v,p){S.view=v;S.p=p||{};render();try{window.scrollTo(0,0)}catch(e){}}
 let rid=0;
 function shell(){
-  const u=S.u;const menu=MENUS[u.perfil]||[];const ativo=MENU_DE[S.view]||S.view;
+  const u=S.u;const menu=(MENUS[u.perfil]||[]).filter(([k])=>S.iaAtiva||['p_ia','a_tutor'].indexOf(k)<0);const ativo=MENU_DE[S.view]||S.view;
   if(!$('#app')){
     $('#root').innerHTML=`<div id="app"><header class="top"><div class="top-in"><div class="logo"><div class="mk">🎓</div><div><b id="pnome"></b></div></div><div class="who" id="who"></div></div></header><div class="shell"><nav class="nav" id="nav"></nav><main id="main"></main></div></div>`;
   }
@@ -330,7 +330,7 @@ ACOES.privacidade=()=>modal(`<div class="hd"><h2>Privacidade e proteção de dad
 <p><b>Menores de idade:</b> o cadastro de alunos menores de 18 anos exige dados e concordância do responsável, ou cadastro feito pelo professor com autorização da escola/responsável.</p>
 <p><b>Seus direitos (LGPD):</b> você pode consultar e corrigir seus dados no Perfil e pedir a exclusão da conta. Alunos podem excluir a própria conta em Perfil; os dados e fotos são apagados.</p>
 <p>Dados não são vendidos nem compartilhados com terceiros.</p></div><button class="btn pri full" data-a="fechar">Entendi</button>`);
-function entrou(r){S.token=r.token;LS.set('sd_token',r.token);S.u=r.usuario;S.view='';S.badge={};$('#root').innerHTML='';
+function entrou(r){S.iaAtiva=false;setTimeout(iaVerificar,50);S.token=r.token;LS.set('sd_token',r.token);S.u=r.usuario;S.view='';S.badge={};$('#root').innerHTML='';
   api('eu').then(x=>{S.cfg=x.cfg}).catch(()=>{});render()}
 ACOES.sair=async()=>{try{await api('sair')}catch(e){}sairLocal()};
 
@@ -430,7 +430,7 @@ VIEWS.a_fazer=async function(p){
   else if(!r.podeEnviar)h+=`<div class="note">O prazo desta atividade terminou e ela não aceita entregas atrasadas.</div>`;
   else if(r.situacao==='atrasada')h+=`<div class="note">O prazo terminou, mas o professor aceita entrega atrasada.</div>`;
   if(a.instrucoes)h+=`<div class="apoio">${linkify(a.instrucoes)}</div>`;
-  h+=`<button class="btn sm" style="margin-bottom:12px" data-go="a_tutor" data-p="${P({atividade:a.id})}">🤖 Pedir ajuda ao Tutor IA</button>`;
+  if(S.iaAtiva)h+=`<button class="btn sm" style="margin-bottom:12px" data-go="a_tutor" data-p="${P({atividade:a.id})}">🤖 Pedir ajuda ao Tutor IA</button>`;
   a.questoes.forEach((q,i)=>h+=htmlQuestaoAluno(q,i,lib?e:null,enviado||!r.podeEnviar));
   if(!enviado&&r.podeEnviar)h+=`<div class="savebar"><span class="st" id="svst">${PL.salvoEm?'Rascunho salvo às '+new Date(PL.salvoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'Suas respostas são salvas automaticamente'}</span><button class="btn" data-a="salvarAgora">Salvar</button><button class="btn pri" data-a="enviarAtiv">Enviar ✓</button></div>`;
   return {html:h,depois:()=>{bindPlayer()}};
@@ -769,6 +769,7 @@ MENUS.professor.splice(3,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(4,0,['p_ia','✨','Gerar com IA']);
 MENUS.admin.splice(MENUS.admin.length-1,0,['ad_ia','🤖','IA: uso e custos']);
 MENUS.aluno.splice(4,0,['a_tutor','🤖','Tutor IA']);
+async function iaVerificar(){try{const r=await api('iaStatus');const antes=S.iaAtiva;S.iaAtiva=!!r.ativa;if(antes!==S.iaAtiva&&$('#nav'))shell()}catch(e){}}
 function mdSimples(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^\s*[-•]\s+/gm,'• ').replace(/\n/g,'<br>')}
 function lerArquivo(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Não foi possível ler '+f.name));r.readAsDataURL(f)})}
 
@@ -885,7 +886,7 @@ VIEWS.ad_ia=async function(){
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
 (async function iniciar(){
   try{S.info=await api('info');document.title=S.info.nome}catch(e){}
-  if(S.token){try{const r=await api('eu');S.u=r.usuario;S.cfg=r.cfg}catch(e){S.token=null;LS.del('sd_token')}}
+  if(S.token){try{const r=await api('eu');S.u=r.usuario;S.cfg=r.cfg;iaVerificar()}catch(e){S.token=null;LS.del('sd_token')}}
   render();
 })();
 </script>
