@@ -1,0 +1,21 @@
+// testes da correção automática das discursivas (palavras-chave)
+import fs from 'node:fs'; import vm from 'node:vm';
+const src = fs.readFileSync(new URL('../server/desafio_rotas.js', import.meta.url), 'utf8');
+const ini = src.indexOf('const DISC_STOP'); const fim = src.indexOf('// dá nota às discursivas');
+const ctx = {}; vm.createContext(ctx); vm.runInContext(src.slice(ini, fim) + ';this.f=notaDiscAuto_;', ctx);
+let ok = 0, falhas = 0; const t = (n, c, x) => { if (c) ok++; else { falhas++; console.log('❌ ' + n, JSON.stringify(x)); } };
+const fab = 'A formiga e o gafanhoto. Durante todo o verão, a formiga trabalhou carregando grãos. O gafanhoto passava os dias cantando. No inverno, com fome, bateu à porta da formiga, que ofereceu comida e um conselho.';
+const q = { tipo: 'disc', pontos: 2, enunciado: 'Você concorda com a atitude da formiga no final? Explique.', textoApoio: fab, explicacao: 'Resposta pessoal, com justificativa. Ex.: sim, porque ela ajudou e ensinou a importância de se planejar.' };
+let r = ctx.f(q, '', false); t('em branco = 0', r.p === 0, r);
+r = ctx.f(q, '', true); t('só foto = metade provisória', r.p === 1, r);
+r = ctx.f(q, 'não sei', false); t('"não sei" = 0', r.p === 0, r);
+r = ctx.f(q, 'sim', false); t('"sim" = 0', r.p === 0, r);
+r = ctx.f(q, 'Sim, porque ela ajudou o gafanhoto que estava com fome e deu um conselho', false); t('boa resposta = nota cheia', r.p === 2, r);
+r = ctx.f(q, 'acho que sim ela foi boa', false); t('resposta vaga = parcial', r.p > 0 && r.p < 2, r);
+const q2 = { tipo: 'disc', pontos: 2, enunciado: 'Explique o que é fotossíntese.', textoApoio: '', explicacao: 'É o processo em que as plantas usam a luz do Sol, a água e o gás carbônico para produzir seu alimento e liberar oxigênio.' };
+r = ctx.f(q2, 'As plantas usam a luz do sol e a água para fazer o próprio alimento', false); t('conteúdo certo = cheia', r.p === 2, r);
+r = ctx.f(q2, 'Explique o que é fotossíntese fotossíntese é', false); t('copiar o enunciado não dá nota cheia', r.p < 2, r);
+r = ctx.f(q2, 'é uma coisa que acontece na natureza todo dia', false); t('sem relação = parcial baixa', r.p <= 1, r);
+r = ctx.f({ ...q2, pontos: 1 }, 'As plantas usam luz e água para fazer alimento', false); t('nota em múltiplos de 0,5', r.p === 1, r);
+r = ctx.f(q2, 'plantas luz alimento', false); t('três palavras soltas = parcial', r.p > 0 && r.p < 2, r);
+console.log('Correção automática: ' + ok + ' ok, ' + falhas + ' falhas'); if (falhas) process.exit(1);
