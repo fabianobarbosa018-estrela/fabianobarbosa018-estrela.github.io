@@ -296,7 +296,7 @@ function notaMax_(a) { return (a.questoes || []).reduce((s, q) => s + (Number(q.
 function entregaDe_(aId, alunoId) { return all_('Entregas').find(e => e.atividadeId === aId && e.alunoId === alunoId) || null; }
 function situacao_(a, e, t) {
   if (a.abertura && a.abertura > t) return 'agendada';
-  if (e && (e.status === 'enviada' || e.status === 'corrigida')) return (e.status === 'corrigida' && a.notasLiberadas) ? 'corrigida' : 'enviada';
+  if (e && (e.status === 'enviada' || e.status === 'corrigida')) return (e.status === 'corrigida' && (a.notasLiberadas || a.tipo === 'desafio')) ? 'corrigida' : 'enviada';
   if (a.encerramento && a.encerramento < t) return 'atrasada';
   return 'pendente';
 }
@@ -346,7 +346,7 @@ rota_('alunoDados', ALU, false, u => {
     r.situacao = situacao_(a, e, t); r.podeEnviar = podeEnviar_(a, t);
     r.rascunho = !!(e && e.status === 'rascunho');
     r.enviadoEm = e ? e.enviadoEm : null; r.atrasada = !!(e && e.atrasada);
-    if (e && e.status === 'corrigida' && a.notasLiberadas) { r.nota = e.nota; r.comentario = e.comentario || ''; }
+    if (e && e.status === 'corrigida' && (a.notasLiberadas || a.tipo === 'desafio')) { r.nota = e.nota; r.comentario = e.comentario || ''; }
     delete r.professorId; return r;
   });
   return { turmas: turmas, atividades: ativs, agora: t };
@@ -382,7 +382,11 @@ function gabaritoLiberado_(a, e) {
 function entregaVisAluno_(a, e) {
   if (!e) return null;
   const c = limpa_(e); const lib = gabaritoLiberado_(a, e);
-  if (!lib) { delete c.nota; delete c.correcao; delete c.comentario; delete c.historico; }
+  if (!lib) {
+    // prova do dia: a nota aparece logo depois do envio; o gabarito continua esperando a liberação
+    if (a.tipo === 'desafio' && e.status === 'corrigida' && typeof desafioResultado_ === 'function') { const r = desafioResultado_(a, e); c.notaAgora = { nota: e.nota, notaMax: e.notaMax, acertos: r.acertos, erros: r.erros, objetivas: r.objetivas, discursivas: r.discursivas }; }
+    delete c.nota; delete c.correcao; delete c.comentario; delete c.historico;
+  }
   return c;
 }
 rota_('abrirAtividade', ALU, false, (u, d) => {
@@ -444,13 +448,13 @@ rota_('removerFoto', ALU, true, (u, d) => {
 rota_('enviarAtividade', ALU, true, (u, d) => {
   const a = ativAluno_(u, d.id); const e = rascunho_(u, a); const t = agora_();
   e.respostas = limpaRespostas_(a, d.respostas);
-  const pend = autoCorrige_(a, e);
-  e.status = pend ? 'enviada' : 'corrigida'; e.enviadoEm = t; e.atualizadoEm = t;
+  if (a.tipo === 'desafio' && typeof desafioCorrigir_ === 'function') desafioCorrigir_(a, e, t);   // prova do dia: nota na hora, inclusive discursivas
+  else { const pend = autoCorrige_(a, e); e.status = pend ? 'enviada' : 'corrigida'; if (!pend) e.corrigidoEm = t; }
+  e.enviadoEm = t; e.atualizadoEm = t;
   e.atrasada = !!(a.encerramento && a.encerramento < t);
-  if (!pend) e.corrigidoEm = t;
   upd_('Entregas', e); log_(u, 'entrega', a.id);
   const out = { enviadoEm: t, protocolo: e.id.toUpperCase(), atrasada: e.atrasada };
-  if (a.tipo === 'desafio' && typeof desafioResultado_ === 'function') out.resultado = desafioResultado_(a, e);
+  if (a.tipo === 'desafio' && typeof desafioResultado_ === 'function') { out.resultado = desafioResultado_(a, e); out.resultado.nota = e.nota; out.resultado.notaMax = e.notaMax; out.entregaId = e.id; }
   return out;
 });
 rota_('pedirRevisao', ALU, true, (u, d) => {
@@ -1206,17 +1210,81 @@ function desafioResultado_(a, e) {
   });
   return r;
 }
+// ---- correção automática das discursivas (nota na hora; o professor pode revisar depois) ----
+const DISC_STOP = ['para','pela','pelo','pelas','pelos','como','porque','quando','qual','quais','isso','esse','essa','este','esta','isto','mais','muito','muita','muitos','muitas','com','sem','que','uma','umas','uns','dos','das','nos','nas','seu','sua','seus','suas','ele','ela','eles','elas','tem','ter','foi','ser','sao','estao','pois','mas','tambem','sobre','entre','depois','antes','ainda','cada','todo','toda','todos','todas','onde','resposta','pessoal','explique','exemplo','justificativa','voce','porque','assim','entao','aqui','nao','sim'];
+function palavrasDisc_(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').match(/[a-z0-9]+/g) || []; }
+function notaDiscAuto_(q, r, temFoto) {
+  const max = Number(q.pontos) || 0; const w = palavrasDisc_(r); const meio = Math.round(max) / 2;
+  if (!w.length) return temFoto ? { p: meio, c: 'Resposta enviada por foto: nota automática provisória. O professor pode revisar.' } : { p: 0, c: 'Questão sem resposta.' };
+  const txt = w.join(' ');
+  if (/^(nao sei|sei la|nao lembro|nada|nao|sim|n sei)$/.test(txt)) return { p: 0, c: 'A resposta não explica a questão. Releia o enunciado e o gabarito comentado.' };
+  const uteis = w.filter(x => x.length >= 3);
+  const doEnunciado = {}; palavrasDisc_(q.enunciado).forEach(x => { doEnunciado[x.slice(0, 5)] = 1; });
+  const ref = {}; palavrasDisc_((q.explicacao || '') + ' ' + (q.textoApoio || '')).filter(x => x.length >= 4 && DISC_STOP.indexOf(x) < 0).forEach(x => { ref[x.slice(0, 5)] = 1; });
+  const toque = {}; let novo = 0;
+  uteis.filter(x => x.length >= 4 && DISC_STOP.indexOf(x) < 0 && ref[x.slice(0, 5)]).forEach(x => { const k = x.slice(0, 5); if (!toque[k]) { toque[k] = 1; if (!doEnunciado[k]) novo++; } });
+  const nt = Object.keys(toque).length; const pessoal = /resposta pessoal|resposta livre|opini/i.test(q.explicacao || '');
+  let f;
+  if (uteis.length < 3) f = 0;
+  else if (uteis.length >= 5 && ((nt >= 2 && novo >= 1) || (pessoal && nt >= 1))) f = 1;
+  else if (uteis.length >= 5 && (nt >= 1 || pessoal)) f = 0.75;
+  else f = 0.5;
+  const p = Math.round(max * f * 2) / 2;
+  const c = f === 1 ? 'Boa resposta! (correção automática)' : f === 0 ? 'Resposta muito curta ou incompleta. (correção automática)'
+    : 'Resposta parcial: compare com o gabarito comentado para completar sua explicação. (correção automática)';
+  return { p: p, c: c };
+}
+// dá nota às discursivas ainda sem nota; devolve true se alguma foi corrigida aqui
+function desafioCorrigeDisc_(a, e) {
+  const qs = a.questoes || []; const c = e.correcao || (e.correcao = { pontos: [], comentarios: [] });
+  c.pontos = c.pontos || []; c.comentarios = c.comentarios || []; let mudou = false;
+  qs.forEach((q, i) => {
+    if (q.tipo !== 'disc' || (c.pontos[i] !== null && c.pontos[i] !== undefined)) return;
+    const fotos = (e.fotos || {})[i] || (e.fotos || {})[String(i)];
+    const n = notaDiscAuto_(q, (e.respostas || [])[i], !!(fotos && (fotos.length || Object.keys(fotos).length)));
+    c.pontos[i] = n.p; if (!c.comentarios[i]) c.comentarios[i] = n.c; mudou = true;
+  });
+  if (mudou) { c.autoDisc = true; e.nota = c.pontos.reduce((s, p) => s + (Number(p) || 0), 0); e.notaMax = notaMax_(a); }
+  return mudou;
+}
+// corrige tudo (objetivas + discursivas) e marca a entrega como corrigida
+function desafioCorrigir_(a, e, t) {
+  autoCorrige_(a, e); desafioCorrigeDisc_(a, e);
+  e.status = 'corrigida'; e.corrigidoEm = t;
+}
+// nota da IA para as discursivas (aplicada pelo servidor quando há chave de IA)
+function desafioNotaIA_(x) {
+  const e = get_('Entregas', x.entregaId); if (!e) return false; const a = get_('Atividades', e.atividadeId); if (!a) return false;
+  const c = e.correcao || { pontos: [], comentarios: [] }; let mudou = false;
+  (x.notas || []).forEach(n => {
+    const q = (a.questoes || [])[n.i]; if (!q || q.tipo !== 'disc') return;
+    const max = Number(q.pontos) || 0; const p = Math.max(0, Math.min(max, Math.round(Number(n.pontos) * 2) / 2));
+    if (!isFinite(p)) return;
+    c.pontos[n.i] = p; c.comentarios[n.i] = txt_(n.comentario, 600) + ' (correção automática)'; mudou = true;
+  });
+  if (!mudou) return false;
+  c.autoDisc = true; c.ia = true; e.correcao = c; e.nota = c.pontos.reduce((s, p) => s + (Number(p) || 0), 0); upd_('Entregas', e); return true;
+}
+// pedido de correção para a IA: só das discursivas corrigidas automaticamente
+function desafioPedidoIA_(x) {
+  const e = get_('Entregas', x.entregaId); if (!e || !e.correcao || !e.correcao.autoDisc || e.correcao.ia) return null;
+  const a = get_('Atividades', e.atividadeId); if (!a || a.tipo !== 'desafio') return null;
+  const itens = []; (a.questoes || []).forEach((q, i) => { const r = String((e.respostas || [])[i] || '').trim(); if (q.tipo === 'disc' && r) itens.push({ i: i, pontos: Number(q.pontos) || 0, enunciado: q.enunciado, texto: (q.textoApoio || '').slice(0, 1500), esperado: q.explicacao || '', resposta: r.slice(0, 2000) }); });
+  if (!itens.length) return null;
+  return { entregaId: e.id, nivel: a.desafio && a.desafio.nivel, itens: itens, provedor: cfg_().iaProvedor || 'gemini' };
+}
 // tarefas periódicas: liberar gabaritos no encerramento e guardar o histórico resumido
 function desafioManutencao_() {
   const t = agora_(); let lib = 0, hist = 0, auto = 0;
   all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio).forEach(a => {
     if (!a.notasLiberadas && a.desafio.liberar !== 'manual' && a.encerramento && a.encerramento < t) { a.notasLiberadas = true; upd_('Atividades', a); lib++; }
     all_('Entregas').filter(e => e.atividadeId === a.id && e.status === 'rascunho' && t > provaFim_(a, e) + 120000).forEach(e => {
-      const pend = autoCorrige_(a, e); const fim = provaFim_(a, e);
-      e.status = pend ? 'enviada' : 'corrigida'; e.enviadoEm = Math.min(t, fim); e.atualizadoEm = t; e.atrasada = false; e.autoEnviada = true;
-      if (!pend) e.corrigidoEm = t;
+      const fim = provaFim_(a, e); desafioCorrigir_(a, e, t);
+      e.enviadoEm = Math.min(t, fim); e.atualizadoEm = t; e.atrasada = false; e.autoEnviada = true;
       upd_('Entregas', e); auto++;
     });
+    // provas enviadas com discursivas esperando correção: corrige automaticamente
+    all_('Entregas').filter(e => e.atividadeId === a.id && e.status === 'enviada').forEach(e => { desafioCorrigir_(a, e, t); e.atualizadoEm = t; upd_('Entregas', e); auto++; });
     all_('Entregas').filter(e => e.atividadeId === a.id && (e.status === 'enviada' || e.status === 'corrigida')).forEach(e => {
       const r = desafioResultado_(a, e);
       const o = { id: 'h' + e.id, alunoId: e.alunoId, professorId: a.professorId, atividadeId: a.id, dia: a.desafio.dia, nivel: a.desafio.nivel, status: e.status,
@@ -1248,8 +1316,8 @@ function desafioVisao_(a, u, t) {
   if (e && e.status === 'rascunho') { o.fim = provaFim_(a, e); if (t > o.fim + 120000) o.podeEnviar = false; }
   if (e && (e.status === 'enviada' || e.status === 'corrigida')) {
     o.enviadoEm = e.enviadoEm;
-    if (cfg_().desafioPlacar || gabaritoLiberado_(a, e)) { const r = desafioResultado_(a, e); o.acertos = r.acertos; o.erros = r.erros; o.objetivas = r.objetivas; o.discPendentes = r.discPendentes; }
-    if (gabaritoLiberado_(a, e)) { o.nota = e.nota; o.notaMax = e.notaMax; }
+    const r = desafioResultado_(a, e); o.acertos = r.acertos; o.erros = r.erros; o.objetivas = r.objetivas; o.discPendentes = r.discPendentes;
+    o.nota = e.nota; o.notaMax = e.notaMax;
   }
   return o;
 }
@@ -1357,7 +1425,9 @@ const DESAFIO_SIS = {
   manutencao: () => desafioManutencao_(),
   bancoChave: () => PROPS().getProperty('BANCO_CHAVE') || '',
   segredo: () => PROPS().getProperty('CRON_SEGREDO') || '',
-  dia: () => diaLocal_(agora_())
+  dia: () => diaLocal_(agora_()),
+  pedidoIA: x => desafioPedidoIA_(x),
+  notaIA: x => desafioNotaIA_(x)
 };
 
   function preparar(dados) {

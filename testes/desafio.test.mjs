@@ -63,14 +63,15 @@ const errosEsperados = D.questoes.filter((x, i) => x.tipo !== 'disc' && i % 5 ==
 r = await api(A, 'salvarRascunho', { id: D.id, respostas: resp.slice(0, 10) }); t('rascunho salvo', r.ok);
 r = await api(A, 'desafioHoje'); t('mostra progresso do rascunho', r.d.desafios[0].rascunho && r.d.desafios[0].respondidas === 10, r.d.desafios[0]);
 r = await api(A, 'enviarAtividade', { id: D.id, respostas: resp });
-t('envio com correção automática', r.ok && r.d.resultado && r.d.resultado.objetivas === 47 && r.d.resultado.erros === errosEsperados && r.d.resultado.acertos === 47 - errosEsperados && r.d.resultado.discPendentes === 3, r.d);
+t('envio com correção automática', r.ok && r.d.resultado && r.d.resultado.objetivas === 47 && r.d.resultado.erros === errosEsperados && r.d.resultado.acertos === 47 - errosEsperados && r.d.resultado.discPendentes === 0 && r.d.resultado.nota === 47 - errosEsperados && r.d.resultado.notaMax > 0, r.d);
 r = await api(A, 'enviarAtividade', { id: D.id, respostas: resp }); t('não envia duas vezes', !r.ok);
-r = await api(A, 'desafioHoje'); t('placar após o envio', r.d.desafios[0].acertos === 47 - errosEsperados && r.d.desafios[0].erros === errosEsperados && r.d.desafios[0].nota === undefined, r.d.desafios[0]);
+r = await api(A, 'desafioHoje'); t('placar após o envio', r.d.desafios[0].acertos === 47 - errosEsperados && r.d.desafios[0].erros === errosEsperados && r.d.desafios[0].nota === 47 - errosEsperados && r.d.desafios[0].situacao === 'corrigida', r.d.desafios[0]);
+r = await api(A, 'abrirAtividade', { id: D.id }); t('nota aparece na hora, sem gabarito', r.d.entrega.notaAgora && r.d.entrega.notaAgora.nota === 47 - errosEsperados && !r.d.entrega.correcao, r.d.entrega);
 r = await api(A, 'abrirAtividade', { id: D.id }); t('gabarito ainda oculto antes da liberação', r.d.atividade.questoes.every(x => x.correta === undefined));
 // ---- professor corrige as discursivas ----
 r = await api(P, 'atividadeEntregas', { id: D.id }); const lin = r.d.linhas[0];
-t('professor vê a entrega aguardando correção das discursivas', lin.status === 'enviada');
-r = await api(P, 'correcoesPendentes'); t('aparece em Correções', r.d.some(x => x.atividadeId === D.id));
+t('entrega já chega corrigida automaticamente', lin.status === 'corrigida', lin);
+r = await api(P, 'correcoesPendentes'); t('não fica parada em Correções', !r.d.some(x => x.atividadeId === D.id));
 const ent = (await api(P, 'entregaObter', { id: lin.entregaId })).d.entrega;
 const pts = ent.correcao.pontos.map((p, i) => D.questoes[i].tipo === 'disc' ? 2 : p);
 r = await api(P, 'entregaCorrigir', { id: lin.entregaId, pontos: pts, comentarios: [], comentario: 'Muito bem!' }); t('professor corrige', r.ok && r.d.nota === 47 - errosEsperados + 6, r);
@@ -147,6 +148,24 @@ r = JSON.parse(JSON.stringify(await E.processar({ acao: 'desafioCron', segredo: 
 t('o sistema entrega sozinho a prova quando o tempo acaba', r.ok && r.d.manutencao.autoEnviadas === 1, r.d);
 const [eAuto] = await q("select data from sd_entregas where data->>'atividadeId' = $1", [pv.id]);
 t('entrega automática corrigida com as respostas salvas', eAuto.data.autoEnviada && eAuto.data.status !== 'rascunho' && Array.isArray(eAuto.data.correcao.pontos));
+// ---- correção das discursivas pela IA (nota na hora) ----
+await q("delete from sd_atividades where data->>'tipo' = 'desafio'"); await q("delete from sd_entregas");
+await api(P, 'desafioConfigSalvar', { meu: { ativo: true, abertura: '00:00', encerramento: '23:59', diasPrazo: 0, liberar: 'encerramento', duracaoMin: 0, diasSemana: [0, 1, 2, 3, 4, 5, 6] } });
+r = await api(B, 'desafioHoje'); const pvIA = r.d.desafios[0];
+const [aIA] = await q("select data from sd_atividades where id = $1", [pvIA.id]); const QIA = aIA.data.questoes;
+const discIdx = QIA.map((x, i) => x.tipo === 'disc' ? i : -1).filter(i => i >= 0);
+E.ia.resposta = (corpo, url) => /generativelanguage/.test(url) && /corrigindo respostas discursivas/.test(JSON.stringify(corpo))
+  ? { status: 200, corpo: { candidates: [{ content: { parts: [{ text: JSON.stringify({ notas: discIdx.map(i => ({ i, pontos: 1.5, comentario: 'Boa ideia, faltou um exemplo.' })).concat([{ i: 0, pontos: 99, comentario: 'tentativa de mudar objetiva' }]) }) }] } }], usageMetadata: {} } }
+  : { status: 500, corpo: {} };
+const respIA = QIA.map(x => x.tipo === 'disc' ? 'Resposta do aluno com algumas palavras explicando a questão' : x.tipo === 'mc' ? x.correta : x.correta);
+r = await api(B, 'desafioIniciar', { id: pvIA.id });
+r = await api(B, 'enviarAtividade', { id: pvIA.id, respostas: respIA });
+const objMax = QIA.filter(x => x.tipo !== 'disc').reduce((s, x) => s + (Number(x.pontos) || 0), 0);
+t('IA corrige as discursivas e a nota sai na hora', r.ok && r.d.resultado.nota === objMax + 1.5 * discIdx.length, r.d && r.d.resultado);
+const [eIA] = await q("select data from sd_entregas where data->>'atividadeId' = $1", [pvIA.id]);
+t('IA não mexe nas objetivas e deixa comentário', eIA.data.status === 'corrigida' && eIA.data.correcao.pontos[0] === Number(QIA[0].pontos) && /faltou um exemplo/.test(eIA.data.correcao.comentarios[discIdx[0]]) && eIA.data.correcao.ia, eIA.data.correcao);
+r = await api(B, 'desafioHistorico'); t('histórico mostra a nota', r.d.lista.find(x => x.id === pvIA.id).nota === objMax + 1.5 * discIdx.length);
+E.ia.resposta = () => ({ status: 200, corpo: { content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 10, output_tokens: 5 } } });
 // ---- dias da prova ----
 const hojeS = new Date(Date.now() - 3 * 3600e3).getUTCDay();
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");

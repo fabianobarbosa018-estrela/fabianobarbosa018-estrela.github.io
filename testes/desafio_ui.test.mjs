@@ -88,7 +88,7 @@ A.click('[data-a="provaFinalizar"]'); await A.espera(() => A.$('#cOk')); t('conf
 A.click('#cOk'); await A.espera(() => /Prova enviada/.test(A.txt('#sheet')), 6000);
 t('resultado na hora: acertos e erros', /acertos/.test(A.txt('#sheet')) && /erros/.test(A.txt('#sheet')), A.txt('#sheet'));
 A.click('[data-a="fecharEnvio"]'); await A.espera(() => A.$('.pv-res'));
-t('prova entregue: gabarito só depois do encerramento', /PROVA ENTREGUE/.test(A.txt('.pv-res')) && /depois do encerramento/.test(A.txt('.pv-res')) && /acertos/.test(A.txt('.pv-res')));
+t('prova entregue: nota na hora, gabarito só depois do encerramento', /RESULTADO/.test(A.txt('.pv-res')) && A.$('.pv-res .score') && /depois do encerramento/.test(A.txt('.pv-res')) && /acertos/.test(A.txt('.pv-res')));
 await E.q("update sd_atividades set data = jsonb_set(data, '{encerramento}', to_jsonb((extract(epoch from now()) * 1000)::bigint - 1000)) where id = $1", [id]);
 await E.q("insert into sd_kv(k, v) values ('p:CRON_SEGREDO', 's1')"); await E.processar({ acao: 'desafioCron', segredo: 's1' });
 A.click('#nav [data-go="a_atividades"]'); await A.espera(() => A.$('[data-go="a_prova"]'));
