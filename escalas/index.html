@@ -1276,7 +1276,7 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['escala', 'Escala semanal'], ['mensal', 'Escala mensal'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
 
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
@@ -1346,7 +1346,7 @@ function alertasGerais() {
   const out = [];
   const dev = C.folgasDevidas(historicoArr());
   const devem = Object.entries(dev).filter(([id, q]) => q > 0 && funcPorId(id) && funcPorId(id).ativo);
-  if (devem.length) out.push({ t: 'w', m: 'Folgas das festas ainda a devolver: ' + devem.map(([id, q]) => funcPorId(id).nome + ' (' + q + ')').join(', ') + '. Nesses setores de 2 pessoas a devolução em bloco não cabe sem deixar o setor vazio.', link: 'escala' });
+  if (devem.length) out.push({ t: 'w', m: 'Folgas das festas ainda a devolver: ' + devem.map(([id, q]) => funcPorId(id).nome + ' (' + q + ')').join(', ') + '. Nesses setores de 2 pessoas a devolução em bloco não cabe sem deixar o setor vazio.', link: 'mensal' });
   if (S.modo === 'local' && S.funcionarios.length) {
     let ub = null; try { ub = localStorage.getItem('escalas_ultimo_backup'); } catch (e) { }
     const dias = ub ? Math.floor((Date.now() - new Date(ub).getTime()) / 86400000) : null;
@@ -1366,12 +1366,12 @@ function alertasGerais() {
   });
   [[semAtual, 'desta semana'], [prox, 'da próxima semana']].forEach(([sem, rot]) => {
     const e = S.escalas[sem];
-    if (!e) { if (ativos.length) out.push({ t: sem === semAtual ? 'e' : 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') ainda não foi gerada.', link: 'escala', sem }); return; }
-    if (e.status !== 'aprovada') out.push({ t: 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') está em rascunho, aguardando aprovação.', link: 'escala', sem });
+    if (!e) { if (ativos.length) out.push({ t: sem === semAtual ? 'e' : 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') ainda não foi gerada.', link: 'mensal', sem }); return; }
+    if (e.status !== 'aprovada') out.push({ t: 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') está em rascunho, aguardando aprovação.', link: 'mensal', sem });
     const v = C.validarEscala(e, S.funcionarios, S.setores, historicoArr());
-    v.erros.forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'escala', sem }));
-    v.avisos.filter(a => a.fora).forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'escala', sem }));
-    v.avisos.filter(a => !/repete a combinação/.test(a.msg) && !a.fora).forEach(x => out.push({ t: 'w', m: 'Escala ' + rot + ': ' + x.msg, link: 'escala', sem }));
+    v.erros.forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
+    v.avisos.filter(a => a.fora).forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
+    v.avisos.filter(a => !/repete a combinação/.test(a.msg) && !a.fora).forEach(x => out.push({ t: 'w', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
   });
   return out;
 }
@@ -1429,7 +1429,7 @@ function vPainel() {
   const ult = historicoArr().sort((a, b) => b.semana.localeCompare(a.semana)).slice(0, 6);
   return `
   <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${C.DIAS[C.diaSemana(hoje)].toLowerCase()}, ${C.dataBR(hoje)}</p></div><div class="sp"></div>
-  <a class="btn pri big edit-only" href="#escala" data-act="irGerar" data-sem="${sem}">${ic('bolt')} GERAR ESCALA AUTOMÁTICA</a></div>
+  <a class="btn pri big edit-only" href="#mensal" data-act="irGerar" data-sem="${sem}">${ic('bolt')} GERAR ESCALA AUTOMÁTICA</a></div>
   <div class="grid g4">
     <div class="card kpi"><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s) · ${S.funcionarios.length} cadastrados</div></div>
     <div class="card kpi"><div class="l">Setores</div><div class="n">${S.setores.length}</div><div class="x">${S.setores.filter(s => ativos.some(f => f.setorId === s.id)).length} com funcionários ativos</div></div>
@@ -1457,7 +1457,7 @@ function vPainel() {
       ${Object.keys(domPorFunc).length ? '<ul class="list-sm">' + Object.entries(domPorFunc).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, n]) => `<li><span>${esc((funcPorId(id) || {}).nome || 'Removido')}</span><b>${n}</b></li>`).join('') + '</ul>' : '<p class="muted small">Sem histórico ainda.</p>'}
     </div>
     <div class="card"><h2>Últimas escalas</h2>
-      ${ult.length ? '<ul class="list-sm">' + ult.map(e => `<li><a href="#escala" data-act="irSemana" data-sem="${e.semana}">${semanaLabel(e.semana)}</a><span>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</span></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma escala gerada ainda.</p>'}
+      ${ult.length ? '<ul class="list-sm">' + ult.map(e => `<li><a href="#mensal" data-act="irSemana" data-sem="${e.semana}">${semanaLabel(e.semana)}</a><span>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</span></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma escala gerada ainda.</p>'}
     </div>
   </div>`;
 }
@@ -1556,7 +1556,7 @@ function vMensal() {
     <div class="sp"></div>
     <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
   </div>
-  <div class="row mt">${sems.map(s => `<a href="#escala" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? (S.escalas[s].status === 'aprovada' ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-draft">rasc.</span>') : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
+  <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? (S.escalas[s].status === 'aprovada' ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-draft">rasc.</span>') : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
   </div>`;
@@ -1798,7 +1798,7 @@ function vHistorico() {
   if (UI.histTab === 'escalas') {
     if (!escs.length) return h + '<div class="card empty"><b>Nenhuma escala ainda</b></div>';
     h += `<div class="tw"><table class="list"><thead><tr><th>Semana</th><th>Situação</th><th>Funcionários</th><th class="hide-m">Domingo</th><th class="hide-m">Comb. 1/2/3/4</th><th class="hide-m">Alterações</th><th></th></tr></thead><tbody>`;
-    escs.forEach(e => { const at = Object.values(e.atribuicoes || {}); const c = C.PERMITIDAS.map(g => at.filter(a => a.g === g).length); h += `<tr><td><b>${semanaLabel(e.semana)}</b></td><td>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</td><td>${at.length}</td><td class="hide-m">${c[3]}</td><td class="hide-m">${c.join(' / ')}</td><td class="hide-m">${(e.alteracoes || []).length}</td><td><a class="btn sm" href="#escala" data-act="irSemana" data-sem="${e.semana}">Abrir</a></td></tr>`; });
+    escs.forEach(e => { const at = Object.values(e.atribuicoes || {}); const c = C.PERMITIDAS.map(g => at.filter(a => a.g === g).length); h += `<tr><td><b>${semanaLabel(e.semana)}</b></td><td>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</td><td>${at.length}</td><td class="hide-m">${c[3]}</td><td class="hide-m">${c.join(' / ')}</td><td class="hide-m">${(e.alteracoes || []).length}</td><td><a class="btn sm" href="#mensal" data-act="irSemana" data-sem="${e.semana}">Abrir</a></td></tr>`; });
     return h + '</tbody></table></div>';
   }
   if (UI.histTab === 'domingos') {
@@ -1827,7 +1827,7 @@ function vHistorico() {
   }
   // alterações
   if (!S.auditoria.length) return h + '<div class="card empty"><b>Nenhuma alteração registrada</b></div>';
-  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x.semana ? ` <a href="#escala" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x.semana ? ` <a href="#mensal" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   return h;
 }
 
@@ -2613,7 +2613,7 @@ async function vtExcel() {
    ===================================================================== */
 function irRota() {
   const h = (location.hash || '').replace('#', '');
-  UI.rota = ROTAS.some(r => r[0] === h) ? h : 'painel';
+  UI.rota = ROTAS.some(r => r[0] === h) ? h : (h === 'escala' ? 'mensal' : 'painel'); // a tela semanal foi retirada: só a escala mensal
   document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on');
   render(); window.scrollTo(0, 0);
 }
