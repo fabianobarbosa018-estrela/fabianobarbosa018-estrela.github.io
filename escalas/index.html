@@ -1285,14 +1285,14 @@ const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUppe
 function blocoEnvioSetor() {
   const lista = setoresOrd().map(s => ({ s, fs: S.funcionarios.filter(f => f.ativo && f.setorId === s.id) })).filter(x => x.fs.length);
   if (!lista.length) return '';
-  return `<div class="mt"><b>Enviar só para um setor</b>
-    <p class="small muted" style="margin:2px 0 8px">Toque em "Enviar PDF" do setor: abre o compartilhar do celular (WhatsApp etc.) com o PDF do mês mostrado acima, só com as pessoas daquele setor.</p>
-    ${lista.map(x => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_cap1(x.s.nome))}</b><div class="small muted">${esc(x.fs.map(f => _capNome(f.nome)).join(', '))}</div></div><button class="btn wa sm" data-act="enviarSetor" data-id="${x.s.id}">${ic('wa')} Enviar PDF</button></div>`).join('')}</div>`;
+  return `<div class="mt"><b>PDF por setor</b>
+    <p class="small muted" style="margin:2px 0 8px">Escolha o setor: o PDF do mês mostrado acima sai só com as pessoas dele. "Baixar PDF" salva o arquivo; "Enviar" abre o compartilhar do celular (WhatsApp etc.).</p>
+    ${lista.map(x => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_cap1(x.s.nome))}</b><div class="small muted">${esc(x.fs.map(f => _capNome(f.nome)).join(', '))}</div></div><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="baixarSetor" data-id="${x.s.id}">${ic('pdf')} Baixar PDF</button><button class="btn wa sm" data-act="enviarSetor" data-id="${x.s.id}">${ic('wa')} Enviar</button></div></div>`).join('')}</div>`;
 }
-async function enviarSetorPDF(setorId) {
+async function enviarSetorPDF(setorId, compartilhar) {
   const antes = { p: UI.expPeriodo, e: UI.expEscopo, s: UI.expSetor };
   UI.expPeriodo = 'mes'; UI.expEscopo = 'setor'; UI.expSetor = setorId;
-  try { await exportarPDF(false, { compartilhar: true }); }
+  try { await exportarPDF(false, { compartilhar: compartilhar !== false }); }
   finally { UI.expPeriodo = antes.p; UI.expEscopo = antes.e; UI.expSetor = antes.s; }
 }
 let _atualizando = false;
@@ -1573,7 +1573,7 @@ function vMensal() {
   </div>
   <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
+  <div class="row mt"><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
   ${blocoEnvioSetor()}
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
@@ -2649,6 +2649,7 @@ document.addEventListener('click', async ev => {
   const act = el.dataset.act, id = el.dataset.id;
   const sem = UI.semana;
   switch (act) {
+    case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
