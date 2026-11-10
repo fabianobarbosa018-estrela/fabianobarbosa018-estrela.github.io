@@ -1498,7 +1498,7 @@ function vEscala() {
     <button class="btn pri big" data-act="gerar">${ic('bolt')} ${e ? 'REGENERAR ESCALA AUTOMÁTICA' : 'GERAR ESCALA AUTOMÁTICA'}</button>
     ${e && !aprov ? `<button class="btn ok" data-act="aprovar">${ic('check')} Aprovar escala</button>` : ''}
     ${aprov ? `<button class="btn" data-act="reabrir">${ic('edit')} Reabrir para edição</button>` : ''}
-    ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar / WhatsApp</a>` : ''}
+    ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar</a>` : ''}
     ${e ? `<button class="btn danger sm" data-act="excluirEscala">${ic('trash')} Excluir escala</button>` : ''}
   </div></div>`;
   if (!e) {
@@ -1574,7 +1574,7 @@ function vMensal() {
   </div>
   <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
+  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
@@ -1852,7 +1852,7 @@ function vHistorico() {
 function vExportar() {
   const fs = S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   const temEsc = UI.expPeriodo === 'semana' ? !!S.escalas[UI.semana] : semanasDoMes(UI.mes).sems.some(s => S.escalas[s]);
-  return `<div class="row mb"><div><h1>Exportar e compartilhar</h1><p class="sub" style="margin:0">PDF, Excel, impressão e WhatsApp</p></div></div>
+  return `<div class="row mb"><div><h1>Exportar e compartilhar</h1><p class="sub" style="margin:0">PDF, Excel e impressão</p></div></div>
   <div class="card"><div class="grid g2" style="gap:12px">
     <div class="fld"><label class="f">Período</label><select id="expPeriodo"><option value="semana" ${UI.expPeriodo === 'semana' ? 'selected' : ''}>Semana</option><option value="mes" ${UI.expPeriodo === 'mes' ? 'selected' : ''}>Mês</option></select></div>
     <div class="fld"><label class="f">${UI.expPeriodo === 'semana' ? 'Semana (qualquer dia dela)' : 'Mês'}</label>${UI.expPeriodo === 'semana' ? `<input type="date" id="inSemana" value="${UI.semana}">` : `<input type="month" id="inMes" value="${UI.mes}">`}</div>
@@ -1865,7 +1865,6 @@ function vExportar() {
     <button class="btn pri" data-act="expPDF" ${temEsc ? '' : 'disabled'}>${ic('pdf')} Baixar PDF</button>
     <button class="btn" data-act="expXLS" ${temEsc ? '' : 'disabled'}>${ic('xls')} Exportar Excel</button>
     <button class="btn" data-act="expPrint" ${temEsc ? '' : 'disabled'}>${ic('print')} Imprimir</button>
-    <button class="btn wa" data-act="expWA" ${temEsc ? '' : 'disabled'}>${ic('wa')} WhatsApp</button>
   </div>
   <p class="small muted mt">Imprimir gera um PDF em A4 paisagem pronto para impressão (abra o arquivo e imprima). Os arquivos baixados pedem sua confirmação antes de salvar.</p></div>`;
 }
@@ -2720,9 +2719,9 @@ document.addEventListener('click', async ev => {
     case 'addSug': try { const o = S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1; await Store.set('setores', uid('s'), { nome: el.dataset.n, ordem: o, cor: PALETA[o % PALETA.length], criadoEm: agoraISO() }); log('setor', 'Setor criado: ' + el.dataset.n); } catch (e) { } return;
     case 'histTab': UI.histTab = el.dataset.t; return render();
     case 'mesPDF': if (!UI.filtroSetor) return toast('Escolha o setor lá em cima para baixar o PDF.'); // eslint-disable-line no-fallthrough
-    case 'mesXLS': case 'mesPrint': case 'mesWA':
+    case 'mesXLS': case 'mesPrint':
       UI.expPeriodo = 'mes'; UI.expEscopo = UI.filtroSetor ? 'setor' : 'completa'; UI.expSetor = UI.filtroSetor;
-      return act === 'mesPDF' ? exportarPDF(false) : act === 'mesXLS' ? exportarExcel() : act === 'mesPrint' ? exportarPDF(true) : abrirWhatsApp();
+      return act === 'mesPDF' ? exportarPDF(false) : act === 'mesXLS' ? exportarExcel() : exportarPDF(true);
     case 'delAntigas':
       if (!await confirmar('Excluir escalas antigas?', `<p>${Object.keys(S.escalasAntigas).length} escala(s) no formato antigo (segunda a domingo) serão excluídas.</p>`, 'Excluir', true)) return;
       try { for (const k of Object.keys(S.escalasAntigas)) await Store.del('escalas', k); log('sistema', 'Escalas no formato antigo excluídas'); toast('Excluídas.'); } catch (e) { }
@@ -2779,7 +2778,6 @@ document.addEventListener('click', async ev => {
     case 'expPDF': return exportarPDF(false);
     case 'expPrint': return exportarPDF(true);
     case 'expXLS': return exportarExcel();
-    case 'expWA': return abrirWhatsApp();
     case 'backup': return baixarBackup();
     case 'salvarCfg': { const n = document.getElementById('cfgNome').value.trim(), t = document.getElementById('cfgTitulo').value.trim(), imp = document.getElementById('cfgImp').value.trim(); try { await Store.set('config', 'geral', Object.assign({}, S.config, { nomeHotel: n, tituloFolha: t || 'ESCALA DE FOLGA', textoImportante: imp, feriados: feriadosLista() })); log('sistema', 'Configurações alteradas'); toast('Configurações salvas.'); } catch (e) { } return; }
   }
