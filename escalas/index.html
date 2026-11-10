@@ -196,6 +196,7 @@ table.folha tr.sep td{height:22px}
 .fimp-t{color:#C00000;font-weight:800;font-size:40px;line-height:1.15}
 .fimp p{margin:4px 0;font-size:15px}
 .fleg{margin:14px 0 0 60px;display:flex;align-items:center;gap:10px;font-family:Calibri,Carlito,Arial,sans-serif;font-size:16px}
+.fr{color:#FF0000}
 .fleg-f{display:inline-block;border:1.5px solid #000;width:44px;text-align:center;font-weight:800;padding:2px 0}
 .cor-in{width:44px;height:34px;padding:2px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer}
 .ferias-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
@@ -1600,7 +1601,7 @@ function folhaModelo(o) {
     sems.forEach(s => { const e = S.escalas[s]; if (e && e.atribuicoes && e.atribuicoes[id]) a = e.atribuicoes[id]; });
     if (!f && !a) return null;
     const sid = f ? f.setorId : a.setorId;
-    const cel = cols.map(d => { const e = S.escalas[C.inicioSemana(d)]; const st = C.statusDia(e && e.atribuicoes ? e.atribuicoes[id] : null, d, f, !!e); return st === 'F' ? 'F' : st === 'V' ? 'V' : st === '-' ? '-' : ''; });
+    const cel = cols.map(d => { const sd = C.inicioSemana(d), e = S.escalas[sd]; const at = e && e.atribuicoes ? e.atribuicoes[id] : null; const st = C.statusDia(at, d, f, !!e); if (st === 'F' && C.addDias(sd, 4) === d && C.statusDia(at, sd, f, true) === 'F') return 'R'; return st === 'F' ? 'F' : st === 'V' ? 'V' : st === '-' ? '-' : ''; });
     const gs = sems.map(s => { const e = S.escalas[s]; return e && e.atribuicoes && e.atribuicoes[id] ? e.atribuicoes[id].g : null; });
     return { id, f, nome: (f || a).nome, funcao: (f || a).funcao || '', sid, sNome: f ? nomeSetor(sid) : (a.setorNome || 'Sem setor'), cel, gs, criado: (f && f.criadoEm) || '' };
   }).filter(Boolean);
@@ -1637,7 +1638,7 @@ function folhaHTML(m) {
       h += `<tr><td class="fnm" style="background:${g.cor}" title="${esc(g.nome)}">${esc(l.nome.toUpperCase())}</td>`;
       segmentos(l.cel).forEach(sg => {
         if (sg.tipo === 'V') h += `<td colspan="${sg.n}" class="fv">FÉRIAS</td>`;
-        else h += `<td class="${sg.tipo === '-' ? 'nd' : ''}" style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : ''}</td>`;
+        else h += `<td class="${sg.tipo === '-' ? 'nd' : ''}" style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : sg.tipo === 'R' ? '<span class="fr">F</span>' : ''}</td>`;
       });
       h += '</tr>';
     });
@@ -1645,6 +1646,7 @@ function folhaHTML(m) {
   h += `</tbody></table>
   <div class="fimp"><div class="fimp-t">IMPORTANTE</div>${(S.config.textoImportante || '').split('\n').map(p => `<p>${esc(p)}</p>`).join('')}</div>
   <div class="fleg"><span class="fleg-f">F</span><b>FOLGA SEMANAL</b></div>
+  <div class="fleg" style="margin-top:4px"><span class="fleg-f fr">F</span><b class="fr">FOLGA DO FERIADO ( SE POSSIVEL )</b></div>
   </div>`;
   return h;
 }
@@ -2067,7 +2069,7 @@ async function exportarPDF(paraImprimir, opts) {
       const row = [{ content: l.nome.toUpperCase(), styles: { fillColor: rgb(g.cor), halign: 'left' } }];
       segmentos(l.cel).forEach(sg => {
         if (sg.tipo === 'V') row.push({ content: 'FÉRIAS', colSpan: sg.n, styles: { fillColor: rgb(COR_FERIAS), textColor: preto } });
-        else row.push({ content: sg.tipo === 'F' ? 'F' : '', styles: { fillColor: fer(sg.i) || (sg.tipo === '-' ? [243, 244, 246] : rgb(g.cor)) } });
+        else row.push({ content: sg.tipo === 'F' || sg.tipo === 'R' ? 'F' : '', styles: Object.assign({ fillColor: fer(sg.i) || (sg.tipo === '-' ? [243, 244, 246] : rgb(g.cor)) }, sg.tipo === 'R' ? { textColor: [255, 0, 0] } : {}) });
       });
       body.push(row);
     });
@@ -2094,6 +2096,7 @@ async function exportarPDF(paraImprimir, opts) {
   quebradas.forEach((t, i) => doc.text(t, W / 2, y + 16 + i * 4.6, { align: 'center' }));
   y += altura + 5;
   doc.setLineWidth(0.3); doc.rect(20, y, 9, 6); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('F', 24.5, y + 4.3, { align: 'center' }); doc.text('FOLGA SEMANAL', 31, y + 4.3);
+  y += 8; doc.rect(20, y, 9, 6); doc.setTextColor(255, 0, 0); doc.text('F', 24.5, y + 4.3, { align: 'center' }); doc.text('FOLGA DO FERIADO ( SE POSSIVEL )', 31, y + 4.3); doc.setTextColor(0, 0, 0);
   const nomeArquivo = nomeArq('pdf', m).replace('.pdf', paraImprimir ? '-impressao.pdf' : '.pdf');
   const blob = doc.output('blob');
   if (opts && opts.compartilhar) { // abre o compartilhar do celular (WhatsApp etc.); se não der, baixa o arquivo
@@ -2133,7 +2136,7 @@ async function exportarExcel() {
       segmentos(l.cel).forEach(sg => {
         const c = ws.getCell(r, sg.i + 2);
         if (sg.tipo === 'V') { if (sg.n > 1) ws.mergeCells(r, sg.i + 2, r, sg.i + 1 + sg.n); Object.assign(c, { value: 'FÉRIAS', fill: fill(COR_FERIAS), font: { name: 'Calibri', bold: true, size: 10 }, alignment: center }); }
-        else Object.assign(c, { value: sg.tipo === 'F' ? 'F' : null, fill: fill(fer(sg.i) || (sg.tipo === '-' ? '#F3F4F6' : g.cor)), font: { name: 'Calibri', bold: true, size: 11 }, alignment: center });
+        else Object.assign(c, { value: sg.tipo === 'F' || sg.tipo === 'R' ? 'F' : null, fill: fill(fer(sg.i) || (sg.tipo === '-' ? '#F3F4F6' : g.cor)), font: Object.assign({ name: 'Calibri', bold: true, size: 11 }, sg.tipo === 'R' ? { color: { argb: 'FFFF0000' } } : {}), alignment: center });
       });
       r++;
     });
@@ -2152,6 +2155,8 @@ async function exportarExcel() {
   r += 2;
   Object.assign(ws.getCell(r, 2), { value: 'F', font: { name: 'Calibri', bold: true, size: 12 }, alignment: center, border: borda });
   ws.mergeCells(r, 3, r, 10); Object.assign(ws.getCell(r, 3), { value: 'FOLGA SEMANAL', font: { name: 'Calibri', bold: true, size: 12 } });
+  r++; Object.assign(ws.getCell(r, 2), { value: 'F', font: { name: 'Calibri', bold: true, size: 12, color: { argb: 'FFFF0000' } }, alignment: center, border: borda });
+  ws.mergeCells(r, 3, r, 10); Object.assign(ws.getCell(r, 3), { value: 'FOLGA DO FERIADO ( SE POSSIVEL )', font: { name: 'Calibri', bold: true, size: 12, color: { argb: 'FFFF0000' } } });
   ws.getColumn(1).width = n > 7 ? 14 : 28; for (let i = 2; i <= nCols; i++) ws.getColumn(i).width = n > 7 ? 5.2 : 9;
   for (let rr = 3; rr <= ultima; rr++) if (!ws.getRow(rr).height) ws.getRow(rr).height = 18;
   const buf = await wb.xlsx.writeBuffer();
@@ -2163,7 +2168,7 @@ function textoWhatsApp() {
   m.grupos.forEach(g => {
     t += '\n*' + g.nome + '*\n';
     g.linhas.forEach(l => {
-      const fol = m.cols.filter((x, i) => l.cel[i] === 'F');
+      const fol = m.cols.filter((x, i) => l.cel[i] === 'F' || l.cel[i] === 'R');
       const fer = m.cols.filter((x, i) => l.cel[i] === 'V');
       let linha = '• ' + l.nome + ': ';
       const juntar = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1] : l.join('');
