@@ -1573,8 +1573,7 @@ function vMensal() {
   </div>
   <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  <div class="row mt"><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
-  ${blocoEnvioSetor()}
+  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
@@ -2715,7 +2714,8 @@ document.addEventListener('click', async ev => {
     }
     case 'addSug': try { const o = S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1; await Store.set('setores', uid('s'), { nome: el.dataset.n, ordem: o, cor: PALETA[o % PALETA.length], criadoEm: agoraISO() }); log('setor', 'Setor criado: ' + el.dataset.n); } catch (e) { } return;
     case 'histTab': UI.histTab = el.dataset.t; return render();
-    case 'mesPDF': case 'mesXLS': case 'mesPrint': case 'mesWA':
+    case 'mesPDF': if (!UI.filtroSetor) return toast('Escolha o setor lá em cima para baixar o PDF.'); // eslint-disable-line no-fallthrough
+    case 'mesXLS': case 'mesPrint': case 'mesWA':
       UI.expPeriodo = 'mes'; UI.expEscopo = UI.filtroSetor ? 'setor' : 'completa'; UI.expSetor = UI.filtroSetor;
       return act === 'mesPDF' ? exportarPDF(false) : act === 'mesXLS' ? exportarExcel() : act === 'mesPrint' ? exportarPDF(true) : abrirWhatsApp();
     case 'delAntigas':
