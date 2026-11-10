@@ -1279,6 +1279,22 @@ const ICON = {
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
 const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
 
+const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
+const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
+/* Bloco "Enviar só para um setor": um botão por setor, com o PDF do mês só das pessoas daquele setor */
+function blocoEnvioSetor() {
+  const lista = setoresOrd().map(s => ({ s, fs: S.funcionarios.filter(f => f.ativo && f.setorId === s.id) })).filter(x => x.fs.length);
+  if (!lista.length) return '';
+  return `<div class="mt"><b>Enviar só para um setor</b>
+    <p class="small muted" style="margin:2px 0 8px">Toque em "Enviar PDF" do setor: abre o compartilhar do celular (WhatsApp etc.) com o PDF do mês mostrado acima, só com as pessoas daquele setor.</p>
+    ${lista.map(x => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_cap1(x.s.nome))}</b><div class="small muted">${esc(x.fs.map(f => _capNome(f.nome)).join(', '))}</div></div><button class="btn wa sm" data-act="enviarSetor" data-id="${x.s.id}">${ic('wa')} Enviar PDF</button></div>`).join('')}</div>`;
+}
+async function enviarSetorPDF(setorId) {
+  const antes = { p: UI.expPeriodo, e: UI.expEscopo, s: UI.expSetor };
+  UI.expPeriodo = 'mes'; UI.expEscopo = 'setor'; UI.expSetor = setorId;
+  try { await exportarPDF(false, { compartilhar: true }); }
+  finally { UI.expPeriodo = antes.p; UI.expEscopo = antes.e; UI.expSetor = antes.s; }
+}
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -1555,9 +1571,10 @@ function vMensal() {
     <div class="sp"></div>
     <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
   </div>
-  <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? (S.escalas[s].status === 'aprovada' ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-draft">rasc.</span>') : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
+  <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button><button class="btn wa" data-act="mesWA">${ic('wa')} WhatsApp</button></div>
+  ${blocoEnvioSetor()}
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
@@ -1629,7 +1646,7 @@ function folhaHTML(m) {
   h += `</tbody></table>
   <div class="fimp"><div class="fimp-t">IMPORTANTE</div>${(S.config.textoImportante || '').split('\n').map(p => `<p>${esc(p)}</p>`).join('')}</div>
   <div class="fleg"><span class="fleg-f">F</span><b>FOLGA SEMANAL</b></div>
-  ${m.pend ? '<p class="small" style="color:var(--warn)">Contém semana em rascunho, ainda não aprovada.</p>' : ''}</div>`;
+  </div>`;
   return h;
 }
 
@@ -2028,7 +2045,7 @@ function dadosExport() {
 }
 function nomeArq(ext, m) { return ('escala de folga ' + (UI.expPeriodo === 'semana' ? UI.semana : UI.mes) + (UI.expEscopo === 'setor' && m.grupos[0] ? ' ' + m.grupos[0].nome : '') + (UI.expEscopo === 'func' && m.linhas[0] ? ' ' + m.linhas[0].nome : '')).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext; }
 const rgb = hex => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
-async function exportarPDF(paraImprimir) {
+async function exportarPDF(paraImprimir, opts) {
   try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
   catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
   const m = dadosExport(); if (!m.linhas.length) return toast('Nada para exportar.');
@@ -2078,8 +2095,16 @@ async function exportarPDF(paraImprimir) {
   quebradas.forEach((t, i) => doc.text(t, W / 2, y + 16 + i * 4.6, { align: 'center' }));
   y += altura + 5;
   doc.setLineWidth(0.3); doc.rect(20, y, 9, 6); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('F', 24.5, y + 4.3, { align: 'center' }); doc.text('FOLGA SEMANAL', 31, y + 4.3);
-  if (m.pend) { doc.setFontSize(8); doc.setTextColor(160, 98, 7); doc.text('Atenção: contém semana em rascunho, ainda não aprovada.', W - 8, y + 4.3, { align: 'right' }); }
-  await salvarArquivo(nomeArq('pdf', m).replace('.pdf', paraImprimir ? '-impressao.pdf' : '.pdf'), doc.output('blob'));
+  const nomeArquivo = nomeArq('pdf', m).replace('.pdf', paraImprimir ? '-impressao.pdf' : '.pdf');
+  const blob = doc.output('blob');
+  if (opts && opts.compartilhar) { // abre o compartilhar do celular (WhatsApp etc.); se não der, baixa o arquivo
+    try {
+      const arq = new File([blob], nomeArquivo, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [arq] })) { await navigator.share({ files: [arq], title: m.titulo }); return; }
+    } catch (x) { if (x && x.name === 'AbortError') return; }
+    toast('Não deu para abrir o compartilhar: o PDF será salvo para você enviar.');
+  }
+  await salvarArquivo(nomeArquivo, blob);
 }
 async function exportarExcel() {
   try { await carregarScript('libs/exceljs.min.js'); } catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de Excel.</p>'); }
@@ -2136,7 +2161,6 @@ async function exportarExcel() {
 function textoWhatsApp() {
   const m = dadosExport();
   let t = '*' + (S.config.nomeHotel || '') + '*\n*' + m.titulo + '*\n' + m.sub + '\n';
-  if (m.pend) t += '_(escala em rascunho, sujeita a alteração)_\n';
   m.grupos.forEach(g => {
     t += '\n*' + g.nome + '*\n';
     g.linhas.forEach(l => {
@@ -2625,6 +2649,7 @@ document.addEventListener('click', async ev => {
   const act = el.dataset.act, id = el.dataset.id;
   const sem = UI.semana;
   switch (act) {
+    case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
     case 'irGerar': UI.semana = el.dataset.sem; return;
