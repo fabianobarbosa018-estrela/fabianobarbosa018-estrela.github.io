@@ -1296,6 +1296,7 @@ async function enviarSetorPDF(setorId, compartilhar) {
   try { await exportarPDF(false, { compartilhar: compartilhar !== false }); }
   finally { UI.expPeriodo = antes.p; UI.expEscopo = antes.e; UI.expSetor = antes.s; }
 }
+const VERSAO_APP = '09/11 21:50';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -1309,9 +1310,9 @@ async function atualizarSistema() {
       await Promise.allSettled(Object.values(Store.filas)); // deixa terminar o que está sendo salvo
       await Nuvem.carregarTudo();
     }
-    toast('Atualizado! Carregando a versão mais nova…');
+    toast('Atualizado! Carregando a versão mais nova… (versão desta tela: ' + VERSAO_APP + ')');
     try { await fetch(location.pathname + '?v=' + Date.now(), { cache: 'reload' }); await fetch(location.pathname, { cache: 'reload' }); } catch (e) { }
-    setTimeout(() => location.reload(), 500);
+    setTimeout(() => location.replace(location.pathname + '?v=' + Date.now() + (location.hash || '')), 500);
   } catch (e) {
     toast(e && e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Não foi possível atualizar. Tente de novo.');
     _atualizando = false;
@@ -1567,7 +1568,7 @@ function vMensal() {
   UI.setoresSel = (UI.setoresSel || []).filter(id => setorPorId(id));
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
-  let h = `<div class="row mb"><div><h1>Escala mensal</h1><p class="sub" style="margin:0">Folha de folga do mês, no mesmo formato da planilha do hotel</p></div></div>
+  let h = `<div class="row mb"><div><h1>Escala mensal</h1><p class="sub" style="margin:0">Folha de folga do mês, no mesmo formato da planilha do hotel</p><p class="small muted" style="margin:2px 0 0">Versão ${VERSAO_APP}</p></div></div>
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="mesAnt">${ic('chevL')}</button><input type="month" id="inMes" value="${UI.mes}"><button class="btn icon" data-act="mesProx">${ic('chevR')}</button>
   </div>
