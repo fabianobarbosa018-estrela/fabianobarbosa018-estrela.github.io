@@ -1026,7 +1026,7 @@ const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de f
 const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
 const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
 const S = { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
-const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
+const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', setoresSel: [], filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
 let DB = null, DL = null;
 const LS_KEY = 'escalas_hotel_v1';
 
@@ -1564,14 +1564,15 @@ function semanasDoMes(ym) {
 }
 function vMensal() {
   const { sems } = semanasDoMes(UI.mes);
-  const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorId: UI.filtroSetor }));
+  UI.setoresSel = (UI.setoresSel || []).filter(id => setorPorId(id));
+  const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
   let h = `<div class="row mb"><div><h1>Escala mensal</h1><p class="sub" style="margin:0">Folha de folga do mês, no mesmo formato da planilha do hotel</p></div></div>
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="mesAnt">${ic('chevL')}</button><input type="month" id="inMes" value="${UI.mes}"><button class="btn icon" data-act="mesProx">${ic('chevR')}</button>
-    <div class="sp"></div>
-    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
   </div>
+  <div class="small muted mt">Marque os setores que quer ver e baixar (pode marcar mais de um):</div>
+  <div class="row mt" style="gap:6px">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
   <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
@@ -1606,6 +1607,7 @@ function folhaModelo(o) {
     return { id, f, nome: (f || a).nome, funcao: (f || a).funcao || '', sid, sNome: f ? nomeSetor(sid) : (a.setorNome || 'Sem setor'), cel, gs, criado: (f && f.criadoEm) || '' };
   }).filter(Boolean);
   if (o.setorId) linhas = linhas.filter(l => l.sid === o.setorId);
+  if (o.setorIds && o.setorIds.length) linhas = linhas.filter(l => o.setorIds.includes(l.sid));
   if (o.funcId) linhas = linhas.filter(l => l.id === o.funcId);
   const gm = {}; linhas.forEach(l => (gm[l.sid] = gm[l.sid] || []).push(l));
   const grupos = Object.keys(gm).sort(cmpSetor).map(sid => ({ sid, nome: gm[sid][0].sNome, cor: corSetor(sid), linhas: gm[sid].sort((a, b) => (a.criado || '').localeCompare(b.criado || '') || a.nome.localeCompare(b.nome)) }));
@@ -2718,10 +2720,20 @@ document.addEventListener('click', async ev => {
     }
     case 'addSug': try { const o = S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1; await Store.set('setores', uid('s'), { nome: el.dataset.n, ordem: o, cor: PALETA[o % PALETA.length], criadoEm: agoraISO() }); log('setor', 'Setor criado: ' + el.dataset.n); } catch (e) { } return;
     case 'histTab': UI.histTab = el.dataset.t; return render();
-    case 'mesPDF': if (!UI.filtroSetor) return toast('Escolha o setor lá em cima para baixar o PDF.'); // eslint-disable-line no-fallthrough
-    case 'mesXLS': case 'mesPrint':
-      UI.expPeriodo = 'mes'; UI.expEscopo = UI.filtroSetor ? 'setor' : 'completa'; UI.expSetor = UI.filtroSetor;
-      return act === 'mesPDF' ? exportarPDF(false) : act === 'mesXLS' ? exportarExcel() : exportarPDF(true);
+    case 'selSetor': { const id = el.dataset.id, a = UI.setoresSel || []; UI.setoresSel = a.includes(id) ? a.filter(x => x !== id) : a.concat(id); return render(); }
+    case 'selLimpar': UI.setoresSel = []; return render();
+    case 'mesPDF': {
+      const ids = setoresOrd().map(x => x.id).filter(id => (UI.setoresSel || []).includes(id));
+      if (!ids.length) return toast('Marque pelo menos um setor para baixar o PDF.');
+      for (let i = 0; i < ids.length; i++) { await enviarSetorPDF(ids[i], false); if (i < ids.length - 1) await new Promise(r => setTimeout(r, 900)); }
+      return;
+    }
+    case 'mesXLS': case 'mesPrint': {
+      const sel = UI.setoresSel || [];
+      if (sel.length > 1) return toast('Para Excel e Imprimir, marque só um setor.');
+      UI.expPeriodo = 'mes'; UI.expEscopo = sel.length ? 'setor' : 'completa'; UI.expSetor = sel[0] || '';
+      return act === 'mesXLS' ? exportarExcel() : exportarPDF(true);
+    }
     case 'delAntigas':
       if (!await confirmar('Excluir escalas antigas?', `<p>${Object.keys(S.escalasAntigas).length} escala(s) no formato antigo (segunda a domingo) serão excluídas.</p>`, 'Excluir', true)) return;
       try { for (const k of Object.keys(S.escalasAntigas)) await Store.del('escalas', k); log('sistema', 'Escalas no formato antigo excluídas'); toast('Excluídas.'); } catch (e) { }
