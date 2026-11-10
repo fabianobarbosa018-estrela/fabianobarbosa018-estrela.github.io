@@ -2038,14 +2038,14 @@ async function salvarArquivo(nome, data) {
 function dadosExport() {
   const p = periodoFolha(UI.expPeriodo);
   const o = Object.assign(p, {});
-  if (UI.expEscopo === 'setor') o.setorId = UI.expSetor || (setoresOrd()[0] || {}).id;
+  if (UI.expEscopo === 'setor') { if (UI.expSetores && UI.expSetores.length) o.setorIds = UI.expSetores; else o.setorId = UI.expSetor || (setoresOrd()[0] || {}).id; }
   if (UI.expEscopo === 'func') o.funcId = UI.expFunc || (S.funcionarios[0] || {}).id;
   const m = folhaModelo(o);
-  if (UI.expEscopo === 'setor' && m.grupos[0]) m.titulo += ' — ' + m.grupos[0].nome.toUpperCase();
+  if (UI.expEscopo === 'setor' && m.grupos[0]) m.titulo += ' — ' + m.grupos.map(g => g.nome.toUpperCase()).join(' E ');
   if (UI.expEscopo === 'func' && m.linhas[0]) m.titulo += ' — ' + m.linhas[0].nome.toUpperCase();
   return m;
 }
-function nomeArq(ext, m) { return ('escala de folga ' + (UI.expPeriodo === 'semana' ? UI.semana : UI.mes) + (UI.expEscopo === 'setor' && m.grupos[0] ? ' ' + m.grupos[0].nome : '') + (UI.expEscopo === 'func' && m.linhas[0] ? ' ' + m.linhas[0].nome : '')).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext; }
+function nomeArq(ext, m) { return ('escala de folga ' + (UI.expPeriodo === 'semana' ? UI.semana : UI.mes) + (UI.expEscopo === 'setor' && m.grupos[0] ? ' ' + m.grupos.map(g => g.nome).join(' ') : '') + (UI.expEscopo === 'func' && m.linhas[0] ? ' ' + m.linhas[0].nome : '')).replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext; }
 const rgb = hex => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
 async function exportarPDF(paraImprimir, opts) {
   try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
@@ -2722,17 +2722,13 @@ document.addEventListener('click', async ev => {
     case 'histTab': UI.histTab = el.dataset.t; return render();
     case 'selSetor': { const id = el.dataset.id, a = UI.setoresSel || []; UI.setoresSel = a.includes(id) ? a.filter(x => x !== id) : a.concat(id); return render(); }
     case 'selLimpar': UI.setoresSel = []; return render();
-    case 'mesPDF': {
+    case 'mesPDF': case 'mesXLS': case 'mesPrint': {
       const ids = setoresOrd().map(x => x.id).filter(id => (UI.setoresSel || []).includes(id));
-      if (!ids.length) return toast('Marque pelo menos um setor para baixar o PDF.');
-      for (let i = 0; i < ids.length; i++) { await enviarSetorPDF(ids[i], false); if (i < ids.length - 1) await new Promise(r => setTimeout(r, 900)); }
-      return;
-    }
-    case 'mesXLS': case 'mesPrint': {
-      const sel = UI.setoresSel || [];
-      if (sel.length > 1) return toast('Para Excel e Imprimir, marque só um setor.');
-      UI.expPeriodo = 'mes'; UI.expEscopo = sel.length ? 'setor' : 'completa'; UI.expSetor = sel[0] || '';
-      return act === 'mesXLS' ? exportarExcel() : exportarPDF(true);
+      if (!ids.length) return toast('Marque pelo menos um setor para baixar.');
+      const antes = { p: UI.expPeriodo, e: UI.expEscopo, s: UI.expSetores };
+      UI.expPeriodo = 'mes'; UI.expEscopo = 'setor'; UI.expSetores = ids;
+      try { return await (act === 'mesPDF' ? exportarPDF(false) : act === 'mesXLS' ? exportarExcel() : exportarPDF(true)); }
+      finally { UI.expPeriodo = antes.p; UI.expEscopo = antes.e; UI.expSetores = antes.s; }
     }
     case 'delAntigas':
       if (!await confirmar('Excluir escalas antigas?', `<p>${Object.keys(S.escalasAntigas).length} escala(s) no formato antigo (segunda a domingo) serão excluídas.</p>`, 'Excluir', true)) return;
