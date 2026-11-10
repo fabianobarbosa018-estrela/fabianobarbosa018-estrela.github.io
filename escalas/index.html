@@ -680,6 +680,7 @@ table.folha.vt .edit-click{cursor:pointer}
   function validarEscala(escala, funcionarios, setores, historico) {
     var sem = escala.semana, at = escala.atribuicoes || {};
     var erros = [], avisos = [];
+    if (escala.modo === 'manual') return { ok: true, erros: [], avisos: [] }; // escala lançada à mão pelo gestor: vale como está, sem alertas
     var setorPorId = {}; (setores || []).forEach(function (s) { setorPorId[s.id] = s; });
     var funcPorId = {}; (funcionarios || []).forEach(function (f) { funcPorId[f.id] = f; });
     var nomeSetor = function (sid) { return setorPorId[sid] ? setorPorId[sid].nome : 'Sem setor'; };
@@ -1362,12 +1363,10 @@ function alertasGerais() {
   S.setores.forEach(s => {
     const n = ativos.filter(f => f.setorId === s.id).length;
     if (n === 0) out.push({ t: 'w', m: 'Setor "' + s.nome + '" não tem funcionários ativos.', link: 'setores' });
-    else if (n === 1) out.push({ t: 'w', m: 'Setor "' + s.nome + '" tem apenas 1 funcionário: nos dias de folga dele o setor ficará sem ninguém.', link: 'funcionarios' });
   });
   [[semAtual, 'desta semana'], [prox, 'da próxima semana']].forEach(([sem, rot]) => {
     const e = S.escalas[sem];
     if (!e) { if (ativos.length) out.push({ t: sem === semAtual ? 'e' : 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') ainda não foi gerada.', link: 'mensal', sem }); return; }
-    if (e.status !== 'aprovada') out.push({ t: 'w', m: 'A escala ' + rot + ' (' + semanaLabel(sem) + ') está em rascunho, aguardando aprovação.', link: 'mensal', sem });
     const v = C.validarEscala(e, S.funcionarios, S.setores, historicoArr());
     v.erros.forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
     v.avisos.filter(a => a.fora).forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));

@@ -429,6 +429,7 @@
   function validarEscala(escala, funcionarios, setores, historico) {
     var sem = escala.semana, at = escala.atribuicoes || {};
     var erros = [], avisos = [];
+    if (escala.modo === 'manual') return { ok: true, erros: [], avisos: [] }; // escala lançada à mão pelo gestor: vale como está, sem alertas
     var setorPorId = {}; (setores || []).forEach(function (s) { setorPorId[s.id] = s; });
     var funcPorId = {}; (funcionarios || []).forEach(function (f) { funcPorId[f.id] = f; });
     var nomeSetor = function (sid) { return setorPorId[sid] ? setorPorId[sid].nome : 'Sem setor'; };
