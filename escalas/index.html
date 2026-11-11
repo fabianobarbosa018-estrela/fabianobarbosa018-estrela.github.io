@@ -1497,7 +1497,7 @@ function vServicos() {
   corpo += `<tr><td class="svc-dia">Ajustes</td>${vis.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
 
   h += `<div class="card mb"><div class="svc-wrap"><table class="svc">${thead}<tbody>${corpo}</tbody></table></div>
-    <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do lote escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p></div>`;
+    <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela: toque num dia vazio de diarista e a diária cadastrada entra sozinha. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do lote escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p></div>`;
   if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
   h += `<div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
   <p class="small muted mt">Baixar, Excel e Imprimir saem só do lote e do grupo escolhidos acima.</p>`;
@@ -1845,7 +1845,17 @@ async function servXls() {
   await salvarArquivo('servicos-prestados-' + m.mes + '-' + m.P.arq + '.xlsx', new Blob([buf]));
 }
 
-const VERSAO_APP = '11/11 19:55';
+/* Toque num dia vazio de diarista: lança a diária cadastrada, sem digitar. Para outro valor, toque de novo e digite. */
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if (!t || !t.dataset || t.dataset.svc !== 'dia' || t.value !== '') return;
+  const p = S.prestadores.find(x => x.id === t.dataset.pid);
+  if (!p || (p.modalidade || 'diaria') !== 'diaria' || !(+p.valor > 0)) return;
+  t.value = r2(p.valor);
+  t.blur();
+  servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
+});
+const VERSAO_APP = '11/11 20:03';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
