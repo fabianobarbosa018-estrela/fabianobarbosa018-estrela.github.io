@@ -209,6 +209,9 @@ table.svc tr.svc-sum td{background:#eef2f6;font-weight:600}
 .ajrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .ajrow input[type=number]{width:110px}
 table.svc tr.svc-fora td{opacity:.4}
+.lote-g{display:grid;grid-template-columns:1.4fr .7fr .7fr .95fr 1.7fr 30px;gap:6px;align-items:center}
+.lote-g input,.lote-aj input{width:100%;min-width:0;box-sizing:border-box}
+.lote-aj{display:grid;grid-template-columns:1.2fr 1fr 1.4fr;gap:8px;align-items:center}
 
 .fleg-f{display:inline-block;border:1.5px solid #000;width:44px;text-align:center;font-weight:800;padding:2px 0}
 .cor-in{width:44px;height:34px;padding:2px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer}
@@ -1320,7 +1323,7 @@ const servKey = (mes, pid) => mes + '__' + pid;
 const servMesDe = k => k.split('__')[0];
 const servDiasDoMes = mes => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
 const servMesVizinho = (mes, delta) => { let [y, m] = mes.split('-').map(Number); m += delta; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return y + '-' + String(m).padStart(2, '0'); };
-const servMeses = () => [...new Set(Object.keys(S.servicos).map(servMesDe))].sort();
+const servMeses = () => [...new Set(Object.keys(S.servicos).filter(k => !k.endsWith('__lotes')).map(servMesDe))].sort();
 const servPrestadores = () => S.prestadores.filter(p => p.ativo !== false).slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || ''));
 const r2 = v => Math.round((+v || 0) * 100) / 100;
 const servMoeda = v => (+v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1331,15 +1334,33 @@ let _servMemo = {};
 function servNovaCache() { _servMemo = {}; }
 
 /* Cálculo de um prestador num mês. Saldo anterior vem do último mês com planilha. */
-/* Períodos de pagamento: dia 15 (dias 01 a 15, paga dia 20) e fim do mês (dias 16 a fim, paga dia 05 do mês seguinte) */
-const SERV_PER = {
-  '15': { nome: 'PAGAMENTO DO DIA 15', opcao: 'Dia 15: dias 01 a 15 (paga dia 20)', ini: 1, fim: 15, idx: 0, paga: 'PAGA NO DIA 20', arq: 'dia-15' },
-  'fim': { nome: 'PAGAMENTO DO FIM DO MÊS', opcao: 'Fim do mês: dias 16 a 31 (paga dia 05)', ini: 16, fim: 31, idx: 1, paga: 'PAGA NO DIA 05 DO MÊS SEGUINTE', arq: 'fim-do-mes' },
-  'mes': { nome: 'MÊS INTEIRO', opcao: 'Mês inteiro (só para conferir)', ini: 1, fim: 31, idx: -1, paga: '', arq: 'mes-inteiro' }
-};
-const servPerAtual = () => (SERV_PER[UI.servPer] ? UI.servPer : '15');
-const servQuinzena = d => (d && +d.slice(8, 10) <= 15 ? 0 : 1);
-/* Cálculo de um prestador num mês. g = [dia 15, fim do mês]; valores de cada pagamento já com saldo, descontos e adiantamentos */
+/* ----- Lotes de pagamento: intervalos de dias do mês pagos de uma vez. Valem para todos os prestadores. ----- */
+const servLotesDefault = mes => [
+  { id: '15', nome: 'Dia 15', de: 1, ate: 15, pctPadrao: 40, dataPadrao: mes + '-20' },
+  { id: 'fim', nome: 'Fim do mês', de: 16, ate: servDiasDoMes(mes), pctPadrao: 60, dataPadrao: servMesVizinho(mes, 1) + '-05' }
+];
+function servLotesMes(mes) {
+  const doc = S.servicos[mes + '__lotes'];
+  const arr = doc && Array.isArray(doc.lotes) && doc.lotes.length ? doc.lotes : servLotesDefault(mes);
+  return arr.slice().sort((a, b) => a.de - b.de);
+}
+/* Pagamentos de um prestador, por id de lote. Formato antigo (lista de dois) vira os lotes '15' e 'fim'. */
+function servPagosDoc(l) {
+  const pg = (l && l.pagos) || {};
+  return Array.isArray(pg) ? { '15': pg[0] || {}, 'fim': pg[1] || {} } : pg;
+}
+/* Dias do mês que não estão em nenhum lote */
+function servDiasSemLote(mes) {
+  const lotes = servLotesMes(mes), out = [];
+  for (let d = 1; d <= servDiasDoMes(mes); d++) if (!lotes.some(x => d >= x.de && d <= x.ate)) out.push(d);
+  return out;
+}
+/* Grupo de prestadores: 'todos', 'diaria' (só diaristas) ou 'outros' (mensais, combinados e extras) */
+const servGrupoOk = (p, g) => g === 'todos' || ((p.modalidade || 'diaria') === 'diaria') === (g === 'diaria');
+const servPrestadoresGrupo = () => servPrestadores().filter(p => servGrupoOk(p, UI.servGrupo || 'todos'));
+
+/* Cálculo de um prestador num mês, lote a lote. Cada lote tem valor, data, % (mensal/combinado) e pago.
+   O saldo anterior entra no 1º lote. Descontos, adiantamentos e extras entram no lote da data (sem data: último lote). */
 function servCalc(mes, pid) {
   const mk = mes + '|' + pid;
   if (_servMemo[mk]) return _servMemo[mk];
@@ -1349,27 +1370,34 @@ function servCalc(mes, pid) {
   const modal = p.modalidade || 'diaria';
   const diasTotal = r2(Object.values(l.dias || {}).reduce((a, v) => a + (+v || 0), 0));
   const valorMes = l.valor != null ? r2(l.valor) : r2(p.valor);
-  const g = [0, 0];
+  const lotes = servLotesMes(mes), n = lotes.length;
+  const pg = servPagosDoc(l);
+  const ixDia = dia => lotes.findIndex(x => dia >= x.de && dia <= x.ate);
+  const ixData = d => { if (!d) return n - 1; const i = ixDia(+d.slice(8, 10)); return i >= 0 ? i : n - 1; };
+  const pctDe = x => (pg[x.id] && pg[x.id].pct != null ? +pg[x.id].pct : (+x.pctPadrao || 0));
+  const g = lotes.map(() => 0);
   if (tem) {
-    if (modal === 'diaria') Object.entries(l.dias || {}).forEach(([dd, v]) => { g[+dd <= 15 ? 0 : 1] += +v || 0; });
-    else if (modal === 'mensal' || modal === 'combinado') { g[0] = r2(valorMes * 0.4); g[1] = r2(valorMes - g[0]); }
-    (l.extras || []).forEach(x => { g[servQuinzena(x.data)] += +x.valor || 0; });
+    if (modal === 'diaria') Object.entries(l.dias || {}).forEach(([dd, v]) => { const i = ixDia(+dd); if (i >= 0) g[i] += +v || 0; });
+    else if (modal === 'mensal' || modal === 'combinado') lotes.forEach((x, i) => { g[i] += valorMes * pctDe(x) / 100; });
+    (l.extras || []).forEach(x => { g[ixData(x.data)] += +x.valor || 0; });
   }
-  const soma2 = arr => { const q = [0, 0]; (arr || []).forEach(x => { q[servQuinzena(x.data)] += +x.valor || 0; }); return [r2(q[0]), r2(q[1])]; };
-  const dsc = soma2(l.descontos), adi = soma2(l.adiant);
-  const gg = [r2(g[0]), r2(g[1])];
-  const bruto = r2(gg[0] + gg[1]);
-  const extras = r2((l.extras || []).reduce((a, x) => a + (+x.valor || 0), 0));
+  const soma = arr => { const q = lotes.map(() => 0); (arr || []).forEach(x => { q[ixData(x.data)] += +x.valor || 0; }); return q.map(r2); };
+  const dsc = soma(l.descontos), adi = soma(l.adiant), gg = g.map(r2);
   const ant = servSaldoAnt(mes, pid);
-  const liquido = r2(bruto + ant - dsc[0] - dsc[1] - adi[0] - adi[1]);
-  const valores = [r2(gg[0] + ant - dsc[0] - adi[0]), r2(gg[1] - dsc[1] - adi[1])]; // o saldo anterior vai para o pagamento do dia 15
-  const pg = l.pagos || [];
-  const pagos = [0, 1].map(i => {
-    const o = pg[i] || {};
-    return { ref: String(i + 1), valor: valores[i], data: o.data || (i === 0 ? mes + '-20' : servMesVizinho(mes, 1) + '-05'), pago: !!o.pago, valorPago: o.valorPago != null ? r2(o.valorPago) : undefined };
+  const valores = lotes.map((x, i) => r2(gg[i] + (i === 0 ? ant : 0) - dsc[i] - adi[i]));
+  const pagos = lotes.map((x, i) => {
+    const o = pg[x.id] || {};
+    return { id: x.id, nome: x.nome, de: x.de, ate: x.ate, pct: pctDe(x), valor: valores[i], data: o.data || x.dataPadrao || '', pago: !!o.pago, valorPago: o.valorPago != null ? r2(o.valorPago) : undefined };
   });
+  const bruto = r2(gg.reduce((a, v) => a + v, 0));
+  const liquido = r2(valores.reduce((a, v) => a + v, 0));
   const pago = r2(pagos.filter(x => x.pago).reduce((a, x) => a + (x.valorPago != null ? x.valorPago : x.valor), 0));
-  const r = { p, l, modal, diasTotal, valorMes, g: gg, dsc, adi, extras, bruto, desc: r2(dsc[0] + dsc[1]), adiant: r2(adi[0] + adi[1]), ant, liquido, pagos, pago, saldo: r2(liquido - pago) };
+  const r = {
+    p, l, modal, diasTotal, valorMes, lotes, g: gg, dsc, adi,
+    extras: r2((l.extras || []).reduce((a, x) => a + (+x.valor || 0), 0)),
+    bruto, desc: r2(dsc.reduce((a, v) => a + v, 0)), adiant: r2(adi.reduce((a, v) => a + v, 0)),
+    ant, liquido, pagos, pago, saldo: r2(liquido - pago)
+  };
   _servMemo[mk] = r;
   return r;
 }
@@ -1399,37 +1427,53 @@ function servCriarMes(mes) {
   return true;
 }
 
+/* Lote escolhido na tela (id do lote, ou 'mes') */
+function servPerSel(lotes) {
+  const v = UI.servPer;
+  if (v === 'mes') return 'mes';
+  return lotes.some(x => x.id === v) ? v : (lotes[0] ? lotes[0].id : 'mes');
+}
+const servGrupoNome = { todos: 'Todos os prestadores', diaria: 'Só diaristas', outros: 'Só mensais, combinados e extras' };
 function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
-  const mes = UI.servMes;
-  const per = servPerAtual(), P = SERV_PER[per];
+  const mes = UI.servMes, ult = servDiasDoMes(mes), dd2 = dd => String(dd).padStart(2, '0');
+  const lotes = servLotesMes(mes), sel = servPerSel(lotes);
+  const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
+  const grupo = UI.servGrupo || 'todos';
   const ativos = servPrestadores();
   if (ativos.length) servCriarMes(mes); // cria a planilha do mês (e de quem entrou depois) sem precisar clicar
   const criado = servMeses().includes(mes);
-  let h = `<div class="row mb"><div><h1>Serviços prestados</h1><p class="sub" style="margin:0">Controle mensal dos prestadores: lance o valor de cada dia e acompanhe os pagamentos</p></div></div>
+  let h = `<div class="row mb"><div><h1>Serviços prestados</h1><p class="sub" style="margin:0">Controle dos prestadores: lance o valor de cada dia e acompanhe os pagamentos por lote</p></div></div>
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="servAnt">${ic('chevL')}</button><input type="month" id="inServMes" value="${mes}"><button class="btn icon" data-act="servProx">${ic('chevR')}</button>
     <div class="sp"></div>
+    <button class="btn" data-act="servLotes">Lotes do mês</button>
     <button class="btn" data-act="prestLista">Prestadores</button>
   </div>
-  <div class="row mt"><select id="selPer" style="flex:1;min-width:240px">${Object.keys(SERV_PER).map(k => `<option value="${k}" ${k === per ? 'selected' : ''}>${SERV_PER[k].opcao}</option>`).join('')}</select></div></div>`;
+  <div class="row mt" style="gap:8px;flex-wrap:wrap">
+    <select id="selPer" style="flex:1;min-width:220px">${lotes.map(x => `<option value="${esc(x.id)}" ${x.id === sel ? 'selected' : ''}>${esc(x.nome)} · dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))}</option>`).join('')}<option value="mes" ${sel === 'mes' ? 'selected' : ''}>Mês inteiro (só para conferir)</option></select>
+    <select id="selGrupo" style="flex:1;min-width:220px">${Object.keys(servGrupoNome).map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
+  </div></div>`;
   if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
   if (!criado) return h + `<div class="card empty"><b>${servMesNome(mes)} ainda não tem planilha</b>${S.somenteLeitura ? 'Sem permissão para criar agora.' : 'Aguarde um instante.'}</div>`;
+  const vis = servPrestadoresGrupo();
+  if (!vis.length) return h + '<div class="card empty"><b>Nenhum prestador neste grupo</b>Escolha outro grupo acima.</div>';
 
-  const calcs = ativos.map(p => servCalc(mes, p.id));
-  const soma = k => r2(calcs.reduce((a, c) => a + c[k], 0));
+  const calcs = vis.map(p => servCalc(mes, p.id));
+  const aPagar = lote ? r2(calcs.reduce((a, c) => a + c.pagos[idx].valor, 0)) : r2(calcs.reduce((a, c) => a + c.liquido, 0));
+  const jaPago = lote ? r2(calcs.reduce((a, c) => a + (c.pagos[idx].pago ? (c.pagos[idx].valorPago ?? c.pagos[idx].valor) : 0), 0)) : r2(calcs.reduce((a, c) => a + c.pago, 0));
   h += `<div class="row mb" style="gap:10px;flex-wrap:wrap">
-    ${[['Total a pagar', soma('liquido')], ['Já pago', soma('pago')], ['Pendente', soma('saldo')]].map(([t, v]) => `<div class="card" style="flex:1;min-width:150px"><div class="small muted">${t}</div><div style="font-size:20px;font-weight:700">R$ ${servMoeda(v)}</div></div>`).join('')}
+    ${[[lote ? 'A pagar neste lote' : 'Total a pagar', aPagar], ['Já pago', jaPago], ['Pendente', r2(aPagar - jaPago)]].map(([t, v]) => `<div class="card" style="flex:1;min-width:150px"><div class="small muted">${t}</div><div style="font-size:20px;font-weight:700">R$ ${servMoeda(v)}</div></div>`).join('')}
   </div>`;
+  const semLote = servDiasSemLote(mes);
+  if (semLote.length) h += `<div class="alert w mb"><span class="ic">i</span><div>Dias sem lote de pagamento: ${semLote.map(d => dd2(d)).join(', ')}. Eles não entram em nenhum pagamento. Ajuste em "Lotes do mês".</div></div>`;
 
-  const dias = servDiasDoMes(mes);
-  const dd2 = dd => String(dd).padStart(2, '0');
   const dsem = dd => C.DIAS_CURTO[C.diaSemana(mes + '-' + dd2(dd))].toUpperCase();
-  const thead = `<thead><tr><th class="svc-dia" rowspan="2">DIA</th>${ativos.map(p => `<th class="svc-p">${esc(_capNome(p.nome))}</th>`).join('')}</tr><tr>${ativos.map(p => `<th class="svc-f">${esc(p.funcao || '—')}</th>`).join('')}</tr></thead>`;
+  const thead = `<thead><tr><th class="svc-dia" rowspan="2">DIA</th>${vis.map(p => `<th class="svc-p">${esc(_capNome(p.nome))}</th>`).join('')}</tr><tr>${vis.map(p => `<th class="svc-f">${esc(p.funcao || '—')}</th>`).join('')}</tr></thead>`;
   let corpo = '';
-  for (let dd = 1; dd <= dias; dd++) {
-    const fora = per !== 'mes' && (dd < P.ini || dd > P.fim);
+  for (let dd = 1; dd <= ult; dd++) {
+    const fora = lote && (dd < lote.de || dd > lote.ate);
     corpo += `<tr class="${fora ? 'svc-fora' : ''}"><td class="svc-dia">${dd2(dd)} ${dsem(dd)}</td>${calcs.map(c => {
       const v = (c.l.dias || {})[dd2(dd)];
       return `<td><input class="svc-in" type="number" inputmode="decimal" step="0.01" min="0" value="${v ?? ''}" data-svc="dia" data-mes="${mes}" data-pid="${c.p.id}" data-dd="${dd2(dd)}"></td>`;
@@ -1437,37 +1481,42 @@ function vServicos() {
   }
   corpo += `<tr class="svc-sum"><td class="svc-dia">TOTAL DOS DIAS</td>${calcs.map(c => `<td>${servMoeda(c.diasTotal)}</td>`).join('')}</tr>`;
   corpo += `<tr class="svc-sum"><td class="svc-dia">MODALIDADE</td>${calcs.map(c => `<td>${esc(SERV_MOD[c.modal] || '')}</td>`).join('')}</tr>`;
-  SERV_RESUMO.forEach(([rot, fn]) => {
-    corpo += `<tr class="svc-res"><td class="svc-dia">${rot}</td>${calcs.map(c => { const v = fn(c); return `<td>${typeof v === 'number' ? servMoeda(v) : esc(v || '—')}</td>`; }).join('')}</tr>`;
+  servLinhasResumo(lotes).forEach(([rot, fn]) => {
+    corpo += `<tr class="svc-res"><td class="svc-dia">${esc(rot)}</td>${calcs.map(c => { const v = fn(c); return `<td>${typeof v === 'number' ? servMoeda(v) : esc(v || '—')}</td>`; }).join('')}</tr>`;
   });
-  if (per !== 'mes') {
-    corpo += `<tr class="svc-sum"><td class="svc-dia">${P.nome}</td>${calcs.map(c => {
-      const x = c.pagos[P.idx];
-      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-idx="${P.idx}">Pago ✓ · desfazer</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-idx="${P.idx}">Marcar como pago</button>`}</td>`;
+  if (lote) {
+    corpo += `<tr class="svc-sum"><td class="svc-dia">${esc(lote.nome.toUpperCase())}</td>${calcs.map(c => {
+      const x = c.pagos[idx];
+      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(lote.id)}">Pago ✓ · desfazer</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(lote.id)}">Marcar como pago</button>`}</td>`;
     }).join('')}</tr>`;
   }
-  corpo += `<tr><td class="svc-dia">Ajustes</td>${ativos.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
+  corpo += `<tr><td class="svc-dia">Ajustes</td>${vis.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
 
   h += `<div class="card mb"><div class="svc-wrap"><table class="svc">${thead}<tbody>${corpo}</tbody></table></div>
-    <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do pagamento escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e datas.</p></div>`;
+    <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do lote escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p></div>`;
+  if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
   h += `<div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
-  <p class="small muted mt">Imprime e baixa só o pagamento escolhido no seletor de cima.</p>`;
+  <p class="small muted mt">Baixar, Excel e Imprimir saem só do lote e do grupo escolhidos acima.</p>`;
   return h;
 }
+
 /* Linhas do resumo financeiro (mesma ordem na tela, PDF e Excel) */
-const SERV_RESUMO = [
-  ['VALOR A RECEBER', c => c.bruto],
-  ['SALDO ANTERIOR', c => c.ant],
-  ['DESCONTOS', c => c.desc],
-  ['ADIANTAMENTOS', c => c.adiant],
-  ['LÍQUIDO A RECEBER', c => c.liquido],
-  ['CHAVE PIX', c => c.p.pix || '—'],
-  ['TITULAR', c => c.p.titular || '—'],
-  ['1º PAGAMENTO', c => servPagTxt(c.pagos[0])],
-  ['2º PAGAMENTO', c => servPagTxt(c.pagos[1])],
-  ['JÁ PAGO', c => c.pago],
-  ['SALDO ATUAL', c => c.saldo]
-];
+/* Linhas do resumo financeiro da tela (uma linha por lote) */
+function servLinhasResumo(lotes) {
+  const d2 = d => String(d).padStart(2, '0');
+  return [
+    ['VALOR A RECEBER', c => c.bruto],
+    ['SALDO ANTERIOR', c => c.ant],
+    ['DESCONTOS', c => c.desc],
+    ['ADIANTAMENTOS', c => c.adiant],
+    ['LÍQUIDO A RECEBER', c => c.liquido],
+    ['CHAVE PIX', c => c.p.pix || '—'],
+    ['TITULAR', c => c.p.titular || '—'],
+    ...lotes.map((x, i) => [x.nome.toUpperCase() + ' (' + d2(x.de) + ' A ' + d2(x.ate) + ')', c => servPagTxt(c.pagos[i])]),
+    ['JÁ PAGO', c => c.pago],
+    ['SALDO ATUAL', c => c.saldo]
+  ];
+}
 
 /* ----- Ajustes do mês de um prestador ----- */
 function servAjLinha(k, x) {
@@ -1481,17 +1530,21 @@ function servAjLinha(k, x) {
 function servAjustes(mes, pid) {
   servNovaCache();
   const c = servCalc(mes, pid), p = c.p, l = c.l;
+  const pct = c.modal === 'mensal' || c.modal === 'combinado';
   const bloco = (k, titulo, btn) => `<div class="mt"><b>${titulo}</b><div id="ajC_${k}">${(l[k] || []).map(x => servAjLinha(k, x)).join('')}</div><button class="btn sm mt" data-act="ajAdd" data-k="${k}">+ ${btn}</button></div>`;
-  const valorBloco = c.modal === 'mensal' || c.modal === 'combinado'
-    ? `<div class="mt"><b>${c.modal === 'mensal' ? 'Valor mensal' : 'Valor combinado'}</b><input id="ajValor" type="number" step="0.01" min="0" value="${c.valorMes}"><div class="small muted">Dividido em 40% no pagamento do dia 15 e 60% no do fim do mês.</div></div>`
-    : `<div class="small muted mt">${c.modal === 'diaria' ? 'Diária: o total vem da soma dos dias lançados (dias 01 a 15 vão para o pagamento do dia 15).' : 'Serviços extras: o total vem só dos serviços listados abaixo.'}</div>`;
-  const pagBloco = c.pagos.map((x, i) => `<div class="ajrow" data-pg="${i + 1}"><b class="small">${i === 0 ? 'Pagamento do dia 15 (paga dia 20)' : 'Pagamento do fim do mês (paga dia 05)'}</b><span class="small">R$ ${servMoeda(x.valor)}${x.pago ? ' · pago' : ''}</span><input data-f="data" type="date" value="${x.data || ''}"></div>`).join('');
+  const valorBloco = pct
+    ? `<div class="mt"><b>${c.modal === 'mensal' ? 'Valor mensal' : 'Valor combinado'}</b><input id="ajValor" type="number" step="0.01" min="0" value="${c.valorMes}"></div>`
+    : `<div class="small muted mt">${c.modal === 'diaria' ? 'Diária: o total vem da soma dos dias lançados, separado pelos lotes de cada dia.' : 'Serviços extras: o total vem só dos serviços listados abaixo.'}</div>`;
+  const lotesBloco = c.pagos.map(x => {
+    const campoPct = pct ? `<label class="small">% <input data-f="pct" type="number" min="0" max="100" step="0.01" value="${x.pct}" style="width:90px"></label>` : '<span class="small muted">diária</span>';
+    return `<div class="lote-aj" data-pg="${esc(x.id)}" style="margin-top:8px"><span><b>${esc(x.nome)}</b><br><span class="small muted">dias ${x.de} a ${x.ate} · R$ ${servMoeda(x.valor)}${x.pago ? ' · pago' : ''}</span></span>${campoPct}<label class="small">Data <input data-f="data" type="date" value="${x.data || ''}"></label></div>`;
+  }).join('');
   abrirModal(`<div class="mh">${esc(_capNome(p.nome))} — ${servMesNome(mes)}</div>
     <div class="mbd">${valorBloco}
       ${bloco('extras', 'Serviços extras', 'Adicionar serviço extra')}
       ${bloco('adiant', 'Adiantamentos', 'Adicionar adiantamento')}
       ${bloco('descontos', 'Descontos', 'Adicionar desconto')}
-      <div class="mt"><b>Datas dos pagamentos</b>${pagBloco}</div>
+      <div class="mt"><b>Lotes de pagamento</b><div class="small muted">Data e % desta pessoa em cada lote.${pct ? ' A soma dos % deve dar 100.' : ''}</div>${lotesBloco}</div>
     </div>
     <div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="ajSalvar" data-pid="${pid}" data-mes="${mes}">Salvar</button></div>`, true);
 }
@@ -1502,32 +1555,95 @@ async function servAjSalvar(el) {
     r.querySelectorAll('[data-f]').forEach(i => { o[i.dataset.f] = i.type === 'number' ? r2(i.value) : i.value; });
     return o;
   }).filter(o => (o.valor || 0) !== 0);
-  const atual = ((S.servicos[servKey(mes, pid)] || {}).pagos) || [];
+  const raw = servPagosDoc(S.servicos[servKey(mes, pid)] || {});
+  const pagos = {};
+  servLotesMes(mes).forEach(x => {
+    const row = w.querySelector(`[data-pg="${x.id}"]`), o = raw[x.id] || {};
+    const d = row && row.querySelector('[data-f="data"]'), pc = row && row.querySelector('[data-f="pct"]');
+    pagos[x.id] = Object.assign({}, o, { data: d ? d.value : (o.data || ''), pct: pc ? r2(pc.value) : o.pct });
+  });
   const patch = {
     extras: lerLinhas('extras').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', valor: o.valor })),
     adiant: lerLinhas('adiant').map(o => ({ data: o.data || '', valor: o.valor })),
     descontos: lerLinhas('descontos').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', valor: o.valor })),
-    pagos: [0, 1].map(i => { const o = atual[i] || {}; const d = w.querySelector(`[data-pg="${i + 1}"] [data-f="data"]`); return { data: d ? d.value : (o.data || ''), pago: !!o.pago, valorPago: o.valorPago }; })
+    pagos
   };
   const vi = w.querySelector('#ajValor'); if (vi) patch.valor = r2(vi.value);
   fecharModal(w);
   try { await servSalvar(mes, pid, patch); log('servicos', 'Ajustes de ' + ((S.prestadores.find(x => x.id === pid) || {}).nome || '') + ' em ' + mes); } catch (e) { }
   render();
 }
-/* Marca ou desmarca como pago o pagamento de um período (idx 0 = dia 15, 1 = fim do mês), com confirmação */
-async function servPagar(mes, pid, idx) {
-  const c = servCalc(mes, pid), x = c.pagos[idx];
-  const desfazer = x.pago;
-  const nome = _capNome((c.p || {}).nome || '');
-  const quando = idx === 0 ? 'pagamento do dia 15 (paga dia 20)' : 'pagamento do fim do mês (paga dia 05)';
+/* Marca ou desmarca como pago um lote de um prestador, com confirmação */
+async function servPagar(mes, pid, loteId) {
+  const c = servCalc(mes, pid), x = c.pagos.find(y => y.id === loteId);
+  if (!x) return;
+  const desfazer = x.pago, nome = _capNome((c.p || {}).nome || '');
   const ok = await modalMsg(desfazer ? 'Desfazer pagamento' : 'Confirmar pagamento',
-    `<p>${desfazer ? 'Desfazer o pagamento de' : 'Marcar como pago'} <b>R$ ${servMoeda(desfazer && x.valorPago != null ? x.valorPago : x.valor)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${quando} · ${servMesNome(mes)}</p>`,
+    `<p>${desfazer ? 'Desfazer o pagamento de' : 'Marcar como pago'} <b>R$ ${servMoeda(desfazer && x.valorPago != null ? x.valorPago : x.valor)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${esc(x.nome)} (dias ${x.de} a ${x.ate}) · ${servMesNome(mes)}</p>`,
     [{ t: 'Cancelar', v: false }, { t: desfazer ? 'Desfazer' : 'Confirmar pagamento', c: 'pri', v: true }]);
   if (!ok) return;
-  const novo = [0, 1].map(i => { const o = (c.l.pagos || [])[i] || {}; return { data: o.data || c.pagos[i].data, pago: !!o.pago, valorPago: o.valorPago }; });
-  if (desfazer) { novo[idx].pago = false; delete novo[idx].valorPago; }
-  else { novo[idx].pago = true; novo[idx].valorPago = x.valor; }
-  try { await servSalvar(mes, pid, { pagos: novo }); log('servicos', (desfazer ? 'Pagamento desfeito: ' : 'Pago: ') + nome + ' · ' + mes + ' · ' + (idx === 0 ? 'dia 15' : 'fim do mês') + ' · R$ ' + servMoeda(x.valor)); } catch (e) { }
+  const novo = Object.assign({}, servPagosDoc(c.l));
+  novo[loteId] = desfazer
+    ? Object.assign({}, novo[loteId], { pago: false, valorPago: undefined })
+    : Object.assign({}, novo[loteId], { pago: true, valorPago: x.valor });
+  try { await servSalvar(mes, pid, { pagos: novo }); log('servicos', (desfazer ? 'Pagamento desfeito: ' : 'Pago: ') + nome + ' · ' + mes + ' · ' + x.nome + ' · R$ ' + servMoeda(x.valor)); } catch (e) { }
+  render();
+}
+/* Marca como pago, de uma vez, todos os pendentes do grupo escolhido num lote */
+async function servPagarGrupo(mes, loteId) {
+  const lote = servLotesMes(mes).find(x => x.id === loteId);
+  if (!lote) return;
+  const alvo = servPrestadoresGrupo().filter(p => S.servicos[servKey(mes, p.id)]).map(p => {
+    const c = servCalc(mes, p.id), x = c.pagos.find(y => y.id === loteId);
+    return { c, x, pid: p.id };
+  }).filter(o => o.x && !o.x.pago && o.x.valor > 0);
+  if (!alvo.length) return toast('Nada pendente neste grupo para este lote.');
+  const total = r2(alvo.reduce((a, o) => a + o.x.valor, 0));
+  const lista = alvo.map(o => `<li>${esc(_capNome(o.c.p.nome))}: R$ ${servMoeda(o.x.valor)}</li>`).join('');
+  const ok = await modalMsg('Confirmar pagamentos',
+    `<p>Marcar como pagos <b>${alvo.length}</b> pagamento(s) de <b>${esc(lote.nome)}</b> (${servMesNome(mes)}), ${esc(servGrupoNome[UI.servGrupo || 'todos'].toLowerCase())}, total <b>R$ ${servMoeda(total)}</b>?</p><ul>${lista}</ul>`,
+    [{ t: 'Cancelar', v: false }, { t: 'Confirmar pagamentos', c: 'pri', v: true }]);
+  if (!ok) return;
+  for (const o of alvo) {
+    const novo = Object.assign({}, servPagosDoc(o.c.l));
+    novo[loteId] = Object.assign({}, novo[loteId], { pago: true, valorPago: o.x.valor });
+    try { await servSalvar(mes, o.pid, { pagos: novo }); } catch (e) { }
+  }
+  log('servicos', 'Pagos em lote: ' + lote.nome + ' · ' + alvo.length + ' pessoa(s) · R$ ' + servMoeda(total));
+  render();
+}
+/* Lotes do mês: nome, dias, % padrão e data padrão. Valem para todos os prestadores. */
+function servLoteLinha(x) {
+  return `<div class="lote-g" data-lt="${esc(x.id)}" style="margin-top:6px"><input data-f="nome" placeholder="Nome" value="${esc(x.nome || '')}"><input data-f="de" type="number" min="1" max="31" value="${x.de}" title="Do dia"><input data-f="ate" type="number" min="1" max="31" value="${x.ate}" title="Até o dia"><input data-f="pctPadrao" type="number" min="0" max="100" value="${x.pctPadrao || 0}" title="% padrão (mensal/combinado)"><input data-f="dataPadrao" type="date" value="${x.dataPadrao || ''}" title="Data padrão"><button class="btn sm" data-act="loteDel" title="Remover">✕</button></div>`;
+}
+function servLotesEditar(mes) {
+  const lotes = servLotesMes(mes);
+  abrirModal(`<div class="mh">Lotes de pagamento · ${servMesNome(mes)}</div>
+    <div class="mbd">
+      <p class="small muted">Cada lote é um intervalo de dias pago de uma vez. Os lotes valem para todos os prestadores; a data e o % de cada um ficam em "Editar" no prestador. Os lotes não podem se sobrepor.</p>
+      <div class="small muted lote-g"><span>Nome</span><span>Do dia</span><span>Até o dia</span><span>% padrão</span><span>Data padrão</span><span></span></div>
+      <div id="lotesLista">${lotes.map(servLoteLinha).join('')}</div>
+      <div class="row mt"><button class="btn sm" data-act="loteAdd">+ Adicionar lote</button><button class="btn sm" data-act="lotePreset" data-mes="${mes}">Voltar para dia 15 e fim do mês</button></div>
+    </div>
+    <div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="lotesSalvar" data-mes="${mes}">Salvar lotes</button></div>`, true);
+}
+async function servLotesSalvar(el) {
+  const w = el.closest('.mbg'), mes = el.dataset.mes, ult = servDiasDoMes(mes);
+  const lotes = [...w.querySelectorAll('[data-lt]')].map(r => {
+    const v = f => { const i = r.querySelector(`[data-f="${f}"]`); return i ? i.value : ''; };
+    return { id: r.dataset.lt, nome: v('nome').trim(), de: parseInt(v('de'), 10), ate: parseInt(v('ate'), 10), pctPadrao: r2(v('pctPadrao')), dataPadrao: v('dataPadrao') };
+  });
+  const erros = [];
+  if (!lotes.length) erros.push('Crie pelo menos um lote.');
+  lotes.forEach(x => {
+    if (!x.nome) erros.push('Dê um nome para cada lote.');
+    if (!(x.de >= 1 && x.ate <= ult && x.de <= x.ate)) erros.push(`"${x.nome || 'Lote'}": use dias entre 1 e ${ult}, com o "do dia" menor ou igual ao "até o dia".`);
+  });
+  const ord = lotes.slice().sort((a, b) => a.de - b.de);
+  for (let i = 1; i < ord.length; i++) if (ord[i].de <= ord[i - 1].ate) erros.push(`"${ord[i - 1].nome}" e "${ord[i].nome}" se sobrepõem.`);
+  if (erros.length) return modalMsg('Não foi possível salvar', '<ul>' + erros.map(e => `<li>${esc(e)}</li>`).join('') + '</ul>');
+  fecharModal(w);
+  try { await Store.set('servicos', mes + '__lotes', { mes, pid: '__lotes', lotes: ord }); log('servicos', 'Lotes de ' + mes + ': ' + ord.map(x => x.nome).join(', ')); } catch (e) { }
   render();
 }
 
@@ -1566,7 +1682,7 @@ async function servPrestSalvar(el) {
 }
 
 /* ----- Exportação: mesma ordem do resumo da tela ----- */
-/* Linhas do resumo de UM pagamento (dia 15 ou fim do mês) */
+/* Linhas da exportação de UM lote */
 const SERV_LINHAS_PER = idx => [
   { rot: 'VALOR DOS DIAS E SERVIÇOS', v: c => c.g[idx], tot: true, lab: { bold: true }, val: {} },
   { rot: 'SALDO ANTERIOR', v: c => (idx === 0 ? c.ant : 0), tot: true, lab: { bold: true, cor: '#C00000' }, val: { cor: '#C00000' } },
@@ -1578,22 +1694,8 @@ const SERV_LINHAS_PER = idx => [
   { rot: 'DATA DO PAGAMENTO', v: c => servData(c.pagos[idx].data) || '—', lab: { bold: true }, val: { fill: '#E2EFDA', cor: '#00803C', bold: true } },
   { rot: 'SITUAÇÃO', v: c => (c.pagos[idx].pago ? 'PAGO' : 'PENDENTE'), lab: { bold: true }, val: { bold: true, fill: c => (c.pagos[idx].pago ? '#E2EFDA' : '#FFF2CC') } }
 ];
-/* Modelo da exportação: só os dias e o resumo do pagamento escolhido (ou o mês inteiro) */
-function servModelo(mes) {
-  servNovaCache();
-  const per = servPerAtual(), P = SERV_PER[per];
-  const ativos = servPrestadores(), calcs = ativos.map(p => servCalc(mes, p.id));
-  const ult = servDiasDoMes(mes);
-  const dias = Array.from({ length: ult }, (_, i) => i + 1).filter(d => d >= P.ini && d <= Math.min(P.fim, ult));
-  const linhas = per === 'mes' ? SERV_LINHAS : SERV_LINHAS_PER(P.idx);
-  const sub = servMesNome(mes) + (per === 'mes' ? '' : ' · ' + P.nome + ' · DIAS ' + String(P.ini).padStart(2, '0') + ' A ' + String(Math.min(P.fim, ult)).padStart(2, '0') + ' · ' + P.paga);
-  return { mes, per, P, ativos, calcs, dias, linhas, titulo: 'SERVIÇOS PRESTADOS', sub };
-}
-/* ----- Exportação no visual da planilha de referência ----- */
-const SERV_PAL = ['#B4C6E7', '#CCECF0', '#E2EFDA', '#FFF2CC', '#F8CBAD', '#DDEBF7', '#E4DFEC', '#D9E1F2'];
-const SERV_TOP = '#C4D79B', SERV_DATA = '#B7DEE8', SERV_WEEK = '#E4DFEC', SERV_BLUE = '#1F4E79';
-/* Linhas do resumo: rótulo (lab) e valores (val) com cor de fundo, texto e negrito */
-const SERV_LINHAS = [
+/* Linhas da exportação do mês inteiro (uma linha por lote) */
+const servLinhasMes = lotes => [
   { rot: 'VALOR A RECEBER', v: c => c.bruto, tot: true, lab: { fill: '#F8CBAD', cor: '#C00000', bold: true }, val: { fill: '#F8CBAD', bold: true } },
   { rot: 'SALDO ANTERIOR', v: c => c.ant, tot: true, lab: { cor: '#C00000', bold: true }, val: {} },
   { rot: 'DESCONTOS', v: c => c.desc, tot: true, lab: { cor: '#C00000', bold: true }, val: { cor: '#C00000' } },
@@ -1601,11 +1703,28 @@ const SERV_LINHAS = [
   { rot: 'LÍQUIDO A RECEBER', v: c => c.liquido, tot: true, lab: { bold: true, fill: '#F2F2F2' }, val: { bold: true, fill: '#F2F2F2' } },
   { rot: 'CHAVE PIX', v: c => c.p.pix || '—', lab: { bold: true }, val: {} },
   { rot: 'TITULAR', v: c => c.p.titular || '—', lab: { bold: true }, val: { bold: true } },
-  { rot: '1º PAGAMENTO', v: c => servPagTxt(c.pagos[0]), lab: { bold: true }, val: { fill: '#E2EFDA', cor: '#00803C' } },
-  { rot: '2º PAGAMENTO', v: c => servPagTxt(c.pagos[1]), lab: { bold: true }, val: { fill: '#E2EFDA', cor: '#00803C' } },
+  ...lotes.map((x, i) => ({ rot: (x.nome + ' (' + String(x.de).padStart(2, '0') + ' A ' + String(x.ate).padStart(2, '0') + ')').toUpperCase(), v: c => servPagTxt(c.pagos[i]), lab: { bold: true }, val: { fill: '#E2EFDA', cor: '#00803C' } })),
   { rot: 'JÁ PAGO', v: c => c.pago, tot: true, lab: { bold: true, fill: '#E2EFDA' }, val: { bold: true, fill: '#E2EFDA', cor: '#00803C' } },
   { rot: 'SALDO ATUAL', v: c => c.saldo, tot: true, lab: { bold: true, fill: '#F8CBAD', cor: '#C00000' }, val: { bold: true, fill: '#F8CBAD', cor: '#C00000' } }
 ];
+const servSlug = t => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+/* Modelo da exportação: o lote escolhido (ou o mês inteiro) e o grupo escolhido */
+function servModelo(mes) {
+  servNovaCache();
+  const lotes = servLotesMes(mes), sel = servPerSel(lotes);
+  const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
+  const ult = servDiasDoMes(mes), d2 = d => String(d).padStart(2, '0');
+  const ativos = servPrestadoresGrupo(), calcs = ativos.map(p => servCalc(mes, p.id));
+  const dias = Array.from({ length: ult }, (_, i) => i + 1).filter(d => !lote || (d >= lote.de && d <= Math.min(lote.ate, ult)));
+  const linhas = lote ? SERV_LINHAS_PER(idx) : servLinhasMes(lotes);
+  const gTxt = UI.servGrupo === 'diaria' ? ' · SÓ DIARISTAS' : UI.servGrupo === 'outros' ? ' · SEM DIARISTAS' : '';
+  const sub = servMesNome(mes) + (lote ? ' · ' + lote.nome.toUpperCase() + ' · DIAS ' + d2(lote.de) + ' A ' + d2(Math.min(lote.ate, ult)) : ' · MÊS INTEIRO') + gTxt;
+  const arq = (lote ? servSlug(lote.nome) : 'mes-inteiro') + (UI.servGrupo === 'diaria' ? '-diaristas' : UI.servGrupo === 'outros' ? '-sem-diaristas' : '');
+  return { mes, per: lote ? 'lote' : 'mes', lote, idx, P: { arq }, ativos, calcs, dias, linhas, titulo: 'SERVIÇOS PRESTADOS', sub };
+}
+const SERV_PAL = ['#B4C6E7', '#CCECF0', '#E2EFDA', '#FFF2CC', '#F8CBAD', '#DDEBF7', '#E4DFEC', '#D9E1F2'];
+const SERV_TOP = '#C4D79B', SERV_DATA = '#B7DEE8', SERV_WEEK = '#E4DFEC', SERV_BLUE = '#1F4E79';
+/* Linhas do resumo: rótulo (lab) e valores (val) com cor de fundo, texto e negrito */
 const servFill = (x, c) => (typeof x === 'function' ? x(c) : x);
 const servEstiloPDF = st => { const s = {}; if (st.fill) s.fillColor = rgb(st.fill); if (st.cor) s.textColor = rgb(st.cor); if (st.bold) s.fontStyle = 'bold'; return s; };
 
@@ -1715,7 +1834,7 @@ async function servXls() {
   await salvarArquivo('servicos-prestados-' + m.mes + '-' + m.P.arq + '.xlsx', new Blob([buf]));
 }
 
-const VERSAO_APP = '11/11 19:01';
+const VERSAO_APP = '11/11 19:15';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -3088,7 +3207,13 @@ document.addEventListener('click', async ev => {
     case 'servPdf': return servPDF(false);
     case 'servPrint': return servPDF(true);
     case 'servXls': return servXls();
-    case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, +el.dataset.idx);
+    case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
+    case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
+    case 'servLotes': return servLotesEditar(UI.servMes);
+    case 'loteAdd': { const w = el.closest('.mbg'); w.querySelector('#lotesLista').insertAdjacentHTML('beforeend', servLoteLinha({ id: uid('lt'), nome: 'Lote ' + (w.querySelectorAll('[data-lt]').length + 1), de: 1, ate: 1, pctPadrao: 0, dataPadrao: '' })); return; }
+    case 'loteDel': return el.closest('[data-lt]').remove();
+    case 'lotePreset': { const w = el.closest('.mbg'); w.querySelector('#lotesLista').innerHTML = servLotesDefault(el.dataset.mes).map(servLoteLinha).join(''); return; }
+    case 'lotesSalvar': return servLotesSalvar(el);
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'atualizarSistema': return atualizarSistema();
@@ -3230,6 +3355,7 @@ document.addEventListener('change', ev => {
   if (t.dataset && t.dataset.svc === 'dia') { servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, t.value).catch(() => { }); return; }
   if (t.id === 'inServMes' && t.value) { UI.servMes = t.value; render(); return; }
   if (t.id === 'selPer') { UI.servPer = t.value; render(); return; }
+  if (t.id === 'selGrupo') { UI.servGrupo = t.value; render(); return; }
   if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
   else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
   else if (t.id === 'vtMes' && t.value) { UI.vtMes = t.value; render(); }
