@@ -208,6 +208,7 @@ table.svc .svc-in:focus{outline:2px solid #2563eb;background:#eef4ff}
 table.svc tr.svc-sum td{background:#eef2f6;font-weight:600}
 .ajrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .ajrow input[type=number]{width:110px}
+table.svc tr.svc-fora td{opacity:.4}
 
 .fleg-f{display:inline-block;border:1.5px solid #000;width:44px;text-align:center;font-weight:800;padding:2px 0}
 .cor-in{width:44px;height:34px;padding:2px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer}
@@ -1330,34 +1331,45 @@ let _servMemo = {};
 function servNovaCache() { _servMemo = {}; }
 
 /* Cálculo de um prestador num mês. Saldo anterior vem do último mês com planilha. */
+/* Períodos de pagamento: dia 15 (dias 01 a 15, paga dia 20) e fim do mês (dias 16 a fim, paga dia 05 do mês seguinte) */
+const SERV_PER = {
+  '15': { nome: 'PAGAMENTO DO DIA 15', opcao: 'Dia 15: dias 01 a 15 (paga dia 20)', ini: 1, fim: 15, idx: 0, paga: 'PAGA NO DIA 20', arq: 'dia-15' },
+  'fim': { nome: 'PAGAMENTO DO FIM DO MÊS', opcao: 'Fim do mês: dias 16 a 31 (paga dia 05)', ini: 16, fim: 31, idx: 1, paga: 'PAGA NO DIA 05 DO MÊS SEGUINTE', arq: 'fim-do-mes' },
+  'mes': { nome: 'MÊS INTEIRO', opcao: 'Mês inteiro (só para conferir)', ini: 1, fim: 31, idx: -1, paga: '', arq: 'mes-inteiro' }
+};
+const servPerAtual = () => (SERV_PER[UI.servPer] ? UI.servPer : '15');
+const servQuinzena = d => (d && +d.slice(8, 10) <= 15 ? 0 : 1);
+/* Cálculo de um prestador num mês. g = [dia 15, fim do mês]; valores de cada pagamento já com saldo, descontos e adiantamentos */
 function servCalc(mes, pid) {
   const mk = mes + '|' + pid;
   if (_servMemo[mk]) return _servMemo[mk];
   const p = S.prestadores.find(x => x.id === pid) || {};
   const l = S.servicos[servKey(mes, pid)] || {};
+  const tem = !!S.servicos[servKey(mes, pid)]; // sem planilha do prestador naquele mês, não há cobrança
   const modal = p.modalidade || 'diaria';
   const diasTotal = r2(Object.values(l.dias || {}).reduce((a, v) => a + (+v || 0), 0));
   const valorMes = l.valor != null ? r2(l.valor) : r2(p.valor);
-  const tem = !!S.servicos[servKey(mes, pid)]; // sem planilha do prestador naquele mês, não há cobrança
-  const base = !tem ? 0 : modal === 'diaria' ? diasTotal : modal === 'extras' ? 0 : valorMes;
-  const soma = arr => r2((arr || []).reduce((a, x) => a + (+x.valor || 0), 0));
-  const extras = soma(l.extras), desc = soma(l.descontos), adiant = soma(l.adiant);
-  const bruto = r2(base + extras);
-  const ant = servSaldoAnt(mes, pid);
-  const liquido = r2(bruto + ant - desc - adiant);
-  const pg = l.pagos || [];
-  let pagos;
-  if (modal === 'mensal') {
-    const v1 = r2(bruto * 0.4), v2 = r2(bruto - v1);
-    pagos = [
-      { ref: '1', valor: v1, data: (pg[0] && pg[0].data) || mes + '-20', pago: !!(pg[0] && pg[0].pago) },
-      { ref: '2', valor: v2, data: (pg[1] && pg[1].data) || servMesVizinho(mes, 1) + '-05', pago: !!(pg[1] && pg[1].pago) }
-    ];
-  } else {
-    pagos = [0, 1].map(i => ({ ref: String(i + 1), valor: r2(pg[i] && pg[i].valor), data: (pg[i] && pg[i].data) || '', pago: !!(pg[i] && pg[i].pago) }));
+  const g = [0, 0];
+  if (tem) {
+    if (modal === 'diaria') Object.entries(l.dias || {}).forEach(([dd, v]) => { g[+dd <= 15 ? 0 : 1] += +v || 0; });
+    else if (modal === 'mensal' || modal === 'combinado') { g[0] = r2(valorMes * 0.4); g[1] = r2(valorMes - g[0]); }
+    (l.extras || []).forEach(x => { g[servQuinzena(x.data)] += +x.valor || 0; });
   }
-  const pago = r2(pagos.filter(x => x.pago).reduce((a, x) => a + x.valor, 0));
-  const r = { p, l, modal, diasTotal, valorMes, base, extras, bruto, desc, adiant, ant, liquido, pagos, pago, saldo: r2(liquido - pago) };
+  const soma2 = arr => { const q = [0, 0]; (arr || []).forEach(x => { q[servQuinzena(x.data)] += +x.valor || 0; }); return [r2(q[0]), r2(q[1])]; };
+  const dsc = soma2(l.descontos), adi = soma2(l.adiant);
+  const gg = [r2(g[0]), r2(g[1])];
+  const bruto = r2(gg[0] + gg[1]);
+  const extras = r2((l.extras || []).reduce((a, x) => a + (+x.valor || 0), 0));
+  const ant = servSaldoAnt(mes, pid);
+  const liquido = r2(bruto + ant - dsc[0] - dsc[1] - adi[0] - adi[1]);
+  const valores = [r2(gg[0] + ant - dsc[0] - adi[0]), r2(gg[1] - dsc[1] - adi[1])]; // o saldo anterior vai para o pagamento do dia 15
+  const pg = l.pagos || [];
+  const pagos = [0, 1].map(i => {
+    const o = pg[i] || {};
+    return { ref: String(i + 1), valor: valores[i], data: o.data || (i === 0 ? mes + '-20' : servMesVizinho(mes, 1) + '-05'), pago: !!o.pago, valorPago: o.valorPago != null ? r2(o.valorPago) : undefined };
+  });
+  const pago = r2(pagos.filter(x => x.pago).reduce((a, x) => a + (x.valorPago != null ? x.valorPago : x.valor), 0));
+  const r = { p, l, modal, diasTotal, valorMes, g: gg, dsc, adi, extras, bruto, desc: r2(dsc[0] + dsc[1]), adiant: r2(adi[0] + adi[1]), ant, liquido, pagos, pago, saldo: r2(liquido - pago) };
   _servMemo[mk] = r;
   return r;
 }
@@ -1391,6 +1403,7 @@ function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
   const mes = UI.servMes;
+  const per = servPerAtual(), P = SERV_PER[per];
   const ativos = servPrestadores();
   if (ativos.length) servCriarMes(mes); // cria a planilha do mês (e de quem entrou depois) sem precisar clicar
   const criado = servMeses().includes(mes);
@@ -1399,7 +1412,8 @@ function vServicos() {
     <button class="btn icon" data-act="servAnt">${ic('chevL')}</button><input type="month" id="inServMes" value="${mes}"><button class="btn icon" data-act="servProx">${ic('chevR')}</button>
     <div class="sp"></div>
     <button class="btn" data-act="prestLista">Prestadores</button>
-  </div></div>`;
+  </div>
+  <div class="row mt"><select id="selPer" style="flex:1;min-width:240px">${Object.keys(SERV_PER).map(k => `<option value="${k}" ${k === per ? 'selected' : ''}>${SERV_PER[k].opcao}</option>`).join('')}</select></div></div>`;
   if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
   if (!criado) return h + `<div class="card empty"><b>${servMesNome(mes)} ainda não tem planilha</b>${S.somenteLeitura ? 'Sem permissão para criar agora.' : 'Aguarde um instante.'}</div>`;
 
@@ -1415,7 +1429,8 @@ function vServicos() {
   const thead = `<thead><tr><th class="svc-dia" rowspan="2">DIA</th>${ativos.map(p => `<th class="svc-p">${esc(_capNome(p.nome))}</th>`).join('')}</tr><tr>${ativos.map(p => `<th class="svc-f">${esc(p.funcao || '—')}</th>`).join('')}</tr></thead>`;
   let corpo = '';
   for (let dd = 1; dd <= dias; dd++) {
-    corpo += `<tr><td class="svc-dia">${dd2(dd)} ${dsem(dd)}</td>${calcs.map(c => {
+    const fora = per !== 'mes' && (dd < P.ini || dd > P.fim);
+    corpo += `<tr class="${fora ? 'svc-fora' : ''}"><td class="svc-dia">${dd2(dd)} ${dsem(dd)}</td>${calcs.map(c => {
       const v = (c.l.dias || {})[dd2(dd)];
       return `<td><input class="svc-in" type="number" inputmode="decimal" step="0.01" min="0" value="${v ?? ''}" data-svc="dia" data-mes="${mes}" data-pid="${c.p.id}" data-dd="${dd2(dd)}"></td>`;
     }).join('')}</tr>`;
@@ -1425,11 +1440,18 @@ function vServicos() {
   SERV_RESUMO.forEach(([rot, fn]) => {
     corpo += `<tr class="svc-res"><td class="svc-dia">${rot}</td>${calcs.map(c => { const v = fn(c); return `<td>${typeof v === 'number' ? servMoeda(v) : esc(v || '—')}</td>`; }).join('')}</tr>`;
   });
+  if (per !== 'mes') {
+    corpo += `<tr class="svc-sum"><td class="svc-dia">${P.nome}</td>${calcs.map(c => {
+      const x = c.pagos[P.idx];
+      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-idx="${P.idx}">Pago ✓ · desfazer</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-idx="${P.idx}">Marcar como pago</button>`}</td>`;
+    }).join('')}</tr>`;
+  }
   corpo += `<tr><td class="svc-dia">Ajustes</td>${ativos.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
 
   h += `<div class="card mb"><div class="svc-wrap"><table class="svc">${thead}<tbody>${corpo}</tbody></table></div>
-    <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Em "Editar" ficam serviços extras, adiantamentos, descontos e pagamentos.</p></div>`;
-  h += `<div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>`;
+    <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do pagamento escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e datas.</p></div>`;
+  h += `<div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
+  <p class="small muted mt">Imprime e baixa só o pagamento escolhido no seletor de cima.</p>`;
   return h;
 }
 /* Linhas do resumo financeiro (mesma ordem na tela, PDF e Excel) */
@@ -1452,7 +1474,7 @@ function servAjLinha(k, x) {
   x = x || {};
   const del = '<button class="btn sm" data-act="ajDel" title="Remover">✕</button>';
   const val = `<input data-f="valor" type="number" step="0.01" min="0" placeholder="Valor" value="${x.valor ?? ''}">`;
-  if (k === 'descontos') return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Descrição" value="${esc(x.desc || '')}">${val}${del}</div>`;
+  if (k === 'descontos') return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Descrição" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${val}${del}</div>`;
   if (k === 'adiant') return `<div class="ajrow" data-k="${k}"><input data-f="data" type="date" value="${x.data || ''}">${val}${del}</div>`;
   return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Serviço" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${val}${del}</div>`;
 }
@@ -1461,15 +1483,15 @@ function servAjustes(mes, pid) {
   const c = servCalc(mes, pid), p = c.p, l = c.l;
   const bloco = (k, titulo, btn) => `<div class="mt"><b>${titulo}</b><div id="ajC_${k}">${(l[k] || []).map(x => servAjLinha(k, x)).join('')}</div><button class="btn sm mt" data-act="ajAdd" data-k="${k}">+ ${btn}</button></div>`;
   const valorBloco = c.modal === 'mensal' || c.modal === 'combinado'
-    ? `<div class="mt"><b>${c.modal === 'mensal' ? 'Valor mensal' : 'Valor combinado'}</b><input id="ajValor" type="number" step="0.01" min="0" value="${c.valorMes}"><div class="small muted">${c.modal === 'mensal' ? 'O total do mês é dividido em 40% no 1º pagamento e 60% no 2º.' : 'Valor fechado para o mês.'}</div></div>`
-    : `<div class="small muted mt">${c.modal === 'diaria' ? 'Diária: o total vem da soma dos dias lançados.' : 'Serviços extras: o total vem só dos serviços listados abaixo.'}</div>`;
-  const pagBloco = c.pagos.map((pg, i) => `<div class="ajrow" data-pg="${i + 1}"><b class="small">${i + 1}º pagamento</b><input data-f="data" type="date" value="${pg.data || ''}"><input data-f="valor" type="number" step="0.01" min="0" placeholder="Valor" value="${c.modal === 'mensal' ? pg.valor : (pg.valor || '')}" ${c.modal === 'mensal' ? 'readonly' : ''}><label class="small"><input type="checkbox" data-f="pago" ${pg.pago ? 'checked' : ''}> pago</label></div>`).join('');
+    ? `<div class="mt"><b>${c.modal === 'mensal' ? 'Valor mensal' : 'Valor combinado'}</b><input id="ajValor" type="number" step="0.01" min="0" value="${c.valorMes}"><div class="small muted">Dividido em 40% no pagamento do dia 15 e 60% no do fim do mês.</div></div>`
+    : `<div class="small muted mt">${c.modal === 'diaria' ? 'Diária: o total vem da soma dos dias lançados (dias 01 a 15 vão para o pagamento do dia 15).' : 'Serviços extras: o total vem só dos serviços listados abaixo.'}</div>`;
+  const pagBloco = c.pagos.map((x, i) => `<div class="ajrow" data-pg="${i + 1}"><b class="small">${i === 0 ? 'Pagamento do dia 15 (paga dia 20)' : 'Pagamento do fim do mês (paga dia 05)'}</b><span class="small">R$ ${servMoeda(x.valor)}${x.pago ? ' · pago' : ''}</span><input data-f="data" type="date" value="${x.data || ''}"></div>`).join('');
   abrirModal(`<div class="mh">${esc(_capNome(p.nome))} — ${servMesNome(mes)}</div>
     <div class="mbd">${valorBloco}
       ${bloco('extras', 'Serviços extras', 'Adicionar serviço extra')}
       ${bloco('adiant', 'Adiantamentos', 'Adicionar adiantamento')}
       ${bloco('descontos', 'Descontos', 'Adicionar desconto')}
-      <div class="mt"><b>Pagamentos</b>${pagBloco}</div>
+      <div class="mt"><b>Datas dos pagamentos</b>${pagBloco}</div>
     </div>
     <div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="ajSalvar" data-pid="${pid}" data-mes="${mes}">Salvar</button></div>`, true);
 }
@@ -1480,15 +1502,32 @@ async function servAjSalvar(el) {
     r.querySelectorAll('[data-f]').forEach(i => { o[i.dataset.f] = i.type === 'number' ? r2(i.value) : i.value; });
     return o;
   }).filter(o => (o.valor || 0) !== 0);
+  const atual = ((S.servicos[servKey(mes, pid)] || {}).pagos) || [];
   const patch = {
     extras: lerLinhas('extras').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', valor: o.valor })),
     adiant: lerLinhas('adiant').map(o => ({ data: o.data || '', valor: o.valor })),
-    descontos: lerLinhas('descontos').map(o => ({ desc: (o.desc || '').trim(), valor: o.valor })),
-    pagos: [...w.querySelectorAll('[data-pg]')].map(r => ({ ref: r.dataset.pg, data: r.querySelector('[data-f="data"]').value || '', valor: r2(r.querySelector('[data-f="valor"]').value), pago: r.querySelector('[data-f="pago"]').checked }))
+    descontos: lerLinhas('descontos').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', valor: o.valor })),
+    pagos: [0, 1].map(i => { const o = atual[i] || {}; const d = w.querySelector(`[data-pg="${i + 1}"] [data-f="data"]`); return { data: d ? d.value : (o.data || ''), pago: !!o.pago, valorPago: o.valorPago }; })
   };
   const vi = w.querySelector('#ajValor'); if (vi) patch.valor = r2(vi.value);
   fecharModal(w);
   try { await servSalvar(mes, pid, patch); log('servicos', 'Ajustes de ' + ((S.prestadores.find(x => x.id === pid) || {}).nome || '') + ' em ' + mes); } catch (e) { }
+  render();
+}
+/* Marca ou desmarca como pago o pagamento de um período (idx 0 = dia 15, 1 = fim do mês), com confirmação */
+async function servPagar(mes, pid, idx) {
+  const c = servCalc(mes, pid), x = c.pagos[idx];
+  const desfazer = x.pago;
+  const nome = _capNome((c.p || {}).nome || '');
+  const quando = idx === 0 ? 'pagamento do dia 15 (paga dia 20)' : 'pagamento do fim do mês (paga dia 05)';
+  const ok = await modalMsg(desfazer ? 'Desfazer pagamento' : 'Confirmar pagamento',
+    `<p>${desfazer ? 'Desfazer o pagamento de' : 'Marcar como pago'} <b>R$ ${servMoeda(desfazer && x.valorPago != null ? x.valorPago : x.valor)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${quando} · ${servMesNome(mes)}</p>`,
+    [{ t: 'Cancelar', v: false }, { t: desfazer ? 'Desfazer' : 'Confirmar pagamento', c: 'pri', v: true }]);
+  if (!ok) return;
+  const novo = [0, 1].map(i => { const o = (c.l.pagos || [])[i] || {}; return { data: o.data || c.pagos[i].data, pago: !!o.pago, valorPago: o.valorPago }; });
+  if (desfazer) { novo[idx].pago = false; delete novo[idx].valorPago; }
+  else { novo[idx].pago = true; novo[idx].valorPago = x.valor; }
+  try { await servSalvar(mes, pid, { pagos: novo }); log('servicos', (desfazer ? 'Pagamento desfeito: ' : 'Pago: ') + nome + ' · ' + mes + ' · ' + (idx === 0 ? 'dia 15' : 'fim do mês') + ' · R$ ' + servMoeda(x.valor)); } catch (e) { }
   render();
 }
 
@@ -1527,10 +1566,28 @@ async function servPrestSalvar(el) {
 }
 
 /* ----- Exportação: mesma ordem do resumo da tela ----- */
+/* Linhas do resumo de UM pagamento (dia 15 ou fim do mês) */
+const SERV_LINHAS_PER = idx => [
+  { rot: 'VALOR DOS DIAS E SERVIÇOS', v: c => c.g[idx], tot: true, lab: { bold: true }, val: {} },
+  { rot: 'SALDO ANTERIOR', v: c => (idx === 0 ? c.ant : 0), tot: true, lab: { bold: true, cor: '#C00000' }, val: { cor: '#C00000' } },
+  { rot: 'DESCONTOS', v: c => c.dsc[idx], tot: true, lab: { bold: true, cor: '#C00000' }, val: { cor: '#C00000' } },
+  { rot: 'ADIANTAMENTOS', v: c => c.adi[idx], tot: true, lab: { bold: true }, val: { fill: c => (c.adi[idx] > 0 ? '#FFFF00' : null) } },
+  { rot: 'VALOR A PAGAR', v: c => c.pagos[idx].valor, tot: true, lab: { bold: true, fill: '#F8CBAD', cor: '#C00000' }, val: { bold: true, fill: '#F8CBAD' } },
+  { rot: 'CHAVE PIX', v: c => c.p.pix || '—', lab: { bold: true }, val: {} },
+  { rot: 'TITULAR', v: c => c.p.titular || '—', lab: { bold: true }, val: { bold: true } },
+  { rot: 'DATA DO PAGAMENTO', v: c => servData(c.pagos[idx].data) || '—', lab: { bold: true }, val: { fill: '#E2EFDA', cor: '#00803C', bold: true } },
+  { rot: 'SITUAÇÃO', v: c => (c.pagos[idx].pago ? 'PAGO' : 'PENDENTE'), lab: { bold: true }, val: { bold: true, fill: c => (c.pagos[idx].pago ? '#E2EFDA' : '#FFF2CC') } }
+];
+/* Modelo da exportação: só os dias e o resumo do pagamento escolhido (ou o mês inteiro) */
 function servModelo(mes) {
   servNovaCache();
-  const ativos = servPrestadores();
-  return { mes, ativos, calcs: ativos.map(p => servCalc(mes, p.id)), dias: Array.from({ length: servDiasDoMes(mes) }, (_, i) => i + 1), titulo: 'SERVIÇOS PRESTADOS', sub: servMesNome(mes) };
+  const per = servPerAtual(), P = SERV_PER[per];
+  const ativos = servPrestadores(), calcs = ativos.map(p => servCalc(mes, p.id));
+  const ult = servDiasDoMes(mes);
+  const dias = Array.from({ length: ult }, (_, i) => i + 1).filter(d => d >= P.ini && d <= Math.min(P.fim, ult));
+  const linhas = per === 'mes' ? SERV_LINHAS : SERV_LINHAS_PER(P.idx);
+  const sub = servMesNome(mes) + (per === 'mes' ? '' : ' · ' + P.nome + ' · DIAS ' + String(P.ini).padStart(2, '0') + ' A ' + String(Math.min(P.fim, ult)).padStart(2, '0') + ' · ' + P.paga);
+  return { mes, per, P, ativos, calcs, dias, linhas, titulo: 'SERVIÇOS PRESTADOS', sub };
 }
 /* ----- Exportação no visual da planilha de referência ----- */
 const SERV_PAL = ['#B4C6E7', '#CCECF0', '#E2EFDA', '#FFF2CC', '#F8CBAD', '#DDEBF7', '#E4DFEC', '#D9E1F2'];
@@ -1577,13 +1634,13 @@ async function servPDF(paraImprimir) {
   const body = m.dias.map(dd => [{ content: dd2(dd) + ' ' + dsem(dd), styles: { fontStyle: fimSemana(dd) ? 'bold' : 'normal', fillColor: rgb(fimSemana(dd) ? SERV_WEEK : '#FFFFFF') } }]
     .concat(m.calcs.map((c, i) => { const v = (c.l.dias || {})[dd2(dd)]; return { content: v ? servMoeda(v) : '', styles: { fillColor: rgb(cor(i)) } }; }))
     .concat([{ content: '', styles: {} }]));
-  body.push([{ content: 'TOTAL DOS DIAS', styles: { fontStyle: 'bold', fillColor: rgb(SERV_TOP) } }]
+  if (m.per === 'mes') body.push([{ content: 'TOTAL DOS DIAS', styles: { fontStyle: 'bold', fillColor: rgb(SERV_TOP) } }]
     .concat(m.calcs.map(c => ({ content: servMoeda(c.diasTotal), styles: { fontStyle: 'bold' } })))
     .concat([{ content: '', styles: {} }]));
   body.push([{ content: 'MODALIDADE', styles: { fontStyle: 'bold' } }]
     .concat(m.calcs.map(c => ({ content: SERV_MOD[c.modal] || '', styles: { fontSize: fs } })))
     .concat([{ content: '', styles: {} }]));
-  SERV_LINHAS.forEach(L => {
+  m.linhas.forEach(L => {
     const row = [{ content: L.rot, styles: servEstiloPDF(L.lab || {}) }];
     let soma = 0;
     m.calcs.forEach(c => {
@@ -1605,7 +1662,7 @@ async function servPDF(paraImprimir) {
     columnStyles: { 0: { cellWidth: 34, halign: 'left' }, [nc - 1]: { cellWidth: 24 } },
     tableLineColor: [0, 0, 0], tableLineWidth: 0.4
   });
-  await salvarArquivo('servicos-prestados-' + m.mes + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
+  await salvarArquivo('servicos-prestados-' + m.mes + '-' + m.P.arq + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
 }
 
 async function servXls() {
@@ -1639,9 +1696,9 @@ async function servXls() {
   m.dias.forEach(dd => linha([cel(dd2(dd) + ' ' + C.DIAS_CURTO[C.diaSemana(m.mes + '-' + dd2(dd))].toUpperCase(), { bold: fimSemana(dd), fill: fimSemana(dd) ? SERV_WEEK : null })]
     .concat(m.calcs.map((c, i) => { const v = (c.l.dias || {})[dd2(dd)]; return cel(v ? +v : null, { fill: cor(i), num: true }); }))
     .concat([cel('')])));
-  linha([cel('TOTAL DOS DIAS', { bold: true, fill: SERV_TOP })].concat(m.calcs.map(c => cel(c.diasTotal, { bold: true, num: true }))).concat([cel('')]));
+  if (m.per === 'mes') linha([cel('TOTAL DOS DIAS', { bold: true, fill: SERV_TOP })].concat(m.calcs.map(c => cel(c.diasTotal, { bold: true, num: true }))).concat([cel('')]));
   linha([cel('MODALIDADE', { bold: true })].concat(m.calcs.map(c => cel(SERV_MOD[c.modal] || ''))).concat([cel('')]));
-  SERV_LINHAS.forEach(L => {
+  m.linhas.forEach(L => {
     const lab = L.lab || {}, val = L.val || {};
     const cells = [cel(L.rot, lab)];
     let soma = 0;
@@ -1655,10 +1712,10 @@ async function servXls() {
     linha(cells);
   });
   const buf = await wb.xlsx.writeBuffer();
-  await salvarArquivo('servicos-prestados-' + m.mes + '.xlsx', new Blob([buf]));
+  await salvarArquivo('servicos-prestados-' + m.mes + '-' + m.P.arq + '.xlsx', new Blob([buf]));
 }
 
-const VERSAO_APP = '11/11 18:58';
+const VERSAO_APP = '11/11 19:01';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -3031,6 +3088,7 @@ document.addEventListener('click', async ev => {
     case 'servPdf': return servPDF(false);
     case 'servPrint': return servPDF(true);
     case 'servXls': return servXls();
+    case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, +el.dataset.idx);
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'atualizarSistema': return atualizarSistema();
@@ -3171,6 +3229,7 @@ document.addEventListener('change', ev => {
   const t = ev.target;
   if (t.dataset && t.dataset.svc === 'dia') { servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, t.value).catch(() => { }); return; }
   if (t.id === 'inServMes' && t.value) { UI.servMes = t.value; render(); return; }
+  if (t.id === 'selPer') { UI.servPer = t.value; render(); return; }
   if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
   else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
   else if (t.id === 'vtMes' && t.value) { UI.vtMes = t.value; render(); }
