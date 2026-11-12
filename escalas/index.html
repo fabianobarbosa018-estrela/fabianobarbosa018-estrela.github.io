@@ -319,7 +319,8 @@ a.pm-card:hover{background:rgba(24,37,46,.85);border-color:rgba(52,211,153,.3)}
 .pm-kt .x{font-size:11.5px;margin-top:4px;line-height:1.3}
 .pm-kpi{position:relative}
 .pm-ring{width:22px;height:22px;transform:rotate(-90deg);position:absolute;right:12px;top:12px}
-.pm-kt .l{white-space:normal;padding-right:26px;line-height:1.25}
+.pm-kt .l{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;padding-right:0;line-height:1.25}
+.pm-ring{top:auto;bottom:12px;right:12px}
 .pm-rbg{fill:none;stroke:rgba(255,255,255,.12);stroke-width:3}
 .pm-rfg{fill:none;stroke-width:3;stroke-linecap:round}
 .r-teal{stroke:#5eead4}
@@ -355,6 +356,27 @@ a.pm-card:hover{background:rgba(24,37,46,.85);border-color:rgba(52,211,153,.3)}
 .pm .catb.on{background:#0d4a5a;border-color:#5eead4;color:#fff}
 .pm .alert a{color:#5eead4}
 @media (max-width:480px){.pm{padding:14px 10px 22px}.pm-kt .n{font-size:22px}}
+/* ajustes finos para ficar como na referência */
+.pm::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 0% 45%,rgba(45,212,191,.24),transparent 46%),radial-gradient(ellipse at 100% 45%,rgba(45,212,191,.2),transparent 46%)}
+.pm>*{position:relative;z-index:1}
+.pm-kpi{overflow:hidden}
+.pm-kpi::before{content:'';position:absolute;left:18px;right:18px;top:0;height:2px;background:linear-gradient(90deg,transparent,#5eead4,transparent);opacity:.85}
+.pm-kpi.c-gold::before{background:linear-gradient(90deg,transparent,#e9c58a,transparent)}
+.pm-ico{width:40px;height:40px;border-radius:12px;box-shadow:0 0 18px rgba(94,234,212,.25),inset 0 1px 0 rgba(255,255,255,.12)}
+.pm-ico svg{width:20px;height:20px}
+.c-gold .pm-ico{box-shadow:0 0 18px rgba(212,163,89,.28),inset 0 1px 0 rgba(255,255,255,.12)}
+.pm-ring{width:30px;height:30px;right:12px;top:14px;filter:drop-shadow(0 0 4px rgba(94,234,212,.5))}
+.r-gold{filter:drop-shadow(0 0 4px rgba(212,163,89,.5))}
+.pm-rfg{stroke-width:3.2}
+.pm-kt .n{font-size:27px}
+.pm-av{position:relative}
+.pm-av::after{content:'';position:absolute;right:-2px;bottom:-2px;width:7px;height:7px;border-radius:50%;background:#94a3b8;border:1px solid #0c1419}
+.av-t::after{background:#34d399}
+.pm .fin{background:linear-gradient(160deg,rgba(20,32,39,.94),rgba(12,20,26,.96)) padding-box,linear-gradient(135deg,rgba(212,163,89,.75),rgba(94,234,212,.45) 55%,rgba(255,255,255,.12)) border-box;border:1.5px solid transparent}
+.pm .fin .fin-v{font-size:32px}
+.pm-gold{color:#d4a359}
+.pm .badge.b-ok{box-shadow:0 0 12px rgba(16,185,129,.25)}
+.pm-situ-t .pm-ct{font-size:16px}
 
 /* ===== Visual refinado (tema claro e escuro automático) ===== */
 :root{
@@ -2099,7 +2121,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 01:08';
+const VERSAO_APP = '12/11 01:15';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2376,7 +2398,7 @@ function vPainel() {
   ${escA ? `<div class="pm-card mt"><div class="pm-ct">Quem está de folga hoje · <span>${diaHoje}</span></div><div class="pm-chips">${folgNomes.length ? folgNomes.map((n, i) => `<span class="pm-chip"><span class="pm-av ${i % 2 ? 'av-s' : 'av-t'}">${esc(ini(n))}</span>${esc(n)}</span>`).join('') : '<p class="pm-muted">Ninguém de folga hoje.</p>'}</div></div>` : ''}
   <a class="pm-card pm-situ mt kpi-link" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="pm-situ-t"><span class="pm-ct">Situação da escala desta semana</span>${sitTxt}</div><div class="pm-muted">${semanaLabel(sem)} · toque para abrir</div><span class="pm-chev">›</span></a>
 
-  <h3 class="secao">Financeiro · próximo pagamento</h3>
+  <h3 class="secao"><span class="pm-gold">Financeiro</span> · próximo pagamento</h3>
   <div class="grid g2">
     <a class="card fin" href="#servicos">
       <div class="l">Serviços prestados</div>
