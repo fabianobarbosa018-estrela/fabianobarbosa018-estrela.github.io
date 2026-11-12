@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:20';
+const VERSAO_APP = '12/11 00:35';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2031,16 +2031,19 @@ function alertasGerais() {
     v.erros.forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
     v.avisos.filter(a => a.fora).forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
     v.avisos.filter(a => !/repete a combinação/.test(a.msg) && !a.fora).forEach(x => out.push({ t: 'w', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
-    if (e.status !== 'aprovada' && !v.erros.length) out.push({ t: 'i', m: 'Escala ' + rot + ' (' + semanaLabel(sem) + ') aguardando aprovação.', link: 'mensal', sem });
+    if (e.status !== 'aprovada') out.push({ t: 'i', m: 'Escala ' + rot + ' (' + semanaLabel(sem) + ') está em ' + (e.status || 'rascunho') + ', aguardando aprovação.', link: 'mensal', sem });
   });
   // domingo de folga previsto no mês: só cobra depois que todos os domingos do mês já estão planejados
   const mesAtual = hoje.slice(0, 7), ultDia = new Date(+mesAtual.slice(0, 4), +mesAtual.slice(5, 7), 0).getDate();
   const domMes = [];
   for (let dd = 1; dd <= ultDia; dd++) { const iso = mesAtual + '-' + String(dd).padStart(2, '0'); if (C.diaSemana(iso) === 0) domMes.push(iso); }
+  // Lê a escala salva com a mesma regra que monta a escala (grupo ou dias da semana), sem olhar o status de aprovação
   if (domMes.length && domMes.every(dm => S.escalas[dm])) {
     ativos.forEach(f => {
-      const tem = domMes.some(dm => { const a = S.escalas[dm].atribuicoes && S.escalas[dm].atribuicoes[f.id]; return a && a.g === 4; });
-      if (!tem) out.push({ t: 'w', m: f.nome + ' não tem domingo de folga previsto em ' + servMesNome(mesAtual) + '.', link: 'mensal' });
+      const st = domMes.map(dm => C.statusDia(S.escalas[dm].atribuicoes ? S.escalas[dm].atribuicoes[f.id] || null : null, dm, f, true));
+      const trabDom = st.filter(x => x === 'T' || x === 'X').length;
+      const folgaDom = st.filter(x => x === 'F').length;
+      if (trabDom > 0 && folgaDom === 0) out.push({ t: 'w', m: f.nome + ' não tem domingo de folga previsto em ' + servMesNome(mesAtual) + ' (trabalha nos ' + trabDom + ' domingos do mês). Abra a escala para ajustar.', link: 'mensal' });
     });
   }
   out.forEach(a => { if (!a.cat) a.cat = catAlerta(a.m); });
