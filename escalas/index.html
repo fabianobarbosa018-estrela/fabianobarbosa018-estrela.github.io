@@ -71,7 +71,13 @@ h3{font-size:14px;margin:0 0 8px;font-weight:700}
 .kpi .n{font-size:28px;font-weight:800;letter-spacing:-.5px}
 .kpi .l{color:var(--ink2);font-size:13px}
 .kpi .x{font-size:12px;color:var(--ink3);margin-top:2px}
-.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.situ{padding:18px}
+.situ-b{margin:8px 0 6px}
+.fin{display:block;text-decoration:none;color:inherit;border-top:4px solid #e9a23b;padding:18px;cursor:pointer}
+.fin:hover{box-shadow:0 6px 18px rgba(15,76,92,.14)}
+.fin-v{font-size:28px;font-weight:800;letter-spacing:-.5px;margin:4px 0 2px}
+.secao{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink2);margin:24px 0 10px;font-weight:700}
 .kico{width:36px;height:36px;border-radius:10px;background:#e6f1f3;color:var(--pri);display:flex;align-items:center;justify-content:center;margin-bottom:10px}
 .kico svg{width:19px;height:19px}
 .kpi-link{display:block;text-decoration:none;color:inherit;cursor:pointer}
@@ -84,6 +90,15 @@ h3{font-size:14px;margin:0 0 8px;font-weight:700}
 .pdet-t{display:block;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);margin-bottom:6px}
 .pdet-t.tr{color:#15803d}.pdet-t.fo{color:#1d4ed8}
 .pdet .chip{margin:0 4px 6px 0}
+.cats{display:flex;flex-wrap:wrap;gap:6px}
+.catb{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink2)}
+.catb b{color:var(--ink)}
+.catb.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.catb.on b{color:#fff}
+.pg-l{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.pg-l:last-of-type{border-bottom:0}
+.pg-l b{font-size:15px}
+.pg-t{font-weight:700}
 @media (max-width:820px){.pdet-c{grid-template-columns:1fr}}
 .kpi-link:hover{box-shadow:0 6px 18px rgba(15,76,92,.14)}
 .atalhos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
@@ -1922,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '11/11 23:17';
+const VERSAO_APP = '11/11 23:27';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2016,8 +2031,28 @@ function alertasGerais() {
     v.erros.forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
     v.avisos.filter(a => a.fora).forEach(x => out.push({ t: 'e', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
     v.avisos.filter(a => !/repete a combinação/.test(a.msg) && !a.fora).forEach(x => out.push({ t: 'w', m: 'Escala ' + rot + ': ' + x.msg, link: 'mensal', sem }));
+    if (e.status !== 'aprovada' && !v.erros.length) out.push({ t: 'i', m: 'Escala ' + rot + ' (' + semanaLabel(sem) + ') aguardando aprovação.', link: 'mensal', sem });
   });
+  // domingo de folga previsto no mês: só cobra depois que todos os domingos do mês já estão planejados
+  const mesAtual = hoje.slice(0, 7), ultDia = new Date(+mesAtual.slice(0, 4), +mesAtual.slice(5, 7), 0).getDate();
+  const domMes = [];
+  for (let dd = 1; dd <= ultDia; dd++) { const iso = mesAtual + '-' + String(dd).padStart(2, '0'); if (C.diaSemana(iso) === 0) domMes.push(iso); }
+  if (domMes.length && domMes.every(dm => S.escalas[dm])) {
+    ativos.forEach(f => {
+      const tem = domMes.some(dm => { const a = S.escalas[dm].atribuicoes && S.escalas[dm].atribuicoes[f.id]; return a && a.g === 4; });
+      if (!tem) out.push({ t: 'w', m: f.nome + ' não tem domingo de folga previsto em ' + servMesNome(mesAtual) + '.', link: 'mensal' });
+    });
+  }
+  out.forEach(a => { if (!a.cat) a.cat = catAlerta(a.m); });
   return out;
+}
+// Categoria de cada alerta, pelo texto (os alertas já vêm prontos das regras)
+function catAlerta(m) {
+  if (/ainda não foi gerada|aguardando aprovação/.test(m)) return 'status';
+  if (/backup|formato antigo|Cadastre|sem setor definido|Nenhum funcionário ativo|cópia|copiada/.test(m)) return 'sistema';
+  if (/folga|dias seguidos|folgou|folgar|combinação|não existe mais|festas|domingo de folga/.test(m)) return 'pessoas';
+  if (/Setor "|ninguém|insuficiente|sem funcionários|pessoas de folga no mesmo/.test(m)) return 'setores';
+  return 'conflito';
 }
 
 /* =====================================================================
@@ -2063,99 +2098,90 @@ function contagemSemana(semana, setorF) {
   out.forEach(o => { o.trab.sort(); o.folg.sort(); });
   return out;
 }
+// Quanto pagar por data. Serviços: pela data de cada lote. VT: quinzena 1 a 15 paga dia 20; 16 ao fim paga dia 5 do mês seguinte.
+function servDatasPagar(mes) {
+  const datas = {};
+  const soma = (d, v) => { if (v > 0.005) datas[d] = r2((datas[d] || 0) + v); };
+  const dataTxt = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.slice(8, 10) + '/' + d.slice(5, 7) : (d || 'sem data');
+  S.prestadores.forEach(p => servCalc(mes, p.id).pagos.forEach(q => soma(dataTxt(q.data), q.pago ? r2(q.valor - (q.valorPago != null ? q.valorPago : q.valor)) : q.valor)));
+  return datas;
+}
+function vtDatasPagar(meses) {
+  const datas = {};
+  const soma = (d, v) => { if (v > 0.005) datas[d] = r2((datas[d] || 0) + v); };
+  meses.forEach(ym => {
+    const ano = +ym.slice(0, 4), mm = +ym.slice(5, 7), prox = new Date(ano, mm, 1);
+    const d20 = '20/' + String(mm).padStart(2, '0'), d05 = '05/' + String(prox.getMonth() + 1).padStart(2, '0');
+    vtModelo(ym).linhas.forEach(l => { soma(d20, r2(vtTot(l, 'q1') - vtPago(l, 'q1'))); soma(d05, r2(vtTot(l, 'q2') - vtPago(l, 'q2'))); });
+  });
+  return datas;
+}
+function datasOrdenadas(obj) { const ord = d => +String(d).slice(0, 2) || 99; return Object.keys(obj).sort((a, b) => ord(a) - ord(b)).map(d => ({ d, v: obj[d] })); }
+function faixaDia(d) { return d.slice(0, 2) === '20' ? ' · dias 1 a 15' : d.slice(0, 2) === '05' ? ' · dias 16 a 30' : ''; }
+
 function vPainel() {
-  const hoje = C.hojeISO(), sem = C.inicioSemana(hoje);
+  const hoje = C.hojeISO(), sem = C.inicioSemana(hoje), mes = hoje.slice(0, 7);
   const ativos = S.funcionarios.filter(f => f.ativo), inat = S.funcionarios.length - ativos.length;
   const escA = S.escalas[sem];
-  // quem trabalha e quem folga em cada dia da semana: só funcionários ativos (e só o setor escolhido, se houver)
-  const contagem = contagemSemana;
-  const semVista = UI.painelSem || sem, setorF = UI.painelSetor || '';
-  const escV = S.escalas[semVista];
-  const vista = contagem(semVista, setorF);
-  const dias = vista.map(o => o.d);
-  const maxB = Math.max(1, ...vista.map(o => o.trab.length + o.folg.length));
-  const iHoje = dias.indexOf(hoje);
-  const hojeC = contagem(sem, '')[C.diaSemana(hoje)];
+  const hojeC = contagemSemana(sem, '')[C.diaSemana(hoje)];
   const trabHoje = hojeC.trab.length, folgHoje = hojeC.folg.length;
-  const aguard = Object.keys(S.escalas).filter(k => k >= sem && S.escalas[k] && S.escalas[k].status !== 'aprovada');
-  const pend = servPendentes(hoje.slice(0, 7));
   const diaHoje = C.DIAS[C.diaSemana(hoje)].toLowerCase();
-  // domingos
-  const tres = C.addDias(sem, -7 * 12);
-  let domTotal = 0; const domPorFunc = {};
-  historicoArr().filter(e => e.semana >= tres && e.semana <= sem).forEach(e => Object.entries(e.atribuicoes || {}).forEach(([id, a]) => { if (a.g === 4) { domTotal++; domPorFunc[id] = (domPorFunc[id] || 0) + 1; } }));
-  const domSem = escA ? Object.values(escA.atribuicoes || {}).filter(a => a.g === 4) : [];
-  // próximas folgas
-  const prox = [];
-  for (let i = 0; i < 10; i++) {
-    const d = C.addDias(hoje, i), e = S.escalas[C.inicioSemana(d)];
-    if (!e) continue;
-    const nomes = Object.entries(e.atribuicoes || {}).filter(([id, a]) => C.statusDia(a, d, funcPorId(id)) === 'F').map(([id, a]) => (funcPorId(id) || a).nome);
-    if (nomes.length) prox.push({ d, nomes });
-  }
+  const pend = servPendentes(mes);
+  const pSrv = datasOrdenadas(servDatasPagar(mes));
+  const pa = new Date(+mes.slice(0, 4), +mes.slice(5, 7) - 2, 1);
+  const mesAnt = pa.getFullYear() + '-' + String(pa.getMonth() + 1).padStart(2, '0');
+  const pVT = datasOrdenadas(vtDatasPagar([mesAnt, mes]));
+  const totVT = r2(pVT.reduce((acc, x) => acc + x.v, 0));
+  const linhaPg = x => `<div class="pg-l"><span>Dia <b>${x.d}</b>${faixaDia(x.d)}</span><b>R$ ${servMoeda(x.v)}</b></div>`;
   const al = alertasGerais();
-  const ult = historicoArr().sort((a, b) => b.semana.localeCompare(a.semana)).slice(0, 6);
+  const nomes = { status: 'Escalas', pessoas: 'Pessoas e folgas', setores: 'Setores', conflito: 'Conflitos', sistema: 'Sistema' };
+  const cont = {}; al.forEach(a => { cont[a.cat] = (cont[a.cat] || 0) + 1; });
+  const fAl = UI.alertaCat || null, visAl = fAl ? al.filter(a => a.cat === fAl) : al;
+  const catsOk = Object.keys(nomes).filter(k => cont[k]);
   return `
-  <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${C.DIAS[C.diaSemana(hoje)].toLowerCase()}, ${C.dataBR(hoje)}</p></div><div class="sp"></div>
+  <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${diaHoje}, ${C.dataBR(hoje)}</p></div><div class="sp"></div>
   <a class="btn pri big edit-only" href="#mensal" data-act="irGerar" data-sem="${sem}">${ic('bolt')} GERAR ESCALA AUTOMÁTICA</a></div>
+
   <div class="kpis">
-    <div class="card kpi"><div class="kico">${ic('users')}</div><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s) · ${S.funcionarios.length} cadastrados</div></div>
+    <div class="card kpi"><div class="kico">${ic('users')}</div><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s)</div></div>
     <div class="card kpi"><div class="kico">${ic('setores')}</div><div class="l">Setores</div><div class="n">${S.setores.length}</div><div class="x">${S.setores.filter(s => ativos.some(f => f.setorId === s.id)).length} com funcionários ativos</div></div>
     <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="trab"><div class="kico">${ic('check')}</div><div class="l">Trabalhando hoje</div><div class="n">${escA ? trabHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
     <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="folg"><div class="kico">${ic('calendar')}</div><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
-    <a class="card kpi kpi-link" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="kico">${ic('edit')}</div><div class="l">Escalas aguardando aprovação</div><div class="n">${aguard.length}</div><div class="x">${aguard.length ? 'toque para abrir' : 'nenhuma pendente'}</div></a>
-    <a class="card kpi kpi-link" href="#servicos"><div class="kico">${ic('wallet')}</div><div class="l">Serviços pendentes</div><div class="n">R$ ${servMoeda(pend.valor)}</div><div class="x">${pend.qtd} prestador(es) com saldo a pagar</div></a>
   </div>
-  <div class="atalhos mt">
-    <a class="atalho" href="#mensal">${ic('calendar')}<span>Escalas</span></a>
+  <a class="card kpi-link situ mt" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="l">Situação da escala desta semana</div><div class="situ-b">${escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Publicada</span>' : '<span class="badge b-draft">Rascunho · aguardando aprovação</span>') : '<span class="badge b-err">Não gerada</span>'}</div><div class="x">${semanaLabel(sem)} · toque para abrir</div></a>
+
+  <h3 class="secao">Financeiro pendente</h3>
+  <div class="grid g2">
+    <a class="card fin" href="#servicos">
+      <div class="l">Serviços prestados</div>
+      <div class="fin-v">R$ ${servMoeda(pend.valor)}</div>
+      <div class="x">${pend.qtd} prestador(es) com pagamento pendente</div>
+      <div class="mt">${pSrv.length ? pSrv.map(linhaPg).join('') : '<div class="x">Nada pendente.</div>'}</div>
+    </a>
+    <a class="card fin" href="#vt">
+      <div class="l">Vale-transporte</div>
+      <div class="fin-v">R$ ${servMoeda(totVT)}</div>
+      <div class="x">VT ainda não pago deste mês e do anterior</div>
+      <div class="mt">${pVT.length ? pVT.map(linhaPg).join('') : '<div class="x">Nada pendente.</div>'}</div>
+    </a>
+  </div>
+
+  <h3 class="secao">Atalhos</h3>
+  <div class="atalhos">
+    <a class="atalho" href="#mensal">${ic('calendar')}<span>Escala mensal</span></a>
     <a class="atalho" href="#funcionarios">${ic('users')}<span>Funcionários</span></a>
     <a class="atalho" href="#setores">${ic('setores')}<span>Setores</span></a>
-    <a class="atalho" href="#vt">${ic('bus')}<span>Vale-transporte</span></a>
     <a class="atalho" href="#servicos">${ic('servicos')}<span>Serviços prestados</span></a>
-    <a class="atalho" href="#servicos">${ic('wallet')}<span>Pagamentos</span></a>
+    <a class="atalho" href="#vt">${ic('bus')}<span>Vale-transporte</span></a>
+    <a class="atalho" href="#historico">${ic('historico')}<span>Histórico</span></a>
   </div>
-  <div class="grid g2 mt">
-    <a class="card kpi kpi-link" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="l">Situação da escala desta semana</div><div class="n" style="font-size:18px;margin-top:6px">${escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Publicada</span>' : '<span class="badge b-draft">Rascunho · aguardando aprovação</span>') : '<span class="badge b-err">Não gerada</span>'}</div><div class="x">${semanaLabel(sem)} · toque para abrir</div></a>
-    <div class="card kpi"><div class="l">Folgas dominicais</div><div class="n">${domSem.length}</div><div class="x">neste domingo · ${domTotal} nas últimas 12 semanas</div></div>
-  </div>
-  <div class="grid g2 mt">
-    <div class="card">
-      <div class="row" style="gap:8px;flex-wrap:wrap">
-        <button class="btn icon" data-act="painelSem" data-d="-1" aria-label="Semana anterior">${ic('chevL')}</button>
-        <button class="btn" data-act="painelSem" data-d="0">Esta semana</button>
-        <button class="btn icon" data-act="painelSem" data-d="1" aria-label="Próxima semana">${ic('chevR')}</button>
-        <div class="sp"></div>
-        <select id="selPainelSetor" style="min-width:160px"><option value="">Todos os setores</option>${S.setores.map(x => `<option value="${x.id}" ${setorF === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select>
-      </div>
-      <div class="row mt"><h2 style="margin:0">Trabalhando × folga por dia</h2><div class="sp"></div><span class="small muted">${semanaLabel(semVista)}</span></div>
-      ${escV ? (() => {
-        const selI = UI.painelDia === undefined ? (iHoje >= 0 ? iHoje : null) : UI.painelDia;
-        const det = selI != null && vista[selI] ? vista[selI] : null;
-        const chips = arr => arr.length ? arr.map(n => `<span class="chip">${esc(n)}</span>`).join('') : '<span class="muted small">ninguém</span>';
-        return `${iHoje >= 0 ? `<p class="small mt" style="margin:8px 0 0">Hoje: <b style="color:#15803d">${vista[iHoje].trab.length} trabalhando</b> · <b style="color:#1d4ed8">${vista[iHoje].folg.length} de folga</b></p>` : ''}
-      <div class="bars mt">${vista.map((o, i) => `<div class="bar${i === selI ? ' sel' : ''}" data-act="painelDia" data-i="${i}"><div class="nn"><span style="color:#15803d">${o.trab.length}</span> · <span style="color:#1d4ed8">${o.folg.length}</span></div><div class="w" style="height:${o.trab.length / maxB * 120}px" title="${o.trab.length} trabalhando"></div><div class="o" style="height:${o.folg.length / maxB * 120}px" title="${o.folg.length} de folga"></div><div class="lb ${o.d === hoje ? 'today' : ''}">${C.DIAS_CURTO[C.diaSemana(o.d)]}</div></div>`).join('')}</div>
-      <div class="legend mt"><span><i style="background:#4ade80;border-color:#4ade80"></i>Trabalhando</span><span><i style="background:#60a5fa;border-color:#60a5fa"></i>De folga</span><span class="muted">toque num dia para ver os nomes</span></div>
-      ${det ? `<div class="pdet mt"><div class="pdet-h"><b>${C.DIAS_CURTO[C.diaSemana(det.d)]} ${C.dataBR(det.d).slice(0, 5)}</b>${det.d === hoje ? ' <span class="badge b-blue">hoje</span>' : ''}</div>
-        <div class="pdet-c"><div><span class="pdet-t tr">Trabalhando (${det.trab.length})</span>${chips(det.trab)}</div><div><span class="pdet-t fo">De folga (${det.folg.length})</span>${chips(det.folg)}</div></div></div>` : ''}`;
-      })() : '<div class="empty"><b>Sem escala nesta semana</b>Gere a escala para ver a distribuição por dia.</div>'}
-    </div>
-    <div class="card"><h2>Alertas de problemas</h2>
-      ${al.length ? al.slice(0, 12).map(a => `<div class="alert ${a.t}"><span class="ic">${a.t === 'e' ? '!' : 'i'}</span><div>${esc(a.m)} ${a.link ? `<a href="#${a.link}" ${a.sem ? `data-act="irSemana" data-sem="${a.sem}"` : ''}>Abrir</a>` : ''}</div></div>`).join('') + (al.length > 12 ? `<div class="small muted">+ ${al.length - 12} alerta(s)</div>` : '')
-      : '<div class="alert s"><span class="ic">✓</span><div>Nenhum problema encontrado.</div></div>'}
-    </div>
-  </div>
-  <div class="grid g3 mt">
-    <div class="card"><h2>Próximas folgas</h2>
-      ${prox.length ? '<ul class="list-sm">' + prox.slice(0, 7).map(p => `<li><div><b>${C.DIAS_CURTO[C.diaSemana(p.d)]} ${C.dataBR(p.d).slice(0, 5)}</b>${p.d === hoje ? ' <span class="badge b-blue">hoje</span>' : ''}<div>${p.nomes.map(n => '<span class="chip b">' + esc(n) + '</span>').join('')}</div></div></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma folga programada nos próximos dias (gere as escalas).</p>'}
-    </div>
-    <div class="card"><h2>Folga no domingo desta semana</h2>
-      ${domSem.length ? '<ul class="list-sm">' + Object.entries(escA.atribuicoes).filter(([, a]) => a.g === 4).map(([id, a]) => `<li><span>${esc((funcPorId(id) || a).nome)}</span><span class="muted small">${esc(nomeSetor((funcPorId(id) || a).setorId))}</span></li>`).join('') + '</ul>' : '<p class="muted">Ninguém de folga no domingo (ou escala não gerada).</p>'}
-      <h3 class="mt">Mais domingos (12 semanas)</h3>
-      ${Object.keys(domPorFunc).length ? '<ul class="list-sm">' + Object.entries(domPorFunc).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, n]) => `<li><span>${esc((funcPorId(id) || {}).nome || 'Removido')}</span><b>${n}</b></li>`).join('') + '</ul>' : '<p class="muted small">Sem histórico ainda.</p>'}
-    </div>
-    <div class="card"><h2>Últimas escalas</h2>
-      ${ult.length ? '<ul class="list-sm">' + ult.map(e => `<li><a href="#mensal" data-act="irSemana" data-sem="${e.semana}">${semanaLabel(e.semana)}</a><span>${e.status === 'aprovada' ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho</span>'}</span></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma escala gerada ainda.</p>'}
-    </div>
+
+  <h3 class="secao">Central de alertas</h3>
+  <div class="card">
+    <div class="row"><h2 style="margin:0">Problemas que pedem atenção</h2><div class="sp"></div>${al.length ? `<span class="badge ${al.some(a => a.t === 'e') ? 'b-err' : 'b-draft'}">${al.length}</span>` : ''}</div>
+    ${catsOk.length ? `<div class="cats mt">${catsOk.map(k => `<button class="catb${fAl === k ? ' on' : ''}" data-act="alertaCat" data-cat="${k}">${nomes[k]} <b>${cont[k]}</b></button>`).join('')}</div>` : ''}
+    <div class="mt">${visAl.length ? visAl.slice(0, 12).map(a => `<div class="alert ${a.t}"><span class="ic">${a.t === 'e' ? '!' : 'i'}</span><div>${esc(a.m)} ${a.link ? `<a href="#${a.link}" ${a.sem ? `data-act="irSemana" data-sem="${a.sem}"` : ''}>Abrir</a>` : ''}</div></div>`).join('') + (visAl.length > 12 ? `<div class="small muted">+ ${visAl.length - 12} alerta(s)</div>` : '')
+      : '<div class="alert s"><span class="ic">✓</span><div>Nenhum problema encontrado.</div></div>'}</div>
   </div>`;
 }
 
@@ -3362,6 +3388,7 @@ document.addEventListener('click', async ev => {
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
+    case 'alertaCat': { const c = el.dataset.cat; UI.alertaCat = UI.alertaCat === c ? null : c; render(); return; }
     case 'verHoje': {
       const hj = C.hojeISO(), c = contagemSemana(C.inicioSemana(hj), '')[C.diaSemana(hj)];
       const quem = el.dataset.tipo === 'trab' ? c.trab : c.folg;
