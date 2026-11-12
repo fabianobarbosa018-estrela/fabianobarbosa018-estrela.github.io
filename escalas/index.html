@@ -3366,9 +3366,10 @@ document.addEventListener('click', async ev => {
       const hj = C.hojeISO(), c = contagemSemana(C.inicioSemana(hj), '')[C.diaSemana(hj)];
       const quem = el.dataset.tipo === 'trab' ? c.trab : c.folg;
       const titulo = el.dataset.tipo === 'trab' ? 'Trabalhando hoje' : 'De folga hoje';
-      abrirModal(`<h2>${titulo} <span class="muted small">· ${C.DIAS[C.diaSemana(hj)].toLowerCase()}, ${C.dataBR(hj)}</span></h2>
-        <p class="muted">${quem.length} funcionário(s)</p>
-        ${quem.length ? quem.map(n => `<div class="chip" style="font-size:15px;padding:6px 12px;margin:4px 6px 4px 0">${esc(n)}</div>`).join('') : '<p class="muted">Ninguém nesta situação hoje.</p>'}`);
+      abrirModal(`<div style="padding:20px"><h2 style="margin:0 0 4px">${titulo}</h2>
+        <p class="muted small" style="margin:0 0 14px">${C.DIAS[C.diaSemana(hj)]}, ${C.dataBR(hj)} · ${quem.length} funcionário(s)</p>
+        ${quem.length ? quem.map(n => `<span class="chip" style="font-size:15px;padding:6px 12px;margin:0 6px 6px 0;display:inline-block">${esc(n)}</span>`).join('') : '<p class="muted">Ninguém nesta situação hoje.</p>'}
+        <div class="row mt"><div class="sp"></div><button class="btn" onclick="fecharModal(this.closest('.mbg'))">Fechar</button></div></div>`);
       return;
     }
     case 'painelSem': { const k = +el.dataset.d; const base = UI.painelSem || C.inicioSemana(C.hojeISO()); UI.painelSem = k === 0 ? null : C.addDias(base, 7 * k); UI.painelDia = undefined; render(); return; }
