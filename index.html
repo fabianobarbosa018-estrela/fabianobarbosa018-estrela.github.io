@@ -1538,7 +1538,8 @@ function ftCel(c){
   if(c.s==='faltou')return '<td class="ft-falta">✘ não fez</td>';
   if(c.s==='fazendo')return '<td class="ft-and">✍️ fazendo</td>';
   if(c.s==='aberta')return '<td class="ft-and">⏳ ainda não fez</td>';
-  return '<td class="muted small">—</td>';
+  if(c.s==='extra')return '<td class="muted small" title="Prova extra, não obrigatória">— extra</td>';
+  return '<td class="muted small" title="Entrou na turma depois desta prova">—</td>';
 }
 function ftQuadro(q){
   if(!q||!q.turmas.length)return '';

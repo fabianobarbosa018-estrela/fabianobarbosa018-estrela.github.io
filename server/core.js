@@ -1504,8 +1504,8 @@ rota_('desafioQuadro', PROF, false, u => {
         return { id: al.id, nome: al.nome, ignorar: !!al.faltaIgnorar, provas: provas.map(a => {
           const e = all_('Entregas').find(x => x.atividadeId === a.id && x.alunoId === al.id);
           if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return { s: 'nova' };
-          if (!e) return { s: a.encerramento < t ? 'faltou' : 'aberta' };
-          if (e.status === 'rascunho') return { s: a.encerramento < t ? 'faltou' : 'fazendo', inicio: e.iniciadoEm || null };
+          if (!e) return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'aberta' };
+          if (e.status === 'rascunho') return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'fazendo', inicio: e.iniciadoEm || null };
           return { s: e.status === 'corrigida' ? 'corrigida' : 'enviada', nota: e.nota, notaMax: e.notaMax || notaMax_(a), em: e.enviadoEm, entregaId: e.id, auto: !!e.autoEnviada };
         }) };
       }) };
