@@ -2034,7 +2034,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:58';
+const VERSAO_APP = '12/11 01:02';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2441,7 +2441,7 @@ function vMensal() {
   <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status === 'aprovada') ? `<div class="row mt"><span class="small muted">Editar escala aprovada:</span>${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status === 'aprovada').map(s => `<button class="btn pri sm" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar ${semanaLabel(s)}</button>`).join('')}</div>` : ''}
-  ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><span class="small muted">Aprovar escala em rascunho:</span>${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').map(s => `<button class="btn ok sm" data-act="aprovar" data-sem="${s}">${ic('check')} Aprovar ${semanaLabel(s)}</button>`).join('')}</div>` : ''}
+  ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><button class="btn ok" data-act="aprovarMes" data-mes="${UI.mes}">${ic('check')} Aprovar escala do mês (${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length} semana(s) em rascunho)</button></div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
@@ -2959,6 +2959,34 @@ async function abrirEdicaoAprovada(sem) {
     fecharModal(w);
     toast('Ajustes salvos. A escala continua aprovada.');
   };
+}
+/* Aprova de uma vez todas as semanas em rascunho do mês. Se alguma tiver erro de regra, nenhuma é aprovada. */
+async function aprovarMes(ym) {
+  if (S.somenteLeitura) { toast('Somente o administrador pode aprovar a escala.'); return; }
+  const { sems } = semanasDoMes(ym);
+  const rasc = sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada');
+  if (!rasc.length) { toast('Todas as semanas deste mês já estão aprovadas.'); return; }
+  const problemas = [];
+  rasc.forEach(s => {
+    const e = S.escalas[s];
+    const v = C.validarEscala(Object.assign({}, e, { semana: s }), S.funcionarios, S.setores, historicoArr());
+    v.erros.forEach(x => problemas.push(semanaLabel(s) + ': ' + x.msg));
+  });
+  if (problemas.length) {
+    await modalMsg('Não é possível aprovar o mês', '<p>Corrija antes de aprovar. Nenhuma semana foi aprovada:</p><ul class="list-sm">' + problemas.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>');
+    return;
+  }
+  const ok = await confirmar('Aprovar a escala de ' + servMesNome(ym) + '?', '<p>Serão aprovadas <b>' + rasc.length + ' semana(s)</b>:</p><ul class="list-sm">' + rasc.map(s => '<li>' + esc(semanaLabel(s)) + '</li>').join('') + '</ul><p class="muted small">Depois de aprovada, a escala só muda pelo botão Editar escala.</p>', 'Aprovar mês');
+  if (!ok) return;
+  const agora = agoraISO();
+  try {
+    for (const s of rasc) {
+      const e = S.escalas[s];
+      await Store.set('escalas', s, Object.assign({}, e, { modo: e.modo || 'manual', status: 'aprovada', aprovadaEm: agora, alteracoes: (e.alteracoes || []).concat([{ ts: agora, texto: 'Escala aprovada (mês de ' + servMesNome(ym) + ')' }]).slice(-200) }));
+      log('escala', 'Escala aprovada (mês de ' + servMesNome(ym) + ')', s);
+    }
+    toast('Escala de ' + servMesNome(ym) + ' aprovada.');
+  } catch (x) { }
 }
 async function completarEscala() {
   const sem = UI.semana, e = S.escalas[sem];
@@ -3689,6 +3717,7 @@ document.addEventListener('click', async ev => {
     case 'mesAnt': case 'mesProx': { let [y, m] = UI.mes.split('-').map(Number); m += act === 'mesAnt' ? -1 : 1; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } UI.mes = y + '-' + String(m).padStart(2, '0'); return render(); }
     case 'gerar': return acaoGerar(sem);
     case 'gerarMes': return gerarMes();
+    case 'aprovarMes': return aprovarMes(el.dataset.mes || UI.mes);
     case 'aprovar': {
       const sm = el.dataset.sem || sem;
       const e = S.escalas[sm]; const v = C.validarEscala(e, S.funcionarios, S.setores, historicoArr());
