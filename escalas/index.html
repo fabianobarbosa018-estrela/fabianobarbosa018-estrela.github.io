@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:45';
+const VERSAO_APP = '12/11 00:50';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2849,6 +2849,8 @@ async function abrirEdicaoAprovada(sem) {
     const textos = mudancas.map(m => `Ajuste: ${m.nome} · ${C.dataBR(m.data)} · ${m.antes} → ${m.depois}${v.erros.length ? ' (excepcional)' : ''}`)
       .concat(subs.map(s => `Substituição: ${nomeDe(s.escalado)} coberto por ${(funcPorId(s.cobertura) || {}).nome || ''} em ${C.dataBR(s.data)} (${MOTIVOS_AJUSTE[s.motivo]})`));
     const doc = Object.assign({}, e, {
+      // escala ajustada à mão: o servidor aceita folgas fora do padrão só nessas escalas (modo manual)
+      modo: e.modo || 'manual',
       atribuicoes: draft,
       ajustes: (e.ajustes || []).concat(mudancas.map(m => ({ ts: agora, funcId: m.id, nome: m.nome, data: m.data, antes: m.antes, depois: m.depois, excepcional: v.erros.length > 0 }))).slice(-500),
       substituicoes: (e.substituicoes || []).concat(subs.map(s => Object.assign({ ts: agora }, s))).slice(-200),
