@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:18';
+const VERSAO_APP = '12/11 00:40';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2264,6 +2264,7 @@ function vEscala() {
   <div class="row mt edit-only">
     <button class="btn pri big" data-act="gerar">${ic('bolt')} ${e ? 'REGENERAR ESCALA AUTOMÁTICA' : 'GERAR ESCALA AUTOMÁTICA'}</button>
     ${e && !aprov ? `<button class="btn ok" data-act="aprovar">${ic('check')} Aprovar escala</button>` : ''}
+    ${aprov && !S.somenteLeitura ? `<button class="btn pri" data-act="editarAprovada">${ic('edit')} Editar escala</button>` : ''}
     ${aprov ? `<button class="btn" data-act="reabrir">${ic('edit')} Reabrir para edição</button>` : ''}
     ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar</a>` : ''}
     ${e ? `<button class="btn danger sm" data-act="excluirEscala">${ic('trash')} Excluir escala</button>` : ''}
@@ -2310,7 +2311,7 @@ function vEscala() {
   h += `<tr class="tot"><td class="nm" style="background:#f9fafb">De folga</td>${totF.map(n => `<td class="d">${n}</td>`).join('')}<td colspan="2"></td></tr>`;
   h += '</tbody></table></div>';
   if (editavel) h += '<p class="small muted mt">No celular, toque e segure o nome para bloquear ou trocar folgas. Toda alteração é conferida contra as regras antes de ser salva.</p>';
-  if (aprov) h += '<p class="small muted mt">Escala aprovada: para alterar, clique em <b>Reabrir para edição</b>.</p>';
+  if (aprov) h += '<p class="small muted mt">Escala aprovada: para ajustes pontuais use <b>Editar escala</b>. Para refazer a escala inteira, use <b>Reabrir para edição</b>.</p>';
   h += `<div class="small muted mt">Gerada em ${dtHora(e.geradaEm)}${e.aprovadaEm && aprov ? ' · aprovada em ' + dtHora(e.aprovadaEm) : ''}</div>`;
   if ((e.alteracoes || []).length) h += `<details class="card mt"><summary style="cursor:pointer;font-weight:700">Alterações desta escala (${e.alteracoes.length})</summary><ul class="list-sm mt">${e.alteracoes.slice().reverse().map(x => `<li><span>${esc(x.texto)}</span><span class="small muted">${dtHora(x.ts)}</span></li>`).join('')}</ul></details>`;
   return h;
@@ -2761,6 +2762,101 @@ async function trocarFolgas(id) {
     fecharModal(w);
     const at = clone(e.atribuicoes); const g1 = at[id].g, g2 = at[outro].g; at[id].g = g2; at[outro].g = g1; atualizarSnapshot(at, id); atualizarSnapshot(at, outro);
     await salvarAlteracao(sem, at, 'Troca de folgas: ' + (f || a).nome + ' (→ ' + C.GRUPOS[g2].nome + ') ⇄ ' + (funcPorId(outro) || at[outro]).nome + ' (→ ' + C.GRUPOS[g1].nome + ')');
+  };
+}
+/* ---------------- AJUSTES NA ESCALA APROVADA ----------------
+   Ajusta uma escala já aprovada sem regenerá-la: ela continua APROVADA e cada mudança fica registrada
+   (alterações, ajustes por dia e substituições). Só quem pode gravar dados (administrador) vê o botão.
+   Mudanças que quebram regras são permitidas, mas exigem confirmação e ficam marcadas como excepcionais. */
+const MOTIVOS_AJUSTE = { falta: 'Falta', troca: 'Troca de folga', outro: 'Outro' };
+async function abrirEdicaoAprovada(sem) {
+  const e = S.escalas[sem];
+  if (!e || e.status !== 'aprovada') return;
+  if (S.somenteLeitura) { toast('Somente o administrador pode alterar a escala aprovada.'); return; }
+  const dias = C.diasDaSemana(sem);
+  const orig = clone(e.atribuicoes);
+  const nomeDe = id => (funcPorId(id) || orig[id]).nome;
+  const ids = Object.keys(orig).sort((x, y) => nomeDe(x).localeCompare(nomeDe(y)));
+  const stDe = (id, i) => C.statusDia(orig[id], dias[i], funcPorId(id), true);
+  const subs = [];
+  const linhas = ids.map(id => {
+    const f = funcPorId(id), setor = f ? nomeSetor(f.setorId) : (orig[id].setorNome || 'Sem setor');
+    const celulas = dias.map((d, i) => {
+      const st = stDe(id, i);
+      if (st === 'V') return '<td class="d" title="Férias">FÉR</td>';
+      if (st === '-') return '<td class="d" title="Ainda não admitido">—</td>';
+      return `<td class="d"><input type="checkbox" data-aj-id="${id}" data-aj-i="${i}" ${st === 'F' ? 'checked' : ''} title="Marque para folga"></td>`;
+    }).join('');
+    return `<tr><td class="nm"><b>${esc(nomeDe(id))}</b><div class="small muted">${esc(setor)}</div></td>${celulas}</tr>`;
+  }).join('');
+  const cabecalho = dias.map(d => `<th class="d">${C.DIAS_CURTO[C.diaSemana(d)]}<div class="small muted">${C.dataBR(d).slice(0, 5)}</div></th>`).join('');
+  const opcoesFunc = (lista, fn) => lista.map(id => `<option value="${id}">${esc(fn(id))}</option>`).join('');
+  const w = abrirModal(`<div class="mh">Editar escala aprovada · ${esc(semanaLabel(sem))}</div>
+    <div class="mbd">
+      <p class="small muted" style="margin:0 0 10px">Marque o que mudou: <b>☑ = folga</b>, desmarcado = trabalha. Férias não podem ser alteradas aqui. A escala continua aprovada.</p>
+      <div class="tw"><table class="list"><thead><tr><th>Funcionário</th>${cabecalho}</tr></thead><tbody>${linhas}</tbody></table></div>
+      <h3 class="secao" style="margin-top:16px">Substituição</h3>
+      <p class="small muted" style="margin:0 0 8px">Use quando alguém faltar e outro cobrir. Isso só registra; marque também os dias na tabela acima.</p>
+      <div class="grid g2">
+        <label class="f">Escalado<select id="ajEsc">${opcoesFunc(ids, nomeDe)}</select></label>
+        <label class="f">Cobertura<select id="ajCob"><option value="">—</option>${opcoesFunc(S.funcionarios.filter(f => f.ativo).map(f => f.id), id => nomeDe(id))}</select></label>
+        <label class="f">Data<input type="date" id="ajData" min="${dias[0]}" max="${dias[6]}" value="${dias[0]}"></label>
+        <label class="f">Motivo<select id="ajMot">${Object.keys(MOTIVOS_AJUSTE).map(k => `<option value="${k}">${MOTIVOS_AJUSTE[k]}</option>`).join('')}</select></label>
+      </div>
+      <div class="row mt"><button class="btn" id="ajAddSub" type="button">${ic('plus')} Adicionar substituição</button></div>
+      <ul class="list-sm mt" id="ajSubs"></ul>
+    </div>
+    <div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Revisar e salvar</button></div>`, true);
+  const listaSubs = () => {
+    w.querySelector('#ajSubs').innerHTML = subs.length ? subs.map((s, k) => `<li><span>${esc(nomeDe(s.escalado))} coberto por ${esc((funcPorId(s.cobertura) || {}).nome || s.cobertura)} em ${C.dataBR(s.data)} · ${MOTIVOS_AJUSTE[s.motivo]}</span><button class="btn sm" data-rm="${k}" type="button">Remover</button></li>`).join('') : '<li class="muted small">Nenhuma substituição registrada.</li>';
+    w.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { subs.splice(+b.dataset.rm, 1); listaSubs(); });
+  };
+  w.querySelector('#ajAddSub').onclick = () => {
+    const escalado = w.querySelector('#ajEsc').value, cobertura = w.querySelector('#ajCob').value, data = w.querySelector('#ajData').value, motivo = w.querySelector('#ajMot').value;
+    if (!cobertura) return toast('Escolha quem fez a cobertura.');
+    if (!data || data < dias[0] || data > dias[6]) return toast('A data precisa estar dentro desta semana.');
+    if (cobertura === escalado) return toast('Quem cobriu não pode ser a mesma pessoa.');
+    subs.push({ escalado, cobertura, data, motivo }); listaSubs();
+  };
+  listaSubs();
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    // lê as marcações da tabela e monta o rascunho
+    const draft = clone(orig), mudancas = [];
+    ids.forEach(id => {
+      const folgasMarcadas = [];
+      let mudou = false;
+      dias.forEach((d, i) => {
+        const st = stDe(id, i);
+        if (st === 'V' || st === '-') return; // férias e pré-admissão não são editáveis aqui
+        const cb = w.querySelector(`input[data-aj-id="${id}"][data-aj-i="${i}"]`);
+        const depoisF = !!(cb && cb.checked), antesF = st === 'F';
+        if (depoisF) folgasMarcadas.push(C.diaSemana(d));
+        if (depoisF !== antesF) { mudou = true; mudancas.push({ id, nome: nomeDe(id), data: d, antes: antesF ? 'Folga' : 'Trabalha', depois: depoisF ? 'Folga' : 'Trabalha' }); }
+      });
+      // só regrava os dias de folga desta pessoa quando algo mudou; a lista de dias passa a ser a marcada
+      if (mudou) draft[id] = Object.assign({}, orig[id], { dias: folgasMarcadas.sort((a, b) => a - b) });
+    });
+    if (!mudancas.length && !subs.length) return toast('Nenhuma alteração marcada.');
+    const v = C.validarEscala({ semana: sem, modo: e.modo, atribuicoes: draft }, S.funcionarios, S.setores, historicoArr());
+    const resumo = mudancas.map(m => `<li>${esc(m.nome)} · ${C.dataBR(m.data)}: <b>${m.antes}</b> → <b>${m.depois}</b></li>`).join('');
+    const resumoSubs = subs.map(s => `<li>Substituição: ${esc(nomeDe(s.escalado))} coberto por ${esc((funcPorId(s.cobertura) || {}).nome || '')} em ${C.dataBR(s.data)} (${MOTIVOS_AJUSTE[s.motivo]})</li>`).join('');
+    const aviso = v.erros.length ? `<div class="alert w"><span class="ic">!</span><div><b>Esta alteração quebra regras da escala.</b> Ela será salva como excepcional.<br>${v.erros.map(x => esc(x.msg)).join('<br>')}</div></div>` : '';
+    const ok = await confirmar('Confirmar ajustes na escala aprovada?', `<p>A escala continua <b>aprovada</b>. Confira o que será registrado:</p>${aviso}<ul class="list-sm">${resumo}${resumoSubs}</ul>`, 'Confirmar e salvar');
+    if (!ok) return;
+    const agora = agoraISO();
+    const textos = mudancas.map(m => `Ajuste: ${m.nome} · ${C.dataBR(m.data)} · ${m.antes} → ${m.depois}${v.erros.length ? ' (excepcional)' : ''}`)
+      .concat(subs.map(s => `Substituição: ${nomeDe(s.escalado)} coberto por ${(funcPorId(s.cobertura) || {}).nome || ''} em ${C.dataBR(s.data)} (${MOTIVOS_AJUSTE[s.motivo]})`));
+    const doc = Object.assign({}, e, {
+      atribuicoes: draft,
+      ajustes: (e.ajustes || []).concat(mudancas.map(m => ({ ts: agora, funcId: m.id, nome: m.nome, data: m.data, antes: m.antes, depois: m.depois, excepcional: v.erros.length > 0 }))).slice(-500),
+      substituicoes: (e.substituicoes || []).concat(subs.map(s => Object.assign({ ts: agora }, s))).slice(-200),
+      alteracoes: (e.alteracoes || []).concat(textos.map(texto => ({ ts: agora, texto }))).slice(-200)
+    });
+    try { await Store.set('escalas', sem, doc); } catch (x) { render(); return; }
+    textos.forEach(t => log('escala', t, sem));
+    fecharModal(w);
+    toast('Ajustes salvos. A escala continua aprovada.');
   };
 }
 async function completarEscala() {
@@ -3498,6 +3594,7 @@ document.addEventListener('click', async ev => {
       try { await Store.set('escalas', sem, Object.assign({}, e, { status: 'aprovada', aprovadaEm: agoraISO(), alteracoes: (e.alteracoes || []).concat([{ ts: agoraISO(), texto: 'Escala aprovada' }]).slice(-200) })); log('escala', 'Escala aprovada', sem); toast('Escala aprovada.'); } catch (x) { }
       return;
     }
+    case 'editarAprovada': return abrirEdicaoAprovada(UI.semana);
     case 'reabrir': {
       const e = S.escalas[sem];
       if (!await confirmar('Reabrir escala?', '<p>A escala volta para <b>rascunho</b> para permitir alterações. Depois, aprove novamente.</p>', 'Reabrir')) return;
