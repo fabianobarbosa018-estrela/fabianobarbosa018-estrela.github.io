@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:35';
+const VERSAO_APP = '12/11 00:18';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2197,8 +2197,7 @@ function vPainel() {
   const fAl = UI.alertaCat || null, visAl = fAl ? al.filter(a => a.cat === fAl) : al;
   const catsOk = Object.keys(nomes).filter(k => cont[k]);
   return `
-  <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${diaHoje}, ${C.dataBR(hoje)}</p></div><div class="sp"></div>
-  <a class="btn pri big edit-only" href="#mensal" data-act="irGerar" data-sem="${sem}">${ic('bolt')} GERAR ESCALA AUTOMÁTICA</a></div>
+  <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${diaHoje}, ${C.dataBR(hoje)}</p></div></div>
 
   <div class="kpis">
     <div class="card kpi"><div class="kico">${ic('users')}</div><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s)</div></div>
@@ -2206,6 +2205,7 @@ function vPainel() {
     <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="trab"><div class="kico">${ic('check')}</div><div class="l">Trabalhando hoje</div><div class="n">${escA ? trabHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
     <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="folg"><div class="kico">${ic('calendar')}</div><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
   </div>
+  ${escA ? `<div class="card mt"><div class="l">Quem está de folga hoje · ${diaHoje}</div><div style="margin-top:8px">${hojeC.folg.length ? hojeC.folg.map(n => `<span class="chip" style="font-size:15px;padding:6px 12px;margin:0 6px 6px 0;display:inline-block">${esc(n)}</span>`).join('') : '<p class="muted small" style="margin:0">Ninguém de folga hoje.</p>'}</div></div>` : ''}
   <a class="card kpi-link situ mt" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="l">Situação da escala desta semana</div><div class="situ-b">${escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Publicada</span>' : '<span class="badge b-draft">Rascunho · aguardando aprovação</span>') : '<span class="badge b-err">Não gerada</span>'}</div><div class="x">${semanaLabel(sem)} · toque para abrir</div></a>
 
   <h3 class="secao">Financeiro · próximo pagamento</h3>
