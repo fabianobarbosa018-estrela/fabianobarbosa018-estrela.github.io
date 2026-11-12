@@ -1708,6 +1708,7 @@ function estudoHtml(r,extra){
   const sem=!r.texto&&!r.video;
   return `<div class="hd"><h2>📚 ${esc(r.assunto||r.disciplina||'Estudar')}</h2><button class="x" data-a="fechar">✕</button></div>
   <p class="small muted" style="margin-top:0">${esc(r.disciplina||'')}${r.nivel?' · '+esc(r.nivel):''}</p>
+  ${r.aproximado?`<div class="info small" style="margin-bottom:8px">Material de revisão de ${esc(r.disciplina)}. Este assunto ainda não tem uma aula própria; releia o enunciado com calma.</div>`:''}
   ${r.video?`<div class="est-sec">🎬 Vídeo explicativo</div>${estudoVideoHtml(r.video)}`:''}
   ${r.texto?`<div class="est-sec">📖 Entenda o assunto</div><div class="apoio bib-texto">${esc(r.texto)}</div>`:''}
   ${estudoExemploHtml(r.exemplo)}

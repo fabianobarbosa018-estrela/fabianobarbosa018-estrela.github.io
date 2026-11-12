@@ -186,10 +186,12 @@ export function criarServidor(io) {
       const alvo = palavras(b.assunto + ' ' + b.assunto + ' ' + b.enunciado).filter(w => !PAL_VAZIAS.has(w));
       let melhor = null, pts = 0;
       cand.forEach(x => { const voc = new Set(palavras(x.a + ' ' + x.a + ' ' + x.t).map(w => w.slice(0, 6))); const p = alvo.reduce((s, w) => s + (voc.has(w.slice(0, 6)) ? 1 : 0), 0) + niveis.indexOf(x.n) * -0.5; if (p > pts) { pts = p; melhor = x; } });
-      if (pts >= 2) a = melhor;
+      if (pts >= 1) a = melhor;
     }
+    let aprox = false;
+    if (!a && cand.length) { a = cand.filter(x => x.n === niveis[0])[0] || cand[0]; aprox = true; }   // sem assunto parecido: revisão geral da matéria
     if (!a) return base;
-    return { disciplina: D.nome, assunto: a.a, nivel: NIVEL[a.n] || a.n, texto: a.t, video: videoDe(D, a, b.videos), exemplo: exemploDe(a, b.excluir, b.nivel === 'F1I' ? 1 : 2) };
+    return { aproximado: aprox, disciplina: D.nome, assunto: a.a, nivel: NIVEL[a.n] || a.n, texto: a.t, video: videoDe(D, a, b.videos), exemplo: exemploDe(a, b.excluir, b.nivel === 'F1I' ? 1 : 2) };
   }
   async function executarBanco(b) {
     let B;
