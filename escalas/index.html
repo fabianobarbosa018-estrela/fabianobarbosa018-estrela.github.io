@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '11/11 23:39';
+const VERSAO_APP = '12/11 00:05';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2098,8 +2098,11 @@ function contagemSemana(semana, setorF) {
   out.forEach(o => { o.trab.sort(); o.folg.sort(); });
   return out;
 }
-/* Próximo pagamento de serviços: a data mais antiga com algum lote ainda com saldo a pagar (saldo = valor do lote menos o que já foi pago).
-   Ao marcar o lote como pago, ele sai da lista e o próximo pagamento aparece sozinho. Nunca mostra R$ 0,00. */
+/* Início do controle financeiro: novembro/2026. Registros anteriores são histórico e não entram como pendência. */
+const INICIO_CONTROLE = '2026-11';
+/* Próximo pagamento de serviços: a data mais antiga, a partir de INICIO_CONTROLE, com lote ainda com saldo a pagar.
+   Meses anteriores a INICIO_CONTROLE são histórico: não entram como pendência.
+   Ao marcar o lote como pago, ele sai da lista e o próximo aparece sozinho. Nunca mostra R$ 0,00. */
 function servProximo() {
   const hoje = C.hojeISO(), datas = {};
   let semData = 0;
@@ -2107,6 +2110,7 @@ function servProximo() {
     servCalc(mes, p.id).pagos.forEach(q => {
       const falta = q.pago ? r2(q.valor - (q.valorPago != null ? q.valorPago : q.valor)) : q.valor;
       if (!(falta > 0.005)) return;
+      if (mes < INICIO_CONTROLE) return; // histórico: não é pendência atual
       if (!/^\d{4}-\d{2}-\d{2}$/.test(q.data || '')) { semData++; return; }
       const d = datas[q.data] || (datas[q.data] = { valor: 0, pids: new Set() });
       d.valor = r2(d.valor + falta); d.pids.add(p.id);
@@ -2118,51 +2122,53 @@ function servProximo() {
   const d = ds[0];
   return { estado: 'ok', data: d, valor: datas[d].valor, qtd: datas[d].pids.size, atraso: d < hoje };
 }
-/* Próximo pagamento de VT: quinzena 1 (dias 1 a 15) paga dia 20 do mês; quinzena 2 (dias 16 ao fim) paga dia 5 do mês seguinte.
-   Saldo de cada funcionário = VT calculado pela escala menos o que já foi pago naquela quinzena (nunca negativo).
-   Se faltar escala ou valor de passagem em um período já iniciado, mostra Não calculado em vez de um valor incompleto. */
 /* O período tem pelo menos um dia coberto por escala? Antes disso, o VT não é controlado pelo sistema. */
 function vtCobre(ym, a, b) {
   for (let i = a; i <= b; i++) if (S.escalas[C.inicioSemana(ym + '-' + String(i).padStart(2, '0'))]) return true;
   return false;
 }
-/* Funcionários ativos que trabalharam no período (pela escala) sem valor de passagem cadastrado. Esses dias não entram no VT. */
+/* Nomes de funcionários ativos que trabalharam no período (pela escala) sem valor de passagem cadastrado.
+   Quem está marcado como "Não recebe vale-transporte" fica de fora: não tem direito, não é pendência. */
 function vtSemPassagem(ym, a, b) {
-  const doc = vtDoc(ym), quem = new Set();
+  const doc = vtDoc(ym), quem = new Map();
   for (let i = a; i <= b; i++) {
     const dd = ym + '-' + String(i).padStart(2, '0');
     const e = S.escalas[C.inicioSemana(dd)];
     if (!e || !e.atribuicoes) continue;
     S.funcionarios.forEach(f => {
-      if (!f.ativo || quem.has(f.id)) return;
+      if (!f.ativo || quem.has(f.id) || (f.vt && f.vt.nao)) return;
       if (!['T', 'X'].includes(C.statusDia(e.atribuicoes[f.id] || null, dd, f, true))) return;
       const aj = doc.ajustes && doc.ajustes[f.id] && doc.ajustes[f.id][dd];
       if (aj && aj.t === 'trab' && aj.v != null && aj.v !== '') return;
       const v = C.vtValorEm(f, dd);
-      if (!v || (!v.fixo && !(v.total > 0))) quem.add(f.id);
+      if (!v || (!v.fixo && !(v.total > 0))) quem.set(f.id, f.nome);
     });
   }
-  return quem.size;
+  return [...quem.values()];
 }
+/* Próximo pagamento de VT: quinzena 1 (dias 1 a 15) paga dia 20 do mês; quinzena 2 (dias 16 ao fim) paga dia 5 do mês seguinte.
+   Considera só a partir de INICIO_CONTROLE. Saldo = VT da escala menos o já pago (nunca negativo).
+   Faltando escala ou valor de passagem em período já iniciado, mostra Não calculado (com os nomes), em vez de um valor incompleto. */
 function vtProximo() {
   const hoje = C.hojeISO(), mesHoje = hoje.slice(0, 7);
-  const chaves = Object.keys(S.vt).filter(k => /^\d{4}-\d{2}$/.test(k)).concat(Object.keys(S.escalas).map(s => s.slice(0, 7)), [mesHoje]).sort();
-  const lo = chaves[0], hi = chaves[chaves.length - 1];
+  const chaves = Object.keys(S.escalas).map(s => s.slice(0, 7)).concat([mesHoje]).filter(k => k >= INICIO_CONTROLE).sort();
+  const lo = INICIO_CONTROLE, hi = chaves[chaves.length - 1];
   const cand = [];
   for (let ym = lo; ym <= hi; ym = servMesVizinho(ym, 1)) {
     const m = vtModelo(ym), prox = servMesVizinho(ym, 1);
     [['q1', ym + '-01', ym + '-20', 1, 15], ['q2', ym + '-16', prox + '-05', 16, m.dim]].forEach(([q, ini, pag, a, b]) => {
       if (!vtCobre(ym, a, b)) return; // período anterior ao uso das escalas: não faz parte do controle
       const pend = m.linhas.map(l => ({ l, v: r2(Math.max(0, l[q].valor - l.pago[q])) })).filter(o => o.v > 0.004);
+      const valor = r2(pend.reduce((s, o) => s + o.v, 0));
       const pgs = vtDoc(ym).pagamentos || {};
       const registrado = m.linhas.some(l => pgs[l.id] && pgs[l.id][q]); // já houve registro de pagamento nesta quinzena
       const faltaEscala = m.linhas.some(l => l.cel.some((c, i) => i + 1 >= a && i + 1 <= b && c.tipo === 'semEscala'));
-      const semPassagem = vtSemPassagem(ym, a, b);
+      const semPass = vtSemPassagem(ym, a, b);
       const periodo = vtTituloPer(m, q);
-      if ((faltaEscala || semPassagem > 0) && ini <= hoje && (pend.length || !registrado)) {
-        const motivo = [faltaEscala ? 'Faltam escalas para alguns dias deste período.' : '', semPassagem ? semPassagem + ' funcionário(s) sem valor de passagem cadastrado.' : ''].filter(Boolean).join(' ');
+      if ((faltaEscala || semPass.length) && ini <= hoje && (pend.length || !registrado)) {
+        const motivo = [faltaEscala ? 'Faltam escalas para alguns dias deste período.' : '', semPass.length ? 'Sem valor de passagem cadastrado: ' + semPass.join(', ') + '. Corrija em Funcionários.' : ''].filter(Boolean).join(' ');
         cand.push({ pag, periodo, nc: motivo });
-      } else if (pend.length) cand.push({ pag, periodo, valor: r2(pend.reduce((s, o) => s + o.v, 0)), qtd: pend.length });
+      } else if (pend.length) cand.push({ pag, periodo, valor, qtd: pend.length });
     });
   }
   if (!cand.length) return { estado: 'nada' };
