@@ -276,6 +276,11 @@ body{background:linear-gradient(180deg,#f3f6ff 0,#f6f3ff 50%,#f2fbf7 100%) fixed
 .a-check{stroke-dasharray:30;animation:check 3.6s ease-out infinite}.a-gira{animation:girar 9s linear infinite}.a-gira2{animation:girar2 6s linear infinite}
 .a-ponteiro{transform-box:view-box;transform-origin:0 0;animation:girar 12s linear infinite}
 main>*:first-child{animation:surgir .35s ease}
+.ft-tbl table{min-width:100%}.ft-tbl th,.ft-tbl td{text-align:center;white-space:nowrap;padding:8px 10px}.ft-tbl td:first-child,.ft-tbl th:first-child{text-align:left;white-space:normal;min-width:140px}
+.ft-ok b{font-size:16px;color:#15803d}.ft-falta{color:#dc2626;font-weight:700;background:#fef2f2}.ft-and{color:#b45309;font-size:13px}
+.ft-tabs a{display:inline-block;padding:6px 12px;margin:0 6px 6px 0;border-radius:999px;background:#eef2ff;color:#3730a3;text-decoration:none;font-weight:600;font-size:14px}
+.aviso-prova{border-left:5px solid #f59e0b;animation:avisoBrilho 2.4s ease-in-out infinite}@keyframes avisoBrilho{50%{box-shadow:0 0 0 6px rgba(245,158,11,.18)}}
+.aviso-pulo{display:inline-block;animation:avisoPulo 1.2s ease-in-out infinite}@keyframes avisoPulo{50%{transform:translateY(-8px) rotate(-6deg)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1503,6 +1508,152 @@ VIEWS.a_inicio=async function(p){const r=await _inicioTema(p);const h=typeof r==
   const extra=`<h3 class="sec-t">✨ Explore</h3><div class="atalhos">${at.map(([v,i,t,s,c])=>`<button class="atalho tema-${c}" data-go="${v}"><span class="at-ilu" aria-hidden="true">${ILU[i]}</span><b>${t}</b><small>${s}</small></button>`).join('')}</div>
   <div class="frase"><span class="fr-ilu" aria-hidden="true">${ILU.coruja}</span><div><b>Dica da Sabi</b><p>${esc(frase)}</p></div></div>`;
   return typeof r==='string'?h+extra:Object.assign({},r,{html:h+extra})};
+
+/* =================== FALTAS NA PROVA DO DIA: alerta + mensagem para o responsável =================== */
+['professor','admin'].forEach(p=>{MENUS[p].splice(1,0,['p_faltas','📋','Notas e faltas'])});
+const FT={d:null};
+const DIAS_SEM=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+function ftCap(s){return String(s||'').toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase())}
+const FT_COMPOSTOS=['joao','maria','ana','jose','pedro','luiz','luis','carlos','paulo','joana','anna','luana','davi','miguel','gabriel','arthur','enzo','lucas','vitor','victor','marco','marcos'];
+function ftPrimeiro(nome){const p=String(nome||'').trim().split(/\s+/);const n=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');const dois=p.length>2&&['joao','maria','ana','jose','pedro','luiz','luis','carlos','paulo','davi','anna'].indexOf(n(p[0]))>=0&&FT_COMPOSTOS.indexOf(n(p[1]))>=0;return ftCap(dois?p[0]+' '+p[1]:(p[0]||''))}
+function ftDia(dia){const [a,m,d]=String(dia).split('-').map(Number);const w=new Date(Date.UTC(a,m-1,d,12)).getUTCDay();return `${DIAS_SEM[w]} (${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')})`}
+function ftLista(xs){return xs.length<=1?(xs[0]||''):xs.slice(0,-1).join(', ')+' e '+xs[xs.length-1]}
+function ftDatas(x){const fs=(x.novas?x.faltas.filter(f=>f.dia>x.avisadoAte):x.faltas);return fs.map(f=>ftDia(f.dia))}
+function ftMensagem(g,d){
+  const mae=g.responsavel?ftPrimeiro(g.responsavel):'';const al=g.alunos.map(x=>({n:ftPrimeiro(x.nome),ds:ftDatas(x)}));
+  const nomes=ftLista(al.map(x=>x.n));const varios=al.length>1;
+  let t=`Olá${mae?', '+mae:''}! Tudo bem? 😊\n\nAqui é da Sala Digital. `;
+  if(!varios){const x=al[0];t+=`Passando para avisar que ${x.n} não fez a Prova do dia de ${ftLista(x.ds)}.`}
+  else{t+='Passando para avisar sobre a Prova do dia:\n'+al.map(x=>`• ${x.n} não fez a prova de ${ftLista(x.ds)}.`).join('\n')}
+  t+=`\n\nA prova diária é rápida e ajuda muito a fixar o conteúdo da escola. Peço que converse com ${nomes} e acompanhe para que ${varios?'façam':'faça'} a próxima prova: ela fica disponível das ${d.abertura} às ${d.encerramento} na Sala Digital.\n\nQualquer dúvida, estou à disposição. Obrigado!`;
+  return t;
+}
+function ftWhats(g,txt){let n=String(g.telefone||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return `https://wa.me/${n}?text=${encodeURIComponent(txt)}`}
+async function ftCopiar(txt){try{await navigator.clipboard.writeText(txt);return true}catch(e){const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}ta.remove();return ok}}
+async function ftResumo(){try{const r=await api('desafioFaltasResumo');S.badge.p_faltas=r.novas||0;return r.novas||0}catch(e){return 0}}
+function ftAlerta(n){return n?`<div class="note ft-alerta" style="cursor:pointer" data-go="p_faltas">🔔 <b>${n} ${n>1?'responsáveis precisam':'responsável precisa'} ser avisado${n>1?'s':''}</b>: há aluno${n>1?'s':''} que não ${n>1?'fizeram':'fez'} a Prova do dia. Toque para ver a mensagem pronta.</div>`:''}
+const SITE_URL='https://fabianobarbosa018-estrela.github.io/';
+function ftCel(c){
+  if(c.s==='corrigida'||c.s==='enviada')return `<td class="ft-ok" title="Entregue ${c.em?fdh(c.em):''}${c.auto?' (enviada automaticamente)':''}"><b>${nota(c.nota,c.notaMax)}</b><div class="small muted">${c.em?new Date(c.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}${c.auto?' ⏱':''}</div></td>`;
+  if(c.s==='faltou')return '<td class="ft-falta">✘ não fez</td>';
+  if(c.s==='fazendo')return '<td class="ft-and">✍️ fazendo</td>';
+  if(c.s==='aberta')return '<td class="ft-and">⏳ ainda não fez</td>';
+  return '<td class="muted small">—</td>';
+}
+function ftQuadro(q){
+  if(!q||!q.turmas.length)return '';
+  return q.turmas.filter(tu=>tu.provas.length&&tu.alunos.length).map(tu=>{
+    const ps=tu.provas;const media=al=>{const xs=al.provas.filter(c=>c.notaMax&&(c.s==='corrigida'||c.s==='enviada'));const vs=xs.map(c=>c.nota/c.notaMax);const fz=al.provas.filter(c=>c.s==='faltou').length;return {m:vs.length?nota(vs.reduce((a,b)=>a+b,0)/vs.length,1):'—',fz}};
+    return `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 4px">👥 ${esc(tu.nome)}</h3><p class="small muted" style="margin:0 0 10px">Nota de cada aluno em cada Prova do dia (escala 0–${S.cfg.escalaNota}) e hora em que entregou</p>
+    <div class="tbl ft-tbl"><table><tr><th>Aluno</th>${ps.map(p=>`<th>${esc(ftDia(p.dia).replace(/^(\S{3})\S*/,'$1'))}${p.extra?'<div class="small muted">extra</div>':''}${!p.encerrada?'<div class="small" style="color:#16a34a">aberta</div>':''}</th>`).join('')}<th>Média</th><th>Faltas</th></tr>
+    ${tu.alunos.map(al=>{const r=media(al);return `<tr${al.ignorar?' style="opacity:.55"':''}><td><b>${esc(al.nome)}</b></td>${al.provas.map(ftCel).join('')}<td><b>${r.m}</b></td><td>${r.fz?`<span style="color:#dc2626;font-weight:700">${r.fz}</span>`:'0'}</td></tr>`}).join('')}</table></div></div>`}).join('');
+}
+function ftLembrete(d){return `Bom dia, turma! ☀️\n\n📝 A Prova do dia de hoje já está liberada na Sala Digital, das ${d.abertura} às ${d.encerramento}.\n\nEntre, faça com calma e clique em FINALIZAR E ENVIAR PROVA. A nota sai na hora!\n\n👉 ${SITE_URL}`}
+VIEWS.p_faltas=async function(){
+  const [d,q]=await Promise.all([api('desafioFaltas'),api('desafioQuadro').catch(()=>null)]);FT.d=d;S.badge.p_faltas=d.novas||0;
+  const novos=d.grupos.filter(g=>g.novas),avisados=d.grupos.filter(g=>!g.novas);
+  const card=(g,i)=>{const txt=ftMensagem(g,d);return `<div class="card ft-card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><div class="small muted">Responsável</div><h3 style="margin:2px 0">${g.responsavel?esc(g.responsavel):'<span style="color:#b45309">⚠️ não cadastrado</span>'}</h3>${g.telefone?`<div class="small muted">📱 ${esc(g.telefone)}</div>`:''}</div>
+    <button class="btn sm" data-a="ftEditar" data-i="${i}">✏️ Contato</button></div>
+    <div class="list" style="margin:10px 0">${g.alunos.map(x=>`<div class="it"><div class="ic">🎒</div><div class="mid"><div class="t">${esc(x.nome)}</div><div class="s">${esc(x.turma)} · faltou: ${x.faltas.map(f=>`<span class="pill ${f.dia>x.avisadoAte?'pendente':''}" style="margin:2px">${esc(ftDia(f.dia))}</span>`).join(' ')}</div></div></div>`).join('')}</div>
+    <label class="small muted">Mensagem pronta (pode editar antes de enviar)<textarea id="ftMsg${i}" rows="9" style="width:100%;font-size:14px">${esc(txt)}</textarea></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn pri" data-a="ftCopiar" data-i="${i}">📋 Copiar mensagem</button><button class="btn" data-a="ftWhats" data-i="${i}" style="background:#25d366;color:#fff;border-color:#25d366">💬 Enviar no WhatsApp</button>${g.novas?`<button class="btn" data-a="ftAvisado" data-i="${i}">✅ Já avisei</button>`:''}</div></div>`};
+  const idx=g=>d.grupos.indexOf(g);
+  return `<div class="ph"><div><h1>📋 Notas e faltas</h1><p>Quem fez a Prova do dia, a nota de cada aluno e mensagens prontas para responsáveis e alunos</p></div></div>
+  <div class="tabs ft-tabs" style="margin-bottom:12px"><a href="#ft-notas">📊 Notas</a> <a href="#ft-faltas">🔔 Faltas${d.novas?` (${d.novas})`:''}</a> <a href="#ft-lembrete">📣 Lembrete</a></div>
+  <h2 id="ft-notas" style="margin:6px 0 10px">📊 Quem fez a prova e a nota</h2>${ftQuadro(q)||'<div class="info">Ainda não há provas nos últimos dias.</div>'}
+  <h2 id="ft-faltas" style="margin:22px 0 10px">🔔 Faltas: avisar o responsável</h2>
+  ${novos.length?`<div class="note">🔔 ${novos.length} ${novos.length>1?'responsáveis ainda não foram avisados':'responsável ainda não foi avisado'}. Depois de mandar a mensagem, toque em <b>✅ Já avisei</b>: o alerta só volta se o aluno faltar de novo.</div>`:`<div class="info">✅ Nenhuma falta nova. Assim que um aluno deixar de fazer a prova, o alerta aparece aqui e no Início (depois do encerramento, às ${esc(d.encerramento)}).</div>`}
+  ${novos.map(g=>card(g,idx(g))).join('')}
+  ${avisados.length?`<details style="margin-top:14px"><summary class="muted" style="cursor:pointer;margin-bottom:10px">Já avisados (${avisados.length})</summary>${avisados.map(g=>card(g,idx(g))).join('')}</details>`:''}
+  <h2 id="ft-lembrete" style="margin:22px 0 10px">📣 Lembrete para os alunos</h2>
+  <div class="card"><p class="small muted" style="margin-top:0">Os alunos já veem um aviso destacado ao entrar na Sala Digital quando têm prova pendente. Para lembrar quem ainda não entrou, mande esta mensagem no grupo da turma:</p>
+  <textarea id="ftLemb" rows="8" style="width:100%;font-size:14px">${esc(ftLembrete(d))}</textarea>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn pri" data-a="ftCopLemb">📋 Copiar lembrete</button><button class="btn" data-a="ftWhatsLemb" style="background:#25d366;color:#fff;border-color:#25d366">💬 Enviar no WhatsApp</button></div></div>
+  ${d.ignorados.length?`<details style="margin-top:10px"><summary class="muted small" style="cursor:pointer">Alunos sem acompanhamento de faltas (${d.ignorados.length})</summary><div class="list" style="margin-top:8px">${d.ignorados.map(x=>`<div class="it"><div class="mid"><div class="t">${esc(x.nome)}</div><div class="s">${x.faltas} falta${x.faltas>1?'s':''} no período</div></div><div class="end"><button class="btn sm" data-a="ftVoltar" data-id="${x.alunoId}">Voltar a acompanhar</button></div></div>`).join('')}</div></details>`:''}`;
+};
+const ftTexto=i=>{const el=$('#ftMsg'+i);return el?el.value:ftMensagem(FT.d.grupos[i],FT.d)};
+ACOES.ftCopiar=async(d)=>{toast(await ftCopiar(ftTexto(d.i))?'Mensagem copiada! Cole no WhatsApp.':'Não deu para copiar. Selecione o texto e copie.')};
+ACOES.ftWhats=(d)=>{const g=FT.d.grupos[d.i];window.open(ftWhats(g,ftTexto(d.i)),'_blank');if(!g.telefone)toast('Escolha a conversa do responsável no WhatsApp.')};
+ACOES.ftAvisado=async(d)=>{const g=FT.d.grupos[d.i];const ate=g.alunos.reduce((m,x)=>x.faltas.reduce((mm,f)=>f.dia>mm?f.dia:mm,m),'');
+  await api('desafioFaltaAvisado',{alunos:g.alunos.map(x=>x.alunoId),ate});toast('Marcado como avisado.');go('p_faltas')};
+ACOES.ftVoltar=async(d)=>{await api('desafioResponsavelSalvar',{alunoId:d.id,ignorar:false});go('p_faltas')};
+ACOES.ftEditar=(d)=>{const g=FT.d.grupos[d.i];
+  modal(`<div class="hd"><h2>Contato do responsável</h2><button class="x" data-a="fechar">✕</button></div><form id="fFt">
+  <label>Nome do responsável (mãe, pai...)<input name="responsavel" value="${esc(g.responsavel||'')}" placeholder="Ex.: Juliete Tavares de Oliveira"></label>
+  <label>WhatsApp do responsável (com DDD)<input name="telefone" inputmode="tel" value="${esc(g.telefone||'')}" placeholder="Ex.: 81 99999-9999"></label>
+  <p class="small muted">Vale para: ${esc(g.alunos.map(x=>x.nome).join(', '))}. Com o número salvo, o botão do WhatsApp já abre a conversa certa.</p>
+  ${g.alunos.map(x=>`<label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="ig_${x.alunoId}" style="width:auto"> Não acompanhar faltas de ${esc(ftPrimeiro(x.nome))} (ex.: conta de teste)</label>`).join('')}
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn" data-a="fechar">Cancelar</button><button class="btn pri">Salvar</button></div></form>`);
+  $('#fFt').onsubmit=async ev=>{ev.preventDefault();const f=ev.target;
+    for(const x of g.alunos){await api('desafioResponsavelSalvar',{alunoId:x.alunoId,responsavel:f.responsavel.value,telefone:f.telefone.value,ignorar:f['ig_'+x.alunoId].checked})}
+    fechar();toast('Contato salvo.');go('p_faltas')};
+};
+/* alerta no Início do professor e do admin (as telas são definidas mais abaixo no arquivo) */
+queueMicrotask(()=>{['p_inicio','ad_inicio'].forEach(v=>{const orig=VIEWS[v];if(!orig)return;
+  VIEWS[v]=async function(p){const [r,n]=await Promise.all([orig(p),ftResumo()]);const h=typeof r==='string'?r:r.html;const out=h.replace(/(<div class="ph">[\s\S]*?<\/div><\/div>|<div class="ph">[\s\S]*?<\/div>\s*<button[^>]*>[^<]*<\/button><\/div>)/,m=>m+ftAlerta(n));
+    const fin=out===h?ftAlerta(n)+h:out;return typeof r==='string'?fin:Object.assign({},r,{html:fin})}})});
+
+ACOES.ftCopLemb=async()=>{toast(await ftCopiar($('#ftLemb').value)?'Lembrete copiado!':'Não deu para copiar. Selecione o texto e copie.')};
+ACOES.ftWhatsLemb=()=>{window.open('https://wa.me/?text='+encodeURIComponent($('#ftLemb').value),'_blank')};
+/* ---- aviso para o aluno: tem prova para fazer ---- */
+const AVISO_PROVA={visto:''};
+function avisoProvaPend(h){return ((h&&h.desafios)||[]).filter(x=>(x.situacao==='pendente'||x.rascunho)&&x.podeEnviar!==false&&(!x.fim||x.fim>Date.now()))}
+queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;
+  VIEWS.a_inicio=async function(p){const [r,h]=await Promise.all([orig(p),api('desafioHoje').catch(()=>null)]);
+    const pend=avisoProvaPend(h);S.badge.a_atividades=pend.length||0;
+    if(pend.length){const chave=pend.map(x=>x.id).join(',');let visto='';try{visto=sessionStorage.getItem('sd_aviso_prova')||''}catch(e){visto=AVISO_PROVA.visto}
+      if(visto!==chave){AVISO_PROVA.visto=chave;try{sessionStorage.setItem('sd_aviso_prova',chave)}catch(e){}
+        setTimeout(()=>{if(S.view!=='a_inicio'||!$('#modal').classList.contains('hidden'))return;const x=pend[0];
+          modal(`<div style="text-align:center;padding:8px 4px"><div style="font-size:54px" class="aviso-pulo">📝</div><h2 style="margin:6px 0">Você tem prova para fazer!</h2>
+          <p><b>${esc(x.titulo)}</b><br>${x.qtd} questões · ${x.rascunho?'você já começou, falta terminar':'ainda não começou'}</p>
+          <p class="small muted">Prazo: até ${new Date(x.fim||x.encerramento).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} de hoje. A nota sai assim que você enviar.</p>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px"><button class="btn" data-a="fechar">Depois</button><button class="btn pri" data-a="avisoIr">Fazer a prova agora ▶</button></div></div>`)},400)}}
+    const h2=typeof r==='string'?r:r.html;const faixa=pend.length?`<div class="note aviso-prova" style="cursor:pointer;font-size:16px" data-go="a_atividades">📝 <b>Você tem prova para fazer hoje!</b> Toque aqui para começar.</div>`:'';
+    const fin=faixa?h2.replace(/(<div class="ph">[\s\S]*?<\/div><\/div>)/,m=>m+faixa):h2;
+    return typeof r==='string'?fin:Object.assign({},r,{html:fin})}});
+ACOES.avisoIr=()=>{fechar();go('a_atividades')};
+/* =================== ATUALIZAÇÕES DO SISTEMA =================== */
+const NOVIDADES=[
+ {v:'2026-11-12',t:'Notas, faltas e avisos',p:['professor','admin','aluno'],itens:[
+  ['professor','📋 Nova aba <b>Notas e faltas</b>: quadro com quem fez cada Prova do dia, a nota e a hora da entrega.'],
+  ['professor','🔔 Alerta quando um aluno não faz a prova, com <b>mensagem pronta para a mãe/responsável</b> (copiar ou enviar direto no WhatsApp). Irmãos com a mesma mãe recebem uma única mensagem.'],
+  ['professor','📣 Lembrete pronto para mandar no grupo da turma avisando que a prova do dia está liberada.'],
+  ['aluno','📝 Aviso destacado ao entrar na Sala Digital quando você tem prova para fazer.'],
+  ['todos','🆕 Esta aba de Atualizações, com o botão para atualizar o sistema no aparelho.']]},
+ {v:'2026-11-09',t:'Correção automática e nota na hora',p:['professor','admin','aluno'],itens:[
+  ['aluno','✅ A Prova do dia é corrigida por completo assim que você envia, inclusive as discursivas, e a nota aparece na hora.'],
+  ['professor','✍️ As discursivas são corrigidas pela IA (ou por palavras-chave, se a IA falhar). O professor pode revisar a nota em Entregas.']]},
+ {v:'2026-11-08',t:'Provas para os anos iniciais',p:['professor','admin','aluno'],itens:[
+  ['todos','🧒 Turmas do 1º ao 3º ano recebem provas de 20 questões mais fáceis, adequadas à idade.']]},
+ {v:'2026-11-08',t:'Nova cara da Sala Digital',p:['professor','admin','aluno'],itens:[
+  ['todos','🎨 Ilustrações, cores por matéria, animações leves e a coruja Sabi.'],
+  ['aluno','📚 Biblioteca de estudos com textos de todas as matérias.'],
+  ['todos','🖨️ Botão IMPRIMIR PROVA: gera o PDF da prova, sem gabarito.']]},
+ {v:'2026-11-08',t:'Prova do dia',p:['professor','admin','aluno'],itens:[
+  ['todos','📝 Prova diária com questões de todas as matérias, cronômetro, mapa de questões e envio automático no fim do tempo.'],
+  ['professor','⚙️ Professor escolhe os dias da semana, o horário e o tempo de prova.'],
+  ['professor','📚 Banco de Atividades com 8 disciplinas e geração de atividades com IA.']]}
+];
+const VERSAO_ATUAL=NOVIDADES[0].v;
+MENUS.aluno.splice(MENUS.aluno.length-1,0,['atualizacoes','🆕','Atualizações']);
+MENUS.professor.splice(MENUS.professor.length-1,0,['atualizacoes','🆕','Atualizações']);
+MENUS.admin.splice(MENUS.admin.length-1,0,['atualizacoes','🆕','Atualizações']);
+function novVista(){try{return localStorage.getItem('sd_novidades')||''}catch(e){return ''}}
+queueMicrotask(()=>{if(novVista()<VERSAO_ATUAL)S.badge.atualizacoes='novo'});
+VIEWS.atualizacoes=async function(){
+  try{localStorage.setItem('sd_novidades',VERSAO_ATUAL)}catch(e){}S.badge.atualizacoes=0;
+  const perfil=S.u.perfil;const meu=x=>x==='todos'||x===perfil||(perfil==='admin'&&x==='professor');
+  const fd=v=>{const [a,m,d]=v.split('-');return `${d}/${m}/${a}`};
+  const lista=NOVIDADES.map(n=>({...n,itens:n.itens.filter(([q])=>meu(q))})).filter(n=>n.itens.length);
+  return `<div class="ph"><div><h1>🆕 Atualizações do sistema</h1><p>O que há de novo na Sala Digital</p></div></div>
+  <div class="card" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div><b>Versão de ${fd(VERSAO_ATUAL)}</b><div class="small muted">Se alguma novidade não aparecer no seu aparelho, toque em Atualizar agora.</div></div><button class="btn pri" data-a="atualizarAgora">🔄 Atualizar agora</button></div>
+  ${lista.map((n,i)=>`<div class="card" style="margin-bottom:12px"><div class="small muted">${fd(n.v)}${i===0?' · <span class="pill corrigida">novo</span>':''}</div><h3 style="margin:4px 0 8px">${esc(n.t)}</h3><ul style="margin:0;padding-left:18px;line-height:1.6">${n.itens.map(([,x])=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}`;
+};
+ACOES.atualizarAgora=async()=>{toast('Atualizando...');
+  try{if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch(e){}
+  try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.update().catch(()=>{})))}}catch(e){}
+  const u=new URL(location.href);u.searchParams.set('v',Date.now());location.replace(u.toString())};
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}

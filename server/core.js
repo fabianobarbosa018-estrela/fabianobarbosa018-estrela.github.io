@@ -1430,6 +1430,88 @@ const DESAFIO_SIS = {
   notaIA: x => desafioNotaIA_(x)
 };
 
+// ================== FALTAS NA PROVA DO DIA (alerta + mensagem para o responsável) ==================
+const FALTA_JANELA_DIAS = 14;
+function normNome_(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+function desafioFaltas_(u) {
+  const adm = u.perfil === 'admin'; const t = agora_(); const corte = diaLocal_(t - FALTA_JANELA_DIAS * 864e5);
+  const turmas = {}; all_('Turmas').filter(x => !x.arquivada && (adm || x.professorId === u.id)).forEach(x => { turmas[x.id] = x; });
+  const provas = all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio && !a.desafio.extra && a.status === 'publicada' && a.encerramento && a.encerramento < t && a.desafio.dia >= corte && (a.turmas || []).some(id => turmas[id]))
+    .sort((x, y) => (x.desafio.dia < y.desafio.dia ? -1 : 1));
+  const mats = all_('Matriculas').filter(m => m.status === 'aprovado' && turmas[m.turmaId]);
+  const ents = {}; all_('Entregas').forEach(e => { if (e.status === 'enviada' || e.status === 'corrigida') ents[e.atividadeId + '|' + e.alunoId] = 1; });
+  const porAluno = {};
+  provas.forEach(a => {
+    mats.filter(m => (a.turmas || []).indexOf(m.turmaId) >= 0).forEach(m => {
+      if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return;       // entrou na turma depois da prova
+      if (ents[a.id + '|' + m.alunoId]) return;
+      const al = get_('Usuarios', m.alunoId); if (!al || al.perfil !== 'aluno' || al.status !== 'ativo') return;
+      const x = porAluno[al.id] || (porAluno[al.id] = { alunoId: al.id, nome: al.nome, turma: turmas[m.turmaId].nome, responsavel: al.responsavelNome || '', telefone: al.responsavelTelefone || '',
+        ignorar: !!al.faltaIgnorar, avisadoAte: al.faltaAvisadoAte || '', faltas: [] });
+      if (!x.faltas.some(f => f.dia === a.desafio.dia)) x.faltas.push({ dia: a.desafio.dia, titulo: a.titulo });
+    });
+  });
+  const alunos = Object.keys(porAluno).map(k => porAluno[k]);
+  alunos.forEach(x => { x.novas = x.faltas.filter(f => f.dia > x.avisadoAte).length; });
+  // agrupa irmãos com o mesmo responsável numa única mensagem
+  const grupos = {};
+  alunos.filter(x => !x.ignorar).forEach(x => {
+    const k = x.responsavel ? 'r:' + normNome_(x.responsavel) : 'a:' + x.alunoId;
+    const g = grupos[k] || (grupos[k] = { chave: k, responsavel: x.responsavel, telefone: '', alunos: [], novas: 0 });
+    g.alunos.push(x); g.novas += x.novas; if (!g.telefone && x.telefone) g.telefone = x.telefone;
+  });
+  const lista = Object.keys(grupos).map(k => grupos[k]).sort((p, q) => (q.novas - p.novas) || (p.alunos[0].nome < q.alunos[0].nome ? -1 : 1));
+  return { agora: t, janelaDias: FALTA_JANELA_DIAS, grupos: lista, ignorados: alunos.filter(x => x.ignorar).map(x => ({ alunoId: x.alunoId, nome: x.nome, faltas: x.faltas.length })),
+    novas: lista.reduce((s, g) => s + (g.novas ? 1 : 0), 0),
+    abertura: hhmm_(desafioCfgProf_(u.id).abertura || cfg_().desafioAbertura, '06:00'), encerramento: hhmm_(desafioCfgProf_(u.id).encerramento || cfg_().desafioEncerramento, '23:00') };
+}
+function alunoDoProf_(u, alunoId) {
+  const al = get_('Usuarios', alunoId); if (!al || al.perfil !== 'aluno') throw new Error('Aluno não encontrado.');
+  if (u.perfil !== 'admin') {
+    const minhas = all_('Turmas').filter(x => x.professorId === u.id).map(x => x.id);
+    if (!all_('Matriculas').some(m => m.alunoId === al.id && minhas.indexOf(m.turmaId) >= 0)) throw new Error('Este aluno não está nas suas turmas.');
+  }
+  return al;
+}
+rota_('desafioFaltas', PROF, false, u => desafioFaltas_(u));
+rota_('desafioFaltasResumo', PROF, false, u => { const f = desafioFaltas_(u); return { novas: f.novas }; });
+// marca como avisado: o alerta some até o aluno faltar de novo
+rota_('desafioFaltaAvisado', PROF, true, (u, d) => {
+  const ids = Array.isArray(d.alunos) ? d.alunos.slice(0, 20) : []; const ate = String(d.ate || diaLocal_(agora_())).slice(0, 10);
+  ids.forEach(id => { const al = alunoDoProf_(u, id); al.faltaAvisadoAte = ate; upd_('Usuarios', al); });
+  return { ok: true };
+});
+rota_('desafioResponsavelSalvar', PROF, true, (u, d) => {
+  const al = alunoDoProf_(u, d.alunoId);
+  if (d.responsavel !== undefined) al.responsavelNome = txt_(d.responsavel, 100);
+  if (d.telefone !== undefined) al.responsavelTelefone = String(d.telefone || '').replace(/\D/g, '').slice(0, 15);
+  if (d.ignorar !== undefined) al.faltaIgnorar = !!d.ignorar;
+  upd_('Usuarios', al); return { ok: true };
+});
+// quadro de notas: quem fez cada prova do dia e a nota (por turma, últimos dias)
+rota_('desafioQuadro', PROF, false, u => {
+  const adm = u.perfil === 'admin'; const t = agora_(); const corte = diaLocal_(t - FALTA_JANELA_DIAS * 864e5);
+  const turmas = all_('Turmas').filter(x => !x.arquivada && (adm || x.professorId === u.id));
+  return { agora: t, turmas: turmas.map(tu => {
+    const provas = all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio && a.status === 'publicada' && a.desafio.dia >= corte && (a.turmas || []).indexOf(tu.id) >= 0 && a.abertura <= t)
+      .sort((x, y) => (x.desafio.dia < y.desafio.dia ? 1 : x.desafio.dia > y.desafio.dia ? -1 : (y.criadoEm || 0) - (x.criadoEm || 0))).slice(0, 10);
+    const mats = all_('Matriculas').filter(m => m.turmaId === tu.id && m.status === 'aprovado');
+    const alunos = mats.map(m => get_('Usuarios', m.alunoId)).filter(al => al && al.perfil === 'aluno' && al.status === 'ativo').sort((a, b) => (a.nome < b.nome ? -1 : 1));
+    return { id: tu.id, nome: tu.nome, serie: tu.serie || '',
+      provas: provas.map(a => ({ id: a.id, dia: a.desafio.dia, extra: !!a.desafio.extra, encerrada: a.encerramento < t, encerramento: a.encerramento, notaMax: notaMax_(a) })),
+      alunos: alunos.map(al => {
+        const m = mats.find(x => x.alunoId === al.id);
+        return { id: al.id, nome: al.nome, ignorar: !!al.faltaIgnorar, provas: provas.map(a => {
+          const e = all_('Entregas').find(x => x.atividadeId === a.id && x.alunoId === al.id);
+          if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return { s: 'nova' };
+          if (!e) return { s: a.encerramento < t ? 'faltou' : 'aberta' };
+          if (e.status === 'rascunho') return { s: a.encerramento < t ? 'faltou' : 'fazendo', inicio: e.iniciadoEm || null };
+          return { s: e.status === 'corrigida' ? 'corrigida' : 'enviada', nota: e.nota, notaMax: e.notaMax || notaMax_(a), em: e.enviadoEm, entregaId: e.id, auto: !!e.autoEnviada };
+        }) };
+      }) };
+  }) };
+});
+
   function preparar(dados) {
     _cache = {}; _ops = []; _upl = []; _rm = []; _rpc = []; _kv = {};
     Object.keys(TAB).forEach(t => { _cache[t] = (dados[t] || []).map(x => Object.assign({}, x)); });

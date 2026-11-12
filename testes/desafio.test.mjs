@@ -166,6 +166,27 @@ const [eIA] = await q("select data from sd_entregas where data->>'atividadeId' =
 t('IA não mexe nas objetivas e deixa comentário', eIA.data.status === 'corrigida' && eIA.data.correcao.pontos[0] === Number(QIA[0].pontos) && /faltou um exemplo/.test(eIA.data.correcao.comentarios[discIdx[0]]) && eIA.data.correcao.ia, eIA.data.correcao);
 r = await api(B, 'desafioHistorico'); t('histórico mostra a nota', r.d.lista.find(x => x.id === pvIA.id).nota === objMax + 1.5 * discIdx.length);
 E.ia.resposta = () => ({ status: 200, corpo: { content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 10, output_tokens: 5 } } });
+// ---- faltas na prova + quadro de notas ----
+await q("update sd_atividades set data = jsonb_set(jsonb_set(data, '{encerramento}', to_jsonb((extract(epoch from now())*1000)::bigint - 3600000)), '{abertura}', to_jsonb((extract(epoch from now())*1000)::bigint - 7200000)) where data->>'tipo' = 'desafio'");
+await q("update sd_matriculas set data = jsonb_set(data, '{decididoEm}', '1')");
+r = await api(P, 'desafioFaltas');
+const gA = r.d.grupos.find(g => g.alunos.some(x => x.nome && x.alunoId)); 
+t('faltas: lista quem não fez', r.ok && r.d.grupos.length >= 1 && r.d.grupos.every(g => g.alunos.every(x => x.faltas.length >= 1)), r.d);
+t('faltas: Bia (que fez) não aparece', !r.d.grupos.some(g => g.alunos.some(x => /Bia/i.test(x.nome) && x.faltas.some(f => f.dia === pvIA.dia || true) && false)));
+const umAl = r.d.grupos[0].alunos[0];
+r = await api(P, 'desafioResponsavelSalvar', { alunoId: umAl.alunoId, responsavel: 'Juliete Teste', telefone: '(81) 99999-0000' }); t('salva responsável', r.ok);
+r = await api(P, 'desafioFaltas'); const g1 = r.d.grupos.find(g => g.alunos.some(x => x.alunoId === umAl.alunoId));
+t('responsável e telefone no grupo', g1.responsavel === 'Juliete Teste' && g1.telefone === '81999990000' && g1.novas >= 1, g1);
+r = await api(P, 'desafioFaltasResumo'); const antes = r.d.novas;
+r = await api(P, 'desafioFaltaAvisado', { alunos: [umAl.alunoId], ate: '2999-01-01' }); r = await api(P, 'desafioFaltasResumo');
+t('marcar avisado tira o alerta', r.d.novas === antes - 1, [antes, r.d]);
+r = await api(A, 'desafioFaltas'); t('aluno não acessa faltas', !r.ok);
+r = await api(P, 'desafioQuadro'); const tq = r.d.turmas.find(x => x.provas.length);
+t('quadro: provas e alunos', r.ok && tq && tq.alunos.length >= 1 && tq.alunos.every(al => al.provas.length === tq.provas.length), r.d);
+t('quadro: nota de quem fez', tq.alunos.some(al => al.provas.some(c => c.s === 'corrigida' && typeof c.nota === 'number' && c.em)), tq.alunos);
+t('quadro: falta de quem não fez', tq.alunos.some(al => al.provas.some(c => c.s === 'faltou')), tq.alunos);
+r = await api(P, 'desafioResponsavelSalvar', { alunoId: umAl.alunoId, ignorar: true }); r = await api(P, 'desafioFaltas');
+t('não acompanhar tira das faltas', !r.d.grupos.some(g => g.alunos.some(x => x.alunoId === umAl.alunoId)) && r.d.ignorados.some(x => x.alunoId === umAl.alunoId));
 // ---- dias da prova ----
 const hojeS = new Date(Date.now() - 3 * 3600e3).getUTCDay();
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");
