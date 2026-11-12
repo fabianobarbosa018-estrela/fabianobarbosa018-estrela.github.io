@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '11/11 23:27';
+const VERSAO_APP = '11/11 23:39';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2098,25 +2098,79 @@ function contagemSemana(semana, setorF) {
   out.forEach(o => { o.trab.sort(); o.folg.sort(); });
   return out;
 }
-// Quanto pagar por data. Serviços: pela data de cada lote. VT: quinzena 1 a 15 paga dia 20; 16 ao fim paga dia 5 do mês seguinte.
-function servDatasPagar(mes) {
-  const datas = {};
-  const soma = (d, v) => { if (v > 0.005) datas[d] = r2((datas[d] || 0) + v); };
-  const dataTxt = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.slice(8, 10) + '/' + d.slice(5, 7) : (d || 'sem data');
-  S.prestadores.forEach(p => servCalc(mes, p.id).pagos.forEach(q => soma(dataTxt(q.data), q.pago ? r2(q.valor - (q.valorPago != null ? q.valorPago : q.valor)) : q.valor)));
-  return datas;
+/* Próximo pagamento de serviços: a data mais antiga com algum lote ainda com saldo a pagar (saldo = valor do lote menos o que já foi pago).
+   Ao marcar o lote como pago, ele sai da lista e o próximo pagamento aparece sozinho. Nunca mostra R$ 0,00. */
+function servProximo() {
+  const hoje = C.hojeISO(), datas = {};
+  let semData = 0;
+  servMeses().forEach(mes => S.prestadores.forEach(p => {
+    servCalc(mes, p.id).pagos.forEach(q => {
+      const falta = q.pago ? r2(q.valor - (q.valorPago != null ? q.valorPago : q.valor)) : q.valor;
+      if (!(falta > 0.005)) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(q.data || '')) { semData++; return; }
+      const d = datas[q.data] || (datas[q.data] = { valor: 0, pids: new Set() });
+      d.valor = r2(d.valor + falta); d.pids.add(p.id);
+    });
+  }));
+  if (semData) return { estado: 'nc', motivo: semData + ' lote(s) sem data de pagamento. Defina a data na página Serviços prestados.' };
+  const ds = Object.keys(datas).sort();
+  if (!ds.length) return { estado: 'nada' };
+  const d = ds[0];
+  return { estado: 'ok', data: d, valor: datas[d].valor, qtd: datas[d].pids.size, atraso: d < hoje };
 }
-function vtDatasPagar(meses) {
-  const datas = {};
-  const soma = (d, v) => { if (v > 0.005) datas[d] = r2((datas[d] || 0) + v); };
-  meses.forEach(ym => {
-    const ano = +ym.slice(0, 4), mm = +ym.slice(5, 7), prox = new Date(ano, mm, 1);
-    const d20 = '20/' + String(mm).padStart(2, '0'), d05 = '05/' + String(prox.getMonth() + 1).padStart(2, '0');
-    vtModelo(ym).linhas.forEach(l => { soma(d20, r2(vtTot(l, 'q1') - vtPago(l, 'q1'))); soma(d05, r2(vtTot(l, 'q2') - vtPago(l, 'q2'))); });
-  });
-  return datas;
+/* Próximo pagamento de VT: quinzena 1 (dias 1 a 15) paga dia 20 do mês; quinzena 2 (dias 16 ao fim) paga dia 5 do mês seguinte.
+   Saldo de cada funcionário = VT calculado pela escala menos o que já foi pago naquela quinzena (nunca negativo).
+   Se faltar escala ou valor de passagem em um período já iniciado, mostra Não calculado em vez de um valor incompleto. */
+/* O período tem pelo menos um dia coberto por escala? Antes disso, o VT não é controlado pelo sistema. */
+function vtCobre(ym, a, b) {
+  for (let i = a; i <= b; i++) if (S.escalas[C.inicioSemana(ym + '-' + String(i).padStart(2, '0'))]) return true;
+  return false;
 }
-function datasOrdenadas(obj) { const ord = d => +String(d).slice(0, 2) || 99; return Object.keys(obj).sort((a, b) => ord(a) - ord(b)).map(d => ({ d, v: obj[d] })); }
+/* Funcionários ativos que trabalharam no período (pela escala) sem valor de passagem cadastrado. Esses dias não entram no VT. */
+function vtSemPassagem(ym, a, b) {
+  const doc = vtDoc(ym), quem = new Set();
+  for (let i = a; i <= b; i++) {
+    const dd = ym + '-' + String(i).padStart(2, '0');
+    const e = S.escalas[C.inicioSemana(dd)];
+    if (!e || !e.atribuicoes) continue;
+    S.funcionarios.forEach(f => {
+      if (!f.ativo || quem.has(f.id)) return;
+      if (!['T', 'X'].includes(C.statusDia(e.atribuicoes[f.id] || null, dd, f, true))) return;
+      const aj = doc.ajustes && doc.ajustes[f.id] && doc.ajustes[f.id][dd];
+      if (aj && aj.t === 'trab' && aj.v != null && aj.v !== '') return;
+      const v = C.vtValorEm(f, dd);
+      if (!v || (!v.fixo && !(v.total > 0))) quem.add(f.id);
+    });
+  }
+  return quem.size;
+}
+function vtProximo() {
+  const hoje = C.hojeISO(), mesHoje = hoje.slice(0, 7);
+  const chaves = Object.keys(S.vt).filter(k => /^\d{4}-\d{2}$/.test(k)).concat(Object.keys(S.escalas).map(s => s.slice(0, 7)), [mesHoje]).sort();
+  const lo = chaves[0], hi = chaves[chaves.length - 1];
+  const cand = [];
+  for (let ym = lo; ym <= hi; ym = servMesVizinho(ym, 1)) {
+    const m = vtModelo(ym), prox = servMesVizinho(ym, 1);
+    [['q1', ym + '-01', ym + '-20', 1, 15], ['q2', ym + '-16', prox + '-05', 16, m.dim]].forEach(([q, ini, pag, a, b]) => {
+      if (!vtCobre(ym, a, b)) return; // período anterior ao uso das escalas: não faz parte do controle
+      const pend = m.linhas.map(l => ({ l, v: r2(Math.max(0, l[q].valor - l.pago[q])) })).filter(o => o.v > 0.004);
+      const pgs = vtDoc(ym).pagamentos || {};
+      const registrado = m.linhas.some(l => pgs[l.id] && pgs[l.id][q]); // já houve registro de pagamento nesta quinzena
+      const faltaEscala = m.linhas.some(l => l.cel.some((c, i) => i + 1 >= a && i + 1 <= b && c.tipo === 'semEscala'));
+      const semPassagem = vtSemPassagem(ym, a, b);
+      const periodo = vtTituloPer(m, q);
+      if ((faltaEscala || semPassagem > 0) && ini <= hoje && (pend.length || !registrado)) {
+        const motivo = [faltaEscala ? 'Faltam escalas para alguns dias deste período.' : '', semPassagem ? semPassagem + ' funcionário(s) sem valor de passagem cadastrado.' : ''].filter(Boolean).join(' ');
+        cand.push({ pag, periodo, nc: motivo });
+      } else if (pend.length) cand.push({ pag, periodo, valor: r2(pend.reduce((s, o) => s + o.v, 0)), qtd: pend.length });
+    });
+  }
+  if (!cand.length) return { estado: 'nada' };
+  cand.sort((x, y) => x.pag < y.pag ? -1 : x.pag > y.pag ? 1 : 0);
+  const c = cand[0];
+  if (c.nc) return { estado: 'nc', periodo: c.periodo, dataPag: c.pag, motivo: c.nc };
+  return { estado: 'ok', periodo: c.periodo, dataPag: c.pag, valor: c.valor, qtd: c.qtd, atraso: c.pag < hoje };
+}
 function faixaDia(d) { return d.slice(0, 2) === '20' ? ' · dias 1 a 15' : d.slice(0, 2) === '05' ? ' · dias 16 a 30' : ''; }
 
 function vPainel() {
@@ -2126,13 +2180,8 @@ function vPainel() {
   const hojeC = contagemSemana(sem, '')[C.diaSemana(hoje)];
   const trabHoje = hojeC.trab.length, folgHoje = hojeC.folg.length;
   const diaHoje = C.DIAS[C.diaSemana(hoje)].toLowerCase();
-  const pend = servPendentes(mes);
-  const pSrv = datasOrdenadas(servDatasPagar(mes));
-  const pa = new Date(+mes.slice(0, 4), +mes.slice(5, 7) - 2, 1);
-  const mesAnt = pa.getFullYear() + '-' + String(pa.getMonth() + 1).padStart(2, '0');
-  const pVT = datasOrdenadas(vtDatasPagar([mesAnt, mes]));
-  const totVT = r2(pVT.reduce((acc, x) => acc + x.v, 0));
-  const linhaPg = x => `<div class="pg-l"><span>Dia <b>${x.d}</b>${faixaDia(x.d)}</span><b>R$ ${servMoeda(x.v)}</b></div>`;
+  const sp = servProximo(), vp = vtProximo();
+  const finV = r => `<div class="fin-v">${r.estado === 'ok' ? 'R$ ' + servMoeda(r.valor) : r.estado === 'nc' ? 'Não calculado' : 'Nada pendente'}</div>`;
   const al = alertasGerais();
   const nomes = { status: 'Escalas', pessoas: 'Pessoas e folgas', setores: 'Setores', conflito: 'Conflitos', sistema: 'Sistema' };
   const cont = {}; al.forEach(a => { cont[a.cat] = (cont[a.cat] || 0) + 1; });
@@ -2150,19 +2199,21 @@ function vPainel() {
   </div>
   <a class="card kpi-link situ mt" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="l">Situação da escala desta semana</div><div class="situ-b">${escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Publicada</span>' : '<span class="badge b-draft">Rascunho · aguardando aprovação</span>') : '<span class="badge b-err">Não gerada</span>'}</div><div class="x">${semanaLabel(sem)} · toque para abrir</div></a>
 
-  <h3 class="secao">Financeiro pendente</h3>
+  <h3 class="secao">Financeiro · próximo pagamento</h3>
   <div class="grid g2">
     <a class="card fin" href="#servicos">
       <div class="l">Serviços prestados</div>
-      <div class="fin-v">R$ ${servMoeda(pend.valor)}</div>
-      <div class="x">${pend.qtd} prestador(es) com pagamento pendente</div>
-      <div class="mt">${pSrv.length ? pSrv.map(linhaPg).join('') : '<div class="x">Nada pendente.</div>'}</div>
+      ${finV(sp)}
+      ${sp.estado === 'ok'
+        ? `<div class="x">Pagamento dia <b>${C.dataBR(sp.data)}</b>${faixaDia(sp.data.slice(8, 10))}${sp.atraso ? ' <span class="badge b-err">em atraso</span>' : ''}</div><div class="x">${sp.qtd} prestador(es) recebem nesta data</div>`
+        : `<div class="x">${sp.estado === 'nc' ? esc(sp.motivo) : 'Nenhum pagamento de serviço em aberto.'}</div>`}
     </a>
     <a class="card fin" href="#vt">
       <div class="l">Vale-transporte</div>
-      <div class="fin-v">R$ ${servMoeda(totVT)}</div>
-      <div class="x">VT ainda não pago deste mês e do anterior</div>
-      <div class="mt">${pVT.length ? pVT.map(linhaPg).join('') : '<div class="x">Nada pendente.</div>'}</div>
+      ${finV(vp)}
+      ${vp.estado === 'ok'
+        ? `<div class="x">Pagamento dia <b>${C.dataBR(vp.dataPag)}</b>${vp.atraso ? ' <span class="badge b-err">em atraso</span>' : ''}</div><div class="x">Período: ${vp.periodo}</div><div class="x">${vp.qtd} funcionário(s) com VT pendente</div>`
+        : `<div class="x">${vp.estado === 'nc' ? esc(vp.motivo) + ' Período: ' + vp.periodo : 'Nenhum VT em aberto.'}</div>`}
     </a>
   </div>
 
