@@ -160,6 +160,37 @@ export function criarServidor(io) {
     if (q[0] === 'v') return Object.assign(base, { tipo: 'vf', correta: q[3], explicacao: q[4] });
     return Object.assign(base, { tipo: 'disc', pontos: 2, permiteFoto: true, explicacao: q[3] });
   }
+
+  // ---- material de estudo: vídeo, texto e exemplo resolvido ----
+  const normTxt = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const PAL_VAZIAS = new Set('para pela pelo como porque quando qual quais isso esse essa este esta mais muito com sem que uma umas uns dos das nos nas seu sua tem ter foi ser sao pois mas tambem sobre entre cada todo toda onde voce questao numero numeros resposta alternativa correta abaixo'.split(' '));
+  const palavras = x => normTxt(x).match(/[a-z0-9]{4,}/g) || [];
+  function videoDe(D, a, videos) { const v = videos || {}; return v[D.id + '|' + a.a] || v[DISC_BANCO[D.id] + '|' + a.a] || a.v || ''; }
+  function exemploDe(a, excluir, maxDif) {
+    const fora = new Set((excluir || []).map(x => normTxt(x).slice(0, 120)));
+    const ok = a.q.filter(q => q[0] !== 'd' && !fora.has(normTxt(q[2]).slice(0, 120)));
+    const pool = ok.filter(q => q[1] <= (maxDif || 2)); const lista = pool.length ? pool : ok; if (!lista.length) return null;
+    const q = lista[Math.floor(Math.random() * lista.length)];
+    if (q[0] === 'm') return { enunciado: q[2], opcoes: q[3], resposta: q[3][q[4]], explicacao: q[5] };
+    return { enunciado: q[2], resposta: q[3] ? 'Verdadeiro' : 'Falso', explicacao: q[4] };
+  }
+  function estudoDoBanco(B, b) {
+    const D = B.disciplinas.find(x => DISC_BANCO[x.id] === b.disciplinaNome || x.nome === b.disciplinaNome);
+    const base = { disciplina: b.disciplinaNome, assunto: b.assunto || '', texto: '', video: '', exemplo: null };
+    if (!D) return base;
+    const niveis = { F1I: ['F1'], F1: ['F1'], F2: ['F2', 'F1'], EM: ['EM', 'F2'] }[b.nivel] || ['F2', 'F1', 'EM'];
+    const cand = D.assuntos.filter(a => niveis.indexOf(a.n) >= 0);
+    let a = cand.find(x => normTxt(x.a) === normTxt(b.assunto));
+    if (!a) a = cand.find(x => x.q.some(q => normTxt(q[2]) === normTxt(b.enunciado)));
+    if (!a) {   // assunto escrito pela IA: escolhe o assunto do banco com mais palavras em comum
+      const alvo = palavras(b.assunto + ' ' + b.assunto + ' ' + b.enunciado).filter(w => !PAL_VAZIAS.has(w));
+      let melhor = null, pts = 0;
+      cand.forEach(x => { const voc = new Set(palavras(x.a + ' ' + x.a + ' ' + x.t).map(w => w.slice(0, 6))); const p = alvo.reduce((s, w) => s + (voc.has(w.slice(0, 6)) ? 1 : 0), 0) + niveis.indexOf(x.n) * -0.5; if (p > pts) { pts = p; melhor = x; } });
+      if (pts >= 2) a = melhor;
+    }
+    if (!a) return base;
+    return { disciplina: D.nome, assunto: a.a, nivel: NIVEL[a.n] || a.n, texto: a.t, video: videoDe(D, a, b.videos), exemplo: exemploDe(a, b.excluir, b.nivel === 'F1I' ? 1 : 2) };
+  }
   async function executarBanco(b) {
     let B;
     try { B = await abrirBanco(b.chave); }
@@ -167,12 +198,13 @@ export function criarServidor(io) {
     if (b.acao === 'indice') return { ok: true, d: { niveis: NIVEL, disciplinas: B.disciplinas.map(d => ({ id: d.id, nome: d.nome, icone: d.icone,
       assuntos: d.assuntos.map((a, i) => ({ i: i, nome: a.a, nivel: a.n, total: a.q.length,
         tipos: { mc: a.q.filter(q => q[0] === 'm').length, vf: a.q.filter(q => q[0] === 'v').length, disc: a.q.filter(q => q[0] === 'd').length } })) })) } };
+    if (b.acao === 'estudo') return { ok: true, d: estudoDoBanco(B, b) };
     const D = B.disciplinas.find(d => d.id === b.disciplina);
     if (!D) return { ok: false, erro: 'Disciplina não encontrada no banco.' };
     if (b.acao === 'texto') {
       const a = D.assuntos[b.assunto];
       if (!a) return { ok: false, erro: 'Assunto não encontrado.' };
-      return { ok: true, d: { disciplina: D.nome, assunto: a.a, nivel: NIVEL[a.n] || a.n, texto: a.t } };
+      return { ok: true, d: { disciplina: D.nome, assunto: a.a, nivel: NIVEL[a.n] || a.n, texto: a.t, video: videoDe(D, a, b.videos), exemplo: exemploDe(a, [], 1) } };
     }
     if (b.acao !== 'montar') return { ok: false, erro: 'Ação inválida.' };
     const sel = b.assuntos.map(i => D.assuntos[i]).filter(Boolean);
@@ -397,7 +429,7 @@ const COTAS_20 = { 'Português': 4, 'Matemática': 12, 'História': 2, 'Geografi
     const ordemT = { mc: 0, vf: 1, disc: 2 };
     todas.sort((x, y) => (ORDEM_DISC.indexOf(x.disciplina) - ORDEM_DISC.indexOf(y.disciplina)) || (ordemT[x.tipo] - ordemT[y.tipo]));
     const assuntos = [...new Set(todas.map(q => q.assunto).filter(Boolean))];
-    todas.forEach(q => { delete q._h; delete q.assunto; delete q.dificuldade; });
+    todas.forEach(q => { delete q._h; delete q.dificuldade; });   // o assunto fica: serve para o botão "Estudar o assunto"
     return { questoes: todas.slice(0, DESAFIO_TOTAL), origem: deIA >= DESAFIO_TOTAL * 0.9 ? 'ia' : deIA > 0 ? 'ia+banco' : 'banco', deIA: deIA, assuntos: assuntos, motivo: motivo };
   }
   const DESAFIO_TOTAL = 50;

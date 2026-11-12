@@ -281,6 +281,9 @@ main>*:first-child{animation:surgir .35s ease}
 .ft-tabs a{display:inline-block;padding:6px 12px;margin:0 6px 6px 0;border-radius:999px;background:#eef2ff;color:#3730a3;text-decoration:none;font-weight:600;font-size:14px}
 .aviso-prova{border-left:5px solid #f59e0b;animation:avisoBrilho 2.4s ease-in-out infinite}@keyframes avisoBrilho{50%{box-shadow:0 0 0 6px rgba(245,158,11,.18)}}
 .aviso-pulo{display:inline-block;animation:avisoPulo 1.2s ease-in-out infinite}@keyframes avisoPulo{50%{transform:translateY(-8px) rotate(-6deg)}}
+.estudo-linha{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 4px}.estudo-btn{background:#ecfdf5;color:#047857;border-color:#a7f3d0;font-weight:700}
+.est-sec{font-weight:800;color:var(--pri);margin:12px 0 6px}.est-video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000}.est-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.est-ex{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;margin-top:12px}.est-ex-t{font-weight:800;color:#b45309;margin-bottom:6px}.est-op{margin:6px 0;padding-left:18px}.est-op li.ok{color:#15803d;font-weight:700}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1179,7 +1182,7 @@ VIEWS.a_prova=async function(p){
         :e.notaAgora?`<div class="score">${nota(e.notaAgora.nota,e.notaAgora.notaMax)}</div><div class="muted">${pts(e.notaAgora.nota)} de ${pts(e.notaAgora.notaMax)} pontos</div><div class="dz-placar" style="justify-content:center"><span class="ok">✔ ${e.notaAgora.acertos} acertos</span><span class="bad">✘ ${e.notaAgora.erros} erros</span>${e.notaAgora.discursivas?`<span>✍️ ${e.notaAgora.discursivas} discursiva${e.notaAgora.discursivas>1?'s':''} corrigida${e.notaAgora.discursivas>1?'s':''}</span>`:''}</div><p class="small muted">Prova corrigida automaticamente. O gabarito comentado aparece ${a.encerramento>Date.now()?'depois do encerramento ('+quando(a.encerramento)+')':'quando o professor liberar'}.</p>`
         :`${placar}<p>O resultado com a nota, o gabarito e as explicações será mostrado ${a.encerramento>Date.now()?'depois do encerramento ('+quando(a.encerramento)+')':'quando o professor liberar'}.</p>`}</div>`}
     else res=`<div class="pv-folha pv-res"><div class="pv-tit" style="font-size:20px">PROVA ENCERRADA</div><p>O prazo terminou e esta prova não recebe mais respostas.</p></div>`;
-    let corpo='';if(lib||(!enviado&&a.questoes.every(q=>q.tipo==='disc'||q.correta!==undefined))){blocosDisc(a.questoes).forEach(b=>{corpo+=`<div class="pv-disc">${ic(b.d)} ${esc(b.d.toUpperCase())} <span>questões ${b.ini+1} a ${b.fim+1}</span></div>`;for(let i=b.ini;i<=b.fim;i++)corpo+=htmlQuestaoAluno(a.questoes[i],i,lib?e:null,true)})}
+    let corpo='';if(lib||(!enviado&&a.questoes.every(q=>q.tipo==='disc'||q.correta!==undefined))){blocosDisc(a.questoes).forEach(b=>{corpo+=`<div class="pv-disc">${ic(b.d)} ${esc(b.d.toUpperCase())} <span>questões ${b.ini+1} a ${b.fim+1}</span></div>`;for(let i=b.ini;i<=b.fim;i++)corpo+=htmlQuestaoAluno(a.questoes[i],i,lib?e:null,true)+`<div class="estudo-linha"><button type="button" class="btn sm estudo-btn" data-a="estudoAbrir" data-a2="" data-i="${i}">📚 Estudar o assunto</button></div>`})}
     return {html:voltar+cabecalhoProva(a,t)+res+(corpo?`<h3 style="margin:18px 0 8px">${lib?'Gabarito comentado':'Questões'}</h3>`+corpo:''),depois:()=>{}}}
   // 2) ainda não começou: folha de rosto com as instruções
   if(!e||e.status!=='rascunho'){const B=blocosDisc(a.questoes);
@@ -1617,6 +1620,10 @@ queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;
 ACOES.avisoIr=()=>{fechar();go('a_atividades')};
 /* =================== ATUALIZAÇÕES DO SISTEMA =================== */
 const NOVIDADES=[
+ {v:'2026-11-12b',t:'Estudar o assunto',p:['professor','admin','aluno'],itens:[
+  ['aluno','📚 Em cada questão da Prova do dia há o botão <b>Estudar o assunto</b>: abre um vídeo explicativo, um texto curto e um exemplo resolvido.'],
+  ['todos','🎬 82 vídeos escolhidos para os assuntos do 1º ao 9º ano. A Biblioteca também mostra o vídeo e o exemplo.'],
+  ['professor','✏️ O professor pode trocar o vídeo de qualquer assunto: abra Estudar o assunto e toque em <b>Trocar vídeo</b>.']]},
  {v:'2026-11-12',t:'Notas, faltas e avisos',p:['professor','admin','aluno'],itens:[
   ['professor','📋 Nova aba <b>Notas e faltas</b>: quadro com quem fez cada Prova do dia, a nota e a hora da entrega.'],
   ['professor','🔔 Alerta quando um aluno não faz a prova, com <b>mensagem pronta para a mãe/responsável</b> (copiar ou enviar direto no WhatsApp). Irmãos com a mesma mãe recebem uma única mensagem.'],
@@ -1649,7 +1656,7 @@ queueMicrotask(()=>{if(novVista()<VERSAO_ATUAL)S.badge.atualizacoes='novo'});
 VIEWS.atualizacoes=async function(){
   try{localStorage.setItem('sd_novidades',VERSAO_ATUAL)}catch(e){}S.badge.atualizacoes=0;
   const perfil=S.u.perfil;const meu=x=>x==='todos'||x===perfil||(perfil==='admin'&&x==='professor');
-  const fd=v=>{const [a,m,d]=v.split('-');return `${d}/${m}/${a}`};
+  const fd=v=>{const [a,m,d]=v.slice(0,10).split('-');return `${d}/${m}/${a}`};
   const lista=NOVIDADES.map(n=>({...n,itens:n.itens.filter(([q])=>meu(q))})).filter(n=>n.itens.length);
   return `<div class="ph"><div><h1>🆕 Atualizações do sistema</h1><p>O que há de novo na Sala Digital</p></div></div>
   <div class="card" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div><b>Versão de ${fd(VERSAO_ATUAL)}</b><div class="small muted">Se alguma novidade não aparecer no seu aparelho, toque em Atualizar agora.</div></div><button class="btn pri" data-a="atualizarAgora">🔄 Atualizar agora</button></div>
@@ -1694,6 +1701,33 @@ queueMicrotask(()=>{const orig=VIEWS.perfil;if(!orig)return;VIEWS.perfil=async f
 /* professor: avisar agora */
 ACOES.pushAvisarAgora=async()=>{const r=await api('pushAvisarAgora');
   toast(!r.alunos?'Ninguém com prova aberta pendente agora.':r.aparelhos?`Aviso enviado: ${r.enviados} de ${r.aparelhos} aparelho(s). ${r.alunos} aluno(s) ainda não fizeram.`:`${r.alunos} aluno(s) não fizeram, mas nenhum ativou os avisos no celular ainda.`)};
+/* =================== ESTUDAR O ASSUNTO: vídeo + texto + exemplo =================== */
+function estudoVideoHtml(id){return id?`<div class="est-video"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&modestbranding=1" title="Vídeo explicativo" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div><p class="small muted" style="margin:4px 0 10px">Se o vídeo não abrir, <a href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener">assista no YouTube</a>.</p>`:''}
+function estudoExemploHtml(x){if(!x)return '';return `<div class="est-ex"><div class="est-ex-t">✏️ Exemplo resolvido</div><p><b>${esc(x.enunciado)}</b></p>${x.opcoes?`<ul class="est-op">${x.opcoes.map(o=>`<li class="${o===x.resposta?'ok':''}">${esc(o)}</li>`).join('')}</ul>`:''}<p>✅ <b>Resposta:</b> ${esc(x.resposta)}</p>${x.explicacao?`<p class="small">💡 ${esc(x.explicacao)}</p>`:''}</div>`}
+function estudoHtml(r,extra){
+  const sem=!r.texto&&!r.video;
+  return `<div class="hd"><h2>📚 ${esc(r.assunto||r.disciplina||'Estudar')}</h2><button class="x" data-a="fechar">✕</button></div>
+  <p class="small muted" style="margin-top:0">${esc(r.disciplina||'')}${r.nivel?' · '+esc(r.nivel):''}</p>
+  ${r.video?`<div class="est-sec">🎬 Vídeo explicativo</div>${estudoVideoHtml(r.video)}`:''}
+  ${r.texto?`<div class="est-sec">📖 Entenda o assunto</div><div class="apoio bib-texto">${esc(r.texto)}</div>`:''}
+  ${estudoExemploHtml(r.exemplo)}
+  ${sem?`<div class="info">Ainda não há material para este assunto. Releia o enunciado com calma e peça ajuda ao professor.</div>`:''}
+  ${extra||''}`;
+}
+ACOES.estudoAbrir=async(d,b)=>{const atv=(typeof PL!=='undefined'&&PL&&PL.a&&PL.a.id)||d.a;
+  await busy(b,async()=>{try{const r=await api('estudoQuestao',{atividadeId:atv,i:+d.i});
+    const prof=S.u.perfil!=='aluno';
+    modal(estudoHtml(r,prof&&r.assunto?`<div style="margin-top:12px;text-align:right"><button class="btn sm" data-a="estudoVideo" data-disc="${esc(r.disciplina)}" data-ass="${esc(r.assunto)}" data-v="${esc(r.video||'')}">🎬 ${r.video?'Trocar':'Colocar'} vídeo</button></div>`:''))}catch(e){toast(e.message)}})};
+ACOES.estudoVideo=(d)=>{modal(`<div class="hd"><h2>🎬 Vídeo do assunto</h2><button class="x" data-a="fechar">✕</button></div><form id="fVid"><p class="small muted">${esc(d.disc)} · ${esc(d.ass)}</p>
+  <label>Link do YouTube<input name="link" value="${d.v?'https://www.youtube.com/watch?v='+esc(d.v):''}" placeholder="https://www.youtube.com/watch?v=..."></label><p class="small muted">Deixe em branco para voltar ao vídeo padrão (ou ficar sem vídeo). Vale para todas as provas e para a Biblioteca.</p>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-a="fechar">Cancelar</button><button class="btn pri">Salvar</button></div></form>`);
+  $('#fVid').onsubmit=async ev=>{ev.preventDefault();try{await api('estudoVideoSalvar',{disciplina:d.disc,assunto:d.ass,link:ev.target.link.value.trim()});fechar();toast('Vídeo salvo.')}catch(e){toast(e.message)}}};
+/* botão em cada questão da prova (durante a prova) */
+queueMicrotask(()=>{if(typeof provaMostrar!=='function')return;const orig=provaMostrar;provaMostrar=function(i){orig(i);const box=$('#pvQ');if(!box||box.querySelector('.estudo-btn'))return;
+  box.insertAdjacentHTML('beforeend',`<div class="estudo-linha"><button type="button" class="btn sm estudo-btn" data-a="estudoAbrir" data-i="${PROVA.i}">📚 Estudar o assunto</button><span class="small muted">vídeo, explicação e exemplo</span></div>`)}});
+/* Biblioteca: mostra vídeo e exemplo também */
+ACOES.bibLer=async(d,b)=>{await busy(b,async()=>{try{const r=await api('bibliotecaTexto',{disciplina:BIB.disc,assunto:+d.i});
+  modal(estudoHtml(r,S.iaTutor?`<button class="btn full" data-a="bibTutor" style="margin-top:12px">🤖 Tirar dúvidas com o Tutor IA</button>`:''))}catch(e){toast(e.message)}})};
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}

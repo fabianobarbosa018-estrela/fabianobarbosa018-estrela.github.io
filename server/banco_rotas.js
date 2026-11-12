@@ -8,7 +8,7 @@ function bancoChave_() {
   return k;
 }
 rota_('bancoIndice', PROF, false, () => ({ __banco: { acao: 'indice', chave: bancoChave_() } }));
-rota_('bancoTexto', PROF, false, (u, d) => ({ __banco: { acao: 'texto', chave: bancoChave_(), disciplina: txt_(d.disciplina, 40), assunto: Number(d.assunto) } }));
+rota_('bancoTexto', PROF, false, (u, d) => ({ __banco: { acao: 'texto', chave: bancoChave_(), disciplina: txt_(d.disciplina, 40), assunto: Number(d.assunto), videos: videosCfg_() } }));
 rota_('bancoMontar', PROF, true, (u, d) => {
   const chave = bancoChave_();
   const disc = txt_(d.disciplina, 40);
@@ -24,4 +24,4 @@ rota_('bancoMontar', PROF, true, (u, d) => {
 });
 // Biblioteca de estudos do aluno: só os textos de apoio (sem questões, sem gabarito)
 rota_('bibliotecaIndice', ALU, false, () => ({ __banco: { acao: 'indice', chave: bancoChave_() } }));
-rota_('bibliotecaTexto', ALU, false, (u, d) => ({ __banco: { acao: 'texto', chave: bancoChave_(), disciplina: txt_(d.disciplina, 40), assunto: Number(d.assunto) } }));
+rota_('bibliotecaTexto', ALU, false, (u, d) => ({ __banco: { acao: 'texto', chave: bancoChave_(), disciplina: txt_(d.disciplina, 40), assunto: Number(d.assunto), videos: videosCfg_() } }));

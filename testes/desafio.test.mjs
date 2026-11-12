@@ -218,6 +218,23 @@ t('não acompanhar tira das faltas', !r.d.grupos.some(g => g.alunos.some(x => x.
   r = await api(P, 'desafioQuadro'); t('quadro mostra quem ativou avisos', r.d.turmas.some(tu => tu.alunos.some(al => al.avisos)));
   r = await api(A, 'pushCancelar', { endpoint: 'https://push.teste/aluno1' }); r = await api(A, 'pushStatus', { endpoint: 'https://push.teste/aluno1' }); t('desligar avisos', r.d.ativo === false);
 }
+// ---- estudar o assunto (vídeo + texto + exemplo) ----
+{
+  await q("delete from sd_atividades where data->>'tipo' = 'desafio'"); await q("delete from sd_entregas");
+  r = await api(A, 'desafioHoje'); const pe = r.d.desafios[0];
+  const [ae] = await q("select data from sd_atividades where id = $1", [pe.id]);
+  const iMat = ae.data.questoes.findIndex(x => x.disciplina === 'Matemática');
+  t('questões da prova guardam o assunto', ae.data.questoes.every(x => x.assunto), ae.data.questoes.map(x => x.assunto));
+  r = await api(A, 'estudoQuestao', { atividadeId: pe.id, i: iMat });
+  t('estudo: texto, vídeo e exemplo', r.ok && r.d.texto && /^[\w-]{11}$/.test(r.d.video) && r.d.exemplo && r.d.exemplo.resposta, r.d);
+  t('exemplo não repete questão da prova', !ae.data.questoes.some(x => x.enunciado === r.d.exemplo.enunciado));
+  t('estudo não entrega o gabarito da prova', JSON.stringify(r.d).indexOf(String(ae.data.questoes[iMat].explicacao || '###')) < 0 || !ae.data.questoes[iMat].explicacao);
+  r = await api(P, 'estudoVideoSalvar', { disciplina: 'Matemática', assunto: (await api(A, 'estudoQuestao', { atividadeId: pe.id, i: iMat })).d.assunto, link: 'https://youtu.be/abcdefghijk' });
+  r = await api(A, 'estudoQuestao', { atividadeId: pe.id, i: iMat }); t('professor troca o vídeo', r.d.video === 'abcdefghijk', r.d.video);
+  r = await api(P, 'estudoVideoSalvar', { disciplina: 'Matemática', assunto: 'x', link: 'https://exemplo.com/video' }); t('link inválido recusado', !r.ok);
+  r = await api(A, 'estudoVideoSalvar', { disciplina: 'Matemática', assunto: 'x', link: 'https://youtu.be/abcdefghijk' }); t('aluno não troca vídeo', !r.ok);
+  r = await api(A, 'bibliotecaTexto', { disciplina: 'matematica', assunto: 0 }); t('Biblioteca também traz vídeo e exemplo', r.ok && r.d.video && r.d.exemplo, r.d);
+}
 // ---- dias da prova ----
 const hojeS = new Date(Date.now() - 3 * 3600e3).getUTCDay();
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");

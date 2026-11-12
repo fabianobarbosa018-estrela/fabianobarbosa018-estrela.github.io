@@ -96,7 +96,7 @@ function dataBR_(dia) { const p = String(dia).split('-'); return p[2] + '/' + p[
 // cria (ou completa) os desafios do dia para um nível, a partir das questões prontas
 function desafioCriar_(dia, nivel, questoes, origem, assuntos) {
   if (!DESAFIO_NIVEIS[nivel] || !Array.isArray(questoes) || !questoes.length) return 0;
-  const qs = limpaQuestoes_(questoes).map((q, i) => { q.disciplina = txt_(questoes[i].disciplina, 40); return q; });
+  const qs = limpaQuestoes_(questoes).map((q, i) => { q.disciplina = txt_(questoes[i].disciplina, 40); if (questoes[i].assunto) q.assunto = txt_(questoes[i].assunto, 120); return q; });
   const feitos = desafiosDoDia_(dia).filter(a => a.desafio.nivel === nivel);
   let n = 0;
   desafioAlvos_(dia).filter(x => x.nivel === nivel).forEach(x => {
@@ -506,3 +506,21 @@ rota_('pushAvisarAgora', PROF, false, u => {
 });
 // quantos alunos têm avisos ligados (para o professor)
 function pushAtivo_(id) { const u = get_('Usuarios', id); return !!(u && Array.isArray(u.pushSubs) && u.pushSubs.length); }
+
+// ================== ESTUDAR O ASSUNTO (vídeo + texto + exemplo resolvido) ==================
+function videosCfg_() { try { const v = JSON.parse(PROPS().getProperty('VIDEOS_ASSUNTO') || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+function nivelDaAtividade_(a) { return a && a.desafio && a.desafio.nivel ? a.desafio.nivel : (cfg_().desafioNivelPadrao || 'F2'); }
+rota_('estudoQuestao', [ 'aluno', 'professor', 'admin' ], false, (u, d) => {
+  const a = get_('Atividades', d.atividadeId); if (!a) erro_('Atividade não encontrada.');
+  if (u.perfil === 'aluno' && alunosAlvo_(a).indexOf(u.id) < 0) erro_('Sem acesso a esta atividade.');
+  const q = (a.questoes || [])[Number(d.i)]; if (!q) erro_('Questão não encontrada.');
+  return { __banco: { acao: 'estudo', chave: bancoChave_(), disciplinaNome: q.disciplina || a.disciplina || '', assunto: q.assunto || '', enunciado: String(q.enunciado || '').slice(0, 600),
+    nivel: nivelDaAtividade_(a), excluir: (a.questoes || []).map(x => String(x.enunciado || '').slice(0, 200)), videos: videosCfg_() } };
+});
+rota_('estudoVideoSalvar', PROF, true, (u, d) => {
+  const chave = txt_(d.disciplina, 40) + '|' + txt_(d.assunto, 120); const v = videosCfg_();
+  const m = String(d.link || '').match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/) || String(d.link || '').match(/^([\w-]{11})$/);
+  if (d.link && !m) erro_('Cole um link do YouTube (ex.: https://www.youtube.com/watch?v=...).');
+  if (m) v[chave] = m[1]; else delete v[chave];
+  PROPS().setProperty('VIDEOS_ASSUNTO', JSON.stringify(v)); return { ok: true, video: m ? m[1] : '' };
+});
