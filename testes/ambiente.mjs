@@ -15,7 +15,7 @@ export async function criarAmbiente(opcoes = {}) {
     rpc: async (f, a) => { const ks = Object.keys(a || {}); await db.query('select ' + f + '(' + ks.map((k, i) => k + ' => $' + (i + 1)).join(', ') + ')', ks.map(k => a[k])); },
     chaveIA: opcoes.chaveIA === undefined ? 'chave-teste' : opcoes.chaveIA,
     chaveGemini: opcoes.chaveGemini === undefined ? 'chave-gemini-teste' : opcoes.chaveGemini,
-    fetch: async (url, op) => { ia.urls.push(url); ia.chamadas.push(JSON.parse(op.body)); const r = ia.resposta(JSON.parse(op.body), url); return { ok: r.status === 200, status: r.status, json: async () => r.corpo }; },
+    fetch: async (url, op) => { ia.urls.push(url); if (/^https:\/\/push\./.test(url)) { ia.pushes = ia.pushes || []; ia.pushes.push({ url, op }); return { ok: true, status: url.indexOf('morto') >= 0 ? 410 : 201, json: async () => ({}) }; } ia.chamadas.push(JSON.parse(op.body)); const r = ia.resposta(JSON.parse(op.body), url); return { ok: r.status === 200, status: r.status, json: async () => r.corpo }; },
     enviar: async u => { if (storage[u.caminho]) throw new Error('existe'); storage[u.caminho] = u; },
     remover: async c => { delete storage[c]; },
     assinar: async c => { const u = storage[c]; if (!u) throw new Error('nf'); return 'data:' + u.mime + ';base64,' + u.b64; },

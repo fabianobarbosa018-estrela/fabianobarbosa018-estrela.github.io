@@ -1501,7 +1501,7 @@ rota_('desafioQuadro', PROF, false, u => {
       provas: provas.map(a => ({ id: a.id, dia: a.desafio.dia, extra: !!a.desafio.extra, encerrada: a.encerramento < t, encerramento: a.encerramento, notaMax: notaMax_(a) })),
       alunos: alunos.map(al => {
         const m = mats.find(x => x.alunoId === al.id);
-        return { id: al.id, nome: al.nome, ignorar: !!al.faltaIgnorar, provas: provas.map(a => {
+        return { id: al.id, nome: al.nome, ignorar: !!al.faltaIgnorar, avisos: Array.isArray(al.pushSubs) && al.pushSubs.length > 0, provas: provas.map(a => {
           const e = all_('Entregas').find(x => x.atividadeId === a.id && x.alunoId === al.id);
           if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return { s: 'nova' };
           if (!e) return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'aberta' };
@@ -1511,6 +1511,75 @@ rota_('desafioQuadro', PROF, false, u => {
       }) };
   }) };
 });
+
+// ================== AVISOS NO CELULAR (Web Push) ==================
+const PUSH_LEMBRETE_ANTES = 4 * 3600e3;   // lembrete para quem ainda não fez: 4 h antes do encerramento
+function pushSubs_(ids) {
+  const out = []; (ids || []).forEach(id => { const u = get_('Usuarios', id); (u && Array.isArray(u.pushSubs) ? u.pushSubs : []).forEach(s => out.push({ userId: id, endpoint: s.endpoint, keys: s.keys })); }); return out;
+}
+function provaPendentesDe_(a, t) {
+  const feitos = {}; all_('Entregas').forEach(e => { if (e.atividadeId === a.id && (e.status === 'enviada' || e.status === 'corrigida')) feitos[e.alunoId] = 1; });
+  return alunosAlvo_(a).filter(id => !feitos[id]);
+}
+function provasAbertas_(t, filtro) {
+  return all_('Atividades').filter(a => a.tipo === 'desafio' && a.desafio && a.status === 'publicada' && a.abertura <= t && a.encerramento > t && (!filtro || filtro(a)));
+}
+function msgProva_(a, tipo) {
+  const hora = new Date(a.encerramento - 3 * 3600e3).toISOString().slice(11, 16);
+  return tipo === 'lembrete'
+    ? { titulo: '⏰ Ainda dá tempo!', corpo: 'Você ainda não fez a Prova do dia. Ela fecha às ' + hora + '. Bora?', url: './', tag: 'prova-' + a.id }
+    : { titulo: '📝 Prova do dia liberada!', corpo: a.titulo.replace(/^Prova do dia — /, '') + ' · ' + (a.questoes || []).length + ' questões. Disponível até as ' + hora + '.', url: './', tag: 'prova-' + a.id };
+}
+// cron: aviso de abertura e lembrete; marca na prova para não repetir
+function pushPendentes_() {
+  const t = agora_(); const envios = []; const h = Number(new Date(t - 3 * 3600e3).toISOString().slice(11, 13));
+  if (h < 6 || h >= 22) return envios;   // não acorda ninguém de madrugada
+  provasAbertas_(t).forEach(a => {
+    const d = a.desafio; let tipo = null;
+    if (!d.avisoAbertura) { tipo = 'abertura'; d.avisoAbertura = t; }
+    else if (!d.avisoLembrete && a.encerramento - t <= PUSH_LEMBRETE_ANTES && t - d.avisoAbertura > 3600e3) { tipo = 'lembrete'; d.avisoLembrete = t; }
+    if (!tipo) return;
+    upd_('Atividades', a);
+    const subs = pushSubs_(provaPendentesDe_(a, t)); if (subs.length) envios.push({ msg: msgProva_(a, tipo), subs: subs });
+  });
+  return envios;
+}
+function pushRemover_(x) {
+  const mortos = (x && x.endpoints) || []; if (!mortos.length) return 0; let n = 0;
+  all_('Usuarios').forEach(u => { if (!Array.isArray(u.pushSubs)) return; const antes = u.pushSubs.length; u.pushSubs = u.pushSubs.filter(s => mortos.indexOf(s.endpoint) < 0); if (u.pushSubs.length !== antes) { n += antes - u.pushSubs.length; upd_('Usuarios', u); } });
+  return n;
+}
+function pushChaves_() { const j = PROPS().getProperty('VAPID_JWK'), p = PROPS().getProperty('VAPID_PUB'); return j && p ? { jwk: JSON.parse(j), pub: p } : null; }
+DESAFIO_SIS.pushPendentes = () => pushPendentes_();
+DESAFIO_SIS.pushRemover = x => pushRemover_(x);
+DESAFIO_SIS.pushChaves = () => pushChaves_();
+DESAFIO_SIS.pushSalvarChaves = x => { PROPS().setProperty('VAPID_JWK', JSON.stringify(x.jwk)); PROPS().setProperty('VAPID_PUB', x.pub); return true; };
+DESAFIO_SIS.pushAlvos = x => pushSubs_(x.ids);
+rota_('pushChave', [ 'aluno', 'professor', 'admin' ], false, () => ({ __push: { acao: 'chave' } }));
+rota_('pushInscrever', [ 'aluno', 'professor', 'admin' ], true, (u, d) => {
+  const ep = String(d.endpoint || ''); const k = d.keys || {};
+  if (!/^https:\/\/[^\s]{10,800}$/.test(ep) || !/^[\w-]{40,120}$/.test(String(k.p256dh || '')) || !/^[\w-]{10,40}$/.test(String(k.auth || ''))) erro_('Inscrição de aviso inválida.');
+  const subs = (Array.isArray(u.pushSubs) ? u.pushSubs : []).filter(s => s.endpoint !== ep);
+  subs.unshift({ endpoint: ep, keys: { p256dh: String(k.p256dh), auth: String(k.auth) }, criadoEm: agora_() });
+  u.pushSubs = subs.slice(0, 5); upd_('Usuarios', u);
+  return { __push: { acao: 'enviar', envios: [{ msg: { titulo: '🔔 Avisos ativados!', corpo: 'Pronto! Você vai receber um aviso aqui quando a Prova do dia abrir.', url: './', tag: 'teste' }, subs: [{ userId: u.id, endpoint: ep, keys: k }] }] } };
+});
+rota_('pushCancelar', [ 'aluno', 'professor', 'admin' ], true, (u, d) => {
+  u.pushSubs = (Array.isArray(u.pushSubs) ? u.pushSubs : []).filter(s => s.endpoint !== String(d.endpoint || '')); upd_('Usuarios', u); return { ok: true };
+});
+rota_('pushStatus', [ 'aluno', 'professor', 'admin' ], false, (u, d) => ({ ativo: (Array.isArray(u.pushSubs) ? u.pushSubs : []).some(s => s.endpoint === String(d.endpoint || '')), aparelhos: (u.pushSubs || []).length }));
+// professor: avisar agora quem ainda não fez a prova aberta
+rota_('pushAvisarAgora', PROF, false, u => {
+  const adm = u.perfil === 'admin'; const t = agora_(); const minhas = all_('Turmas').filter(x => adm || x.professorId === u.id).map(x => x.id);
+  const envios = []; let alunos = 0;
+  provasAbertas_(t, a => (a.turmas || []).some(id => minhas.indexOf(id) >= 0)).forEach(a => {
+    const ids = provaPendentesDe_(a, t).filter(id => all_('Matriculas').some(m => m.alunoId === id && m.status === 'aprovado' && minhas.indexOf(m.turmaId) >= 0 && (a.turmas || []).indexOf(m.turmaId) >= 0));
+    alunos += ids.length; const subs = pushSubs_(ids); if (subs.length) envios.push({ msg: msgProva_(a, a.encerramento - t <= PUSH_LEMBRETE_ANTES ? 'lembrete' : 'abertura'), subs: subs });
+  });
+  return { __push: { acao: 'enviar', envios: envios, alunos: alunos } };
+});
+// quantos alunos têm avisos ligados (para o professor)
+function pushAtivo_(id) { const u = get_('Usuarios', id); return !!(u && Array.isArray(u.pushSubs) && u.pushSubs.length); }
 
   function preparar(dados) {
     _cache = {}; _ops = []; _upl = []; _rm = []; _rpc = []; _kv = {};

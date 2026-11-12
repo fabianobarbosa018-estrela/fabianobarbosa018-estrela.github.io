@@ -101,7 +101,7 @@ const tF1 = await novaTurma('3º ano B', '3º ano'); const tEM = await novaTurma
 r = await api(P, 'desafioPainel'); t('níveis por série: anos iniciais, EM e Infantil sem desafio', r.d.turmas.find(x => x.id === tF1.id).nivel === 'F1I' && r.d.turmas.find(x => x.id === tEM.id).nivel === 'EM' && r.d.turmas.find(x => x.id === tInf.id).nivel === 'INF', r.d.turmas);
 const E2iaAntes = E.ia.chamadas.length;
 E.ia.resposta = () => ({ status: 429, corpo: { error: { status: 'RESOURCE_EXHAUSTED', message: 'quota' } } });
-r = await api(P, 'desafioGerarAgora'); t('IA falhou: usa a reserva do banco e ninguém fica sem desafio', r.ok && r.d.preparados.length === 3 && r.d.preparados.every(p => p.questoes === (p.nivel === 'F1I' ? 20 : 50) && p.origem === 'banco'), r.d);
+r = await api(P, 'desafioGerarAgora'); t('IA falhou: usa a reserva do banco e ninguém fica sem desafio', r.ok && r.d.preparados.length === 3 && r.d.preparados.every(p => p.questoes === (p.nivel === 'F1I' ? 24 : 50) && p.origem === 'banco'), r.d);
 const ds = (await q("select data from sd_atividades where data->>'tipo' = 'desafio'")).map(x => x.data);
 const F1 = ds.find(a => a.desafio.nivel === 'F1I'), F2 = ds.find(a => a.desafio.nivel === 'F2'), EM = ds.find(a => a.desafio.nivel === 'EM');
 t('um desafio para cada nível', F1 && F2 && EM && F1.turmas.includes(tF1.id) && EM.turmas.includes(tEM.id));
@@ -109,7 +109,7 @@ const fs = await import('fs'); const crypto = await import('crypto');
 // confere os níveis das questões da reserva com o banco original
 const banco = {}; for (const f of fs.readdirSync('/home/claude/supa/banco')) { const L = JSON.parse(fs.readFileSync('/home/claude/supa/banco/' + f, 'utf8')); L.forEach(a => a.q.forEach(x => { banco[x[2]] = a.n; })); }
 t('Anos iniciais: só questões do Fund. I', F1.questoes.every(x => banco[x.enunciado] === 'F1'), F1.questoes.map(x => banco[x.enunciado]));
-t('Anos iniciais: prova de 20, fácil, sem frações e com 1 discursiva', F1.questoes.length === 20 && !F1.questoes.some(x => /fração|frações/i.test(x.enunciado)) && F1.questoes.filter(x => x.tipo === 'disc').length === 1, F1.questoes.map(x => x.enunciado));
+t('Anos iniciais: prova de 24 (12 de Matemática), fácil, sem frações e com 1 discursiva', F1.questoes.length === 24 && F1.questoes.filter(x => x.disciplina === 'Matemática').length === 12 && !F1.questoes.some(x => /fração|frações/i.test(x.enunciado)) && F1.questoes.filter(x => x.tipo === 'disc').length === 1, F1.questoes.map(x => x.enunciado));
 t('Fund. II não recebe questões do Ensino Médio', F2.questoes.every(x => banco[x.enunciado] !== 'EM'));
 t('Ensino Médio não recebe questões do Fund. I', EM.questoes.every(x => banco[x.enunciado] !== 'F1'));
 t('reserva também tem as 8 disciplinas', ['F1I', 'F2', 'EM'].every(n => new Set(ds.find(a => a.desafio.nivel === n).questoes.map(x => x.disciplina)).size === 8));
@@ -187,6 +187,37 @@ t('quadro: nota de quem fez', tq.alunos.some(al => al.provas.some(c => c.s === '
 t('quadro: falta de quem não fez', tq.alunos.some(al => al.provas.some(c => c.s === 'faltou')), tq.alunos);
 r = await api(P, 'desafioResponsavelSalvar', { alunoId: umAl.alunoId, ignorar: true }); r = await api(P, 'desafioFaltas');
 t('não acompanhar tira das faltas', !r.d.grupos.some(g => g.alunos.some(x => x.alunoId === umAl.alunoId)) && r.d.ignorados.some(x => x.alunoId === umAl.alunoId));
+// ---- avisos no celular (Web Push) ----
+{
+  const crypto = await import('node:crypto');
+  const mkSub = (nome) => { const ua = crypto.createECDH('prime256v1'); ua.generateKeys(); return { endpoint: 'https://push.teste/' + nome, keys: { p256dh: ua.getPublicKey().toString('base64url'), auth: crypto.randomBytes(16).toString('base64url') } }; };
+  r = await api(A, 'pushChave'); t('chave pública VAPID', r.ok && /^[\w-]{80,90}$/.test(r.d.chave), r);
+  const r2 = await api(A, 'pushChave'); t('chave é sempre a mesma', r2.d.chave === r.d.chave);
+  E.ia.pushes = [];
+  r = await api(A, 'pushInscrever', mkSub('aluno1')); t('aluno ativa avisos e recebe notificação de teste', r.ok && r.d.enviados === 1 && E.ia.pushes.length === 1, r);
+  const ph = E.ia.pushes[0].op.headers; t('push cifrado com VAPID', ph['Content-Encoding'] === 'aes128gcm' && /^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=[\w-]+$/.test(ph.Authorization) && E.ia.pushes[0].op.body.length > 100);
+  r = await api(A, 'pushInscrever', { endpoint: 'http://inseguro', keys: {} }); t('inscrição inválida é recusada', !r.ok);
+  r = await api(A, 'pushStatus', { endpoint: 'https://push.teste/aluno1' }); t('status do aviso', r.d.ativo === true);
+  r = await api(B, 'pushInscrever', mkSub('morto-bia')); 
+  // prova aberta agora para a turma; A ainda não fez
+  await q("delete from sd_atividades where data->>'tipo' = 'desafio'"); await q("delete from sd_entregas");
+  await api(P, 'desafioConfigSalvar', { meu: { ativo: true, abertura: '00:00', encerramento: '23:59', diasPrazo: 0, liberar: 'encerramento', duracaoMin: 0, diasSemana: [0, 1, 2, 3, 4, 5, 6] } });
+  r = await api(A, 'desafioHoje');
+  E.ia.pushes = [];
+  r = await api(P, 'pushAvisarAgora'); t('professor avisa agora quem não fez', r.ok && r.d.alunos >= 1 && r.d.aparelhos >= 1 && E.ia.pushes.some(p => /aluno1/.test(p.url)), r.d);
+  t('aparelho que sumiu (410) é removido', r.d.removidos >= 0);
+  const hLocal = Number(new Date(Date.now() - 3 * 3600e3).toISOString().slice(11, 13));
+  const segr = (await q("select v from sd_kv where k = 'p:CRON_SEGREDO'"))[0];
+  const agoraReal = Date.now; const meioDia = new Date(new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10) + 'T15:00:00Z').getTime();
+  if (segr) { Date.now = () => meioDia;
+    E.ia.pushes = []; r = await E.processar({ acao: 'desafioCron', segredo: segr.v });
+    t('cron manda o aviso de abertura uma vez', r.ok && r.d.avisos && r.d.avisos.enviados >= 1, r.d);
+    E.ia.pushes = []; r = await E.processar({ acao: 'desafioCron', segredo: segr.v }); t('não repete o aviso', !r.d.avisos && E.ia.pushes.length === 0, r.d);
+    Date.now = agoraReal;
+  } else t('segredo do cron existe', false);
+  r = await api(P, 'desafioQuadro'); t('quadro mostra quem ativou avisos', r.d.turmas.some(tu => tu.alunos.some(al => al.avisos)));
+  r = await api(A, 'pushCancelar', { endpoint: 'https://push.teste/aluno1' }); r = await api(A, 'pushStatus', { endpoint: 'https://push.teste/aluno1' }); t('desligar avisos', r.d.ativo === false);
+}
 // ---- dias da prova ----
 const hojeS = new Date(Date.now() - 3 * 3600e3).getUTCDay();
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");

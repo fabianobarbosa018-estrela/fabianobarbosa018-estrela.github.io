@@ -1247,7 +1247,7 @@ VIEWS.p_desafio=async function(){
    <div class="row2"><label>Encerramento<select id="dzMDias">${[0,1,2,3].map(n=>`<option value="${n}" ${m.diasPrazo===n?'selected':''}>${n===0?'No mesmo dia':n===1?'No dia seguinte':n+' dias depois'}</option>`).join('')}</select></label>
    <label>Gabarito e explicações<select id="dzMLib"><option value="encerramento" ${m.liberar!=='manual'?'selected':''}>Liberar sozinho no encerramento</option><option value="manual" ${m.liberar==='manual'?'selected':''}>Eu libero manualmente</option></select></label></div>
    <button class="btn pri" data-a="dzSalvarMeu">Salvar meu prazo</button></div>
-  <div class="card"><h3 style="margin-bottom:6px">🎓 Nível de cada turma</h3><p class="small muted" style="margin-top:0">O nível vem da série da turma: 1º ao 3º ano → Anos iniciais (prova de 20 questões fáceis); 4º e 5º → Fundamental I; 6º ao 9º → Fundamental II; Ensino Médio → Médio (50 questões). Ajuste se precisar. Turmas sem alunos não recebem desafio.</p>
+  <div class="card"><h3 style="margin-bottom:6px">🎓 Nível de cada turma</h3><p class="small muted" style="margin-top:0">O nível vem da série da turma: 1º ao 3º ano → Anos iniciais (prova de 24 questões fáceis, metade de Matemática); 4º e 5º → Fundamental I; 6º ao 9º → Fundamental II; Ensino Médio → Médio (50 questões). Ajuste se precisar. Turmas sem alunos não recebem desafio.</p>
    ${d.turmas.length?`<div class="tbl"><table><tr><th>Turma</th><th>Série</th><th>Alunos</th><th>Nível do desafio</th></tr>${d.turmas.map(t=>`<tr><td class="wrap"><b>${esc(t.nome)}</b>${t.professor?`<br><span class="small muted">${esc(t.professor)}</span>`:''}</td><td>${esc(t.serie||'—')}</td><td>${t.alunos}</td><td>${nivSel(t)}</td></tr>`).join('')}</table></div>`:'<p class="muted">Nenhuma turma ativa.</p>'}</div>`;
   if(d.admin)h+=`<div class="card"><h3 style="margin-bottom:6px">⚙️ Configuração geral (administrador)</h3>
    <label class="chk"><input type="checkbox" id="dzGAtivo" ${g.ativo?'checked':''}><span>Prova do dia ligada na plataforma</span></label>
@@ -1547,7 +1547,7 @@ function ftQuadro(q){
     const ps=tu.provas;const media=al=>{const xs=al.provas.filter(c=>c.notaMax&&(c.s==='corrigida'||c.s==='enviada'));const vs=xs.map(c=>c.nota/c.notaMax);const fz=al.provas.filter(c=>c.s==='faltou').length;return {m:vs.length?nota(vs.reduce((a,b)=>a+b,0)/vs.length,1):'—',fz}};
     return `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 4px">👥 ${esc(tu.nome)}</h3><p class="small muted" style="margin:0 0 10px">Nota de cada aluno em cada Prova do dia (escala 0–${S.cfg.escalaNota}) e hora em que entregou</p>
     <div class="tbl ft-tbl"><table><tr><th>Aluno</th>${ps.map(p=>`<th>${esc(ftDia(p.dia).replace(/^(\S{3})\S*/,'$1'))}${p.extra?'<div class="small muted">extra</div>':''}${!p.encerrada?'<div class="small" style="color:#16a34a">aberta</div>':''}</th>`).join('')}<th>Média</th><th>Faltas</th></tr>
-    ${tu.alunos.map(al=>{const r=media(al);return `<tr${al.ignorar?' style="opacity:.55"':''}><td><b>${esc(al.nome)}</b></td>${al.provas.map(ftCel).join('')}<td><b>${r.m}</b></td><td>${r.fz?`<span style="color:#dc2626;font-weight:700">${r.fz}</span>`:'0'}</td></tr>`}).join('')}</table></div></div>`}).join('');
+    ${tu.alunos.map(al=>{const r=media(al);return `<tr${al.ignorar?' style="opacity:.55"':''}><td><b>${esc(al.nome)}</b>${al.avisos?' <span title="Avisos no celular ativados">🔔</span>':''}</td>${al.provas.map(ftCel).join('')}<td><b>${r.m}</b></td><td>${r.fz?`<span style="color:#dc2626;font-weight:700">${r.fz}</span>`:'0'}</td></tr>`}).join('')}</table></div></div>`}).join('');
 }
 function ftLembrete(d){return `Bom dia, turma! ☀️\n\n📝 A Prova do dia de hoje já está liberada na Sala Digital, das ${d.abertura} às ${d.encerramento}.\n\nEntre, faça com calma e clique em FINALIZAR E ENVIAR PROVA. A nota sai na hora!\n\n👉 ${SITE_URL}`}
 VIEWS.p_faltas=async function(){
@@ -1570,7 +1570,8 @@ VIEWS.p_faltas=async function(){
   <h2 id="ft-lembrete" style="margin:22px 0 10px">📣 Lembrete para os alunos</h2>
   <div class="card"><p class="small muted" style="margin-top:0">Os alunos já veem um aviso destacado ao entrar na Sala Digital quando têm prova pendente. Para lembrar quem ainda não entrou, mande esta mensagem no grupo da turma:</p>
   <textarea id="ftLemb" rows="8" style="width:100%;font-size:14px">${esc(ftLembrete(d))}</textarea>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn pri" data-a="ftCopLemb">📋 Copiar lembrete</button><button class="btn" data-a="ftWhatsLemb" style="background:#25d366;color:#fff;border-color:#25d366">💬 Enviar no WhatsApp</button></div></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn pri" data-a="ftCopLemb">📋 Copiar lembrete</button><button class="btn" data-a="ftWhatsLemb" style="background:#25d366;color:#fff;border-color:#25d366">💬 Enviar no WhatsApp</button><button class="btn" data-a="pushAvisarAgora">🔔 Avisar agora no celular</button></div>
+  <p class="small muted" style="margin-bottom:0">🔔 Os alunos que ativaram os avisos recebem uma notificação automática quando a prova abre e um lembrete às ${esc(String(Number(d.encerramento.slice(0,2))-4).padStart(2,'0')+d.encerramento.slice(2))} se ainda não fizeram. No quadro de notas, 🔔 ao lado do nome indica quem já ativou.</p></div>
   ${d.ignorados.length?`<details style="margin-top:10px"><summary class="muted small" style="cursor:pointer">Alunos sem acompanhamento de faltas (${d.ignorados.length})</summary><div class="list" style="margin-top:8px">${d.ignorados.map(x=>`<div class="it"><div class="mid"><div class="t">${esc(x.nome)}</div><div class="s">${x.faltas} falta${x.faltas>1?'s':''} no período</div></div><div class="end"><button class="btn sm" data-a="ftVoltar" data-id="${x.alunoId}">Voltar a acompanhar</button></div></div>`).join('')}</div></details>`:''}`;
 };
 const ftTexto=i=>{const el=$('#ftMsg'+i);return el?el.value:ftMensagem(FT.d.grupos[i],FT.d)};
@@ -1621,6 +1622,9 @@ const NOVIDADES=[
   ['professor','🔔 Alerta quando um aluno não faz a prova, com <b>mensagem pronta para a mãe/responsável</b> (copiar ou enviar direto no WhatsApp). Irmãos com a mesma mãe recebem uma única mensagem.'],
   ['professor','📣 Lembrete pronto para mandar no grupo da turma avisando que a prova do dia está liberada.'],
   ['aluno','📝 Aviso destacado ao entrar na Sala Digital quando você tem prova para fazer.'],
+  ['aluno','🔔 Avisos no celular: toque em <b>Ativar avisos</b> no Início e receba uma notificação quando a Prova do dia abrir, mais um lembrete à noite se ainda não tiver feito.'],
+  ['professor','🔔 Avisos no celular para os alunos: automático quando a prova abre, lembrete às 19h para quem não fez e o botão <b>Avisar agora no celular</b>.'],
+  ['todos','🔢 Anos iniciais (1º ao 3º ano): a Prova do dia agora tem 24 questões, metade de Matemática, com 119 questões novas de números, contas, dinheiro, medidas, formas e tabuadas.'],
   ['todos','🆕 Esta aba de Atualizações, com o botão para atualizar o sistema no aparelho.']]},
  {v:'2026-11-09',t:'Correção automática e nota na hora',p:['professor','admin','aluno'],itens:[
   ['aluno','✅ A Prova do dia é corrigida por completo assim que você envia, inclusive as discursivas, e a nota aparece na hora.'],
@@ -1655,6 +1659,41 @@ ACOES.atualizarAgora=async()=>{toast('Atualizando...');
   try{if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch(e){}
   try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.update().catch(()=>{})))}}catch(e){}
   const u=new URL(location.href);u.searchParams.set('v',Date.now());location.replace(u.toString())};
+/* =================== AVISOS NO CELULAR =================== */
+const PUSH={};
+function pushSuportado(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window}
+function pushIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.navigator.standalone}
+function b64uParaU8(s){const p=(s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');const b=atob(p);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+async function pushSubAtual(){try{const r=await navigator.serviceWorker.getRegistration();return r?await r.pushManager.getSubscription():null}catch(e){return null}}
+async function pushEstado(){if(!pushSuportado())return pushIOS()?'ios':'nao';if(Notification.permission==='denied')return 'bloqueado';const s=await pushSubAtual();return s&&Notification.permission==='granted'?'ativo':'desligado'}
+function pushCartao(est){
+  if(est==='ativo'||est==='nao')return '';
+  if(est==='ios')return `<div class="info push-card">🔔 <b>Quer receber aviso quando a prova abrir?</b> No iPhone: toque em <b>Compartilhar</b> ⬆️ e depois em <b>Adicionar à Tela de Início</b>. Abra a Sala Digital pelo ícone novo e toque em Ativar avisos.</div>`;
+  if(est==='bloqueado')return `<div class="info push-card">🔕 Os avisos estão bloqueados neste aparelho. Para receber o aviso da prova, libere as notificações deste site nas configurações do navegador.</div>`;
+  return `<div class="note push-card" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div>🔔 <b>Receba um aviso no celular quando a Prova do dia abrir.</b></div><button class="btn pri" data-a="pushAtivar">Ativar avisos</button></div>`;
+}
+ACOES.pushAtivar=async()=>{
+  try{
+    if(!pushSuportado()){toast(pushIOS()?'No iPhone, adicione a Sala Digital à Tela de Início primeiro.':'Este navegador não aceita avisos.');return}
+    const perm=await Notification.requestPermission();if(perm!=='granted'){toast('Você não permitiu os avisos.');return}
+    let reg=await navigator.serviceWorker.getRegistration();if(!reg)reg=await navigator.serviceWorker.register('sw.js');reg=await navigator.serviceWorker.ready;
+    const {chave}=await api('pushChave');
+    let s=await reg.pushManager.getSubscription();if(!s)s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uParaU8(chave)});
+    const j=s.toJSON();const r=await api('pushInscrever',{endpoint:j.endpoint,keys:j.keys});
+    toast(r&&r.enviados?'Avisos ativados! Você deve receber uma notificação de teste.':'Avisos ativados.');$$('.push-card').forEach(x=>x.remove());
+  }catch(e){toast('Não foi possível ativar os avisos: '+(e&&e.message||e))}
+};
+ACOES.pushDesligar=async()=>{const s=await pushSubAtual();if(s){try{await api('pushCancelar',{endpoint:s.endpoint})}catch(e){}try{await s.unsubscribe()}catch(e){}}toast('Avisos desligados neste aparelho.');go(S.view,S.p)};
+/* cartão no Início do aluno */
+queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;VIEWS.a_inicio=async function(p){const [r,est]=await Promise.all([orig(p),pushEstado()]);const c=pushCartao(est);if(!c)return r;const h=typeof r==='string'?r:r.html;
+  const fin=/<div class="note aviso-prova/.test(h)?h.replace(/(<div class="note aviso-prova[\s\S]*?<\/div>)/,m=>m+c):h.replace(/(<div class="ph">[\s\S]*?<\/div><\/div>)/,m=>m+c);return typeof r==='string'?fin:Object.assign({},r,{html:fin})}});
+/* no Perfil: ligar/desligar */
+queueMicrotask(()=>{const orig=VIEWS.perfil;if(!orig)return;VIEWS.perfil=async function(p){const [r,est]=await Promise.all([orig(p),pushEstado()]);const h=typeof r==='string'?r:r.html;
+  const box=`<div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">🔔 Avisos no celular</h3>${est==='ativo'?`<p class="small muted">Ativados neste aparelho. Você recebe um aviso quando a Prova do dia abrir e um lembrete à noite se ainda não tiver feito.</p><button class="btn" data-a="pushDesligar">Desligar avisos</button>`:pushCartao(est)||'<p class="small muted">Este navegador não aceita avisos.</p>'}</div>`;
+  const fin=h+box;return typeof r==='string'?fin:Object.assign({},r,{html:fin})}});
+/* professor: avisar agora */
+ACOES.pushAvisarAgora=async()=>{const r=await api('pushAvisarAgora');
+  toast(!r.alunos?'Ninguém com prova aberta pendente agora.':r.aparelhos?`Aviso enviado: ${r.enviados} de ${r.aparelhos} aparelho(s). ${r.alunos} aluno(s) ainda não fizeram.`:`${r.alunos} aluno(s) não fizeram, mas nenhum ativou os avisos no celular ainda.`)};
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}

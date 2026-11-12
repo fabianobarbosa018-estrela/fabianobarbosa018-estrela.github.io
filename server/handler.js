@@ -35,6 +35,7 @@ export function criarServidor(io) {
       else if (resp.d && resp.d.__ia) resp = await executarIA(resp.d.__ia);
       else if (resp.d && resp.d.__banco) resp = await executarBanco(resp.d.__banco);
       else if (resp.d && resp.d.__desafio) resp = { ok: true, d: await desafioPreparar({ usarIA: true }) };
+      else if (resp.d && resp.d.__push) resp = await executarPush(resp.d.__push);
       if (b.acao === 'desafioPainel' && resp.ok) resp.d.iaChave = !!(io.chaveGemini || io.chaveIA);
       if (b.acao === 'enviarAtividade' && resp.ok && resp.d && resp.d.entregaId && (io.chaveGemini || io.chaveIA)) {
         try { const n = await corrigirDiscIA(resp.d.entregaId); if (n && resp.d.resultado) { resp.d.resultado.nota = n.nota; resp.d.resultado.notaMax = n.notaMax; } }
@@ -208,12 +209,15 @@ export function criarServidor(io) {
   const DISC_BANCO = { portugues: 'Português', matematica: 'Matemática', historia: 'História', geografia: 'Geografia', educacao_fisica: 'Educação Física', fisica: 'Física', quimica: 'Química', ciencias_biologia: 'Biologia' };
   const COTAS_50 = { 'Português': 7, 'Matemática': 7, 'História': 6, 'Geografia': 6, 'Educação Física': 6, 'Física': 6, 'Química': 6, 'Biologia': 6 };
   // anos iniciais (1º ao 3º ano): prova menor, só com assuntos e questões mais fáceis
-  const COTAS_20 = { 'Português': 4, 'Matemática': 4, 'História': 2, 'Geografia': 2, 'Educação Física': 2, 'Física': 2, 'Química': 2, 'Biologia': 2 };
+  // anos iniciais: reforço em Matemática (metade da prova)
+const COTAS_20 = { 'Português': 4, 'Matemática': 12, 'História': 2, 'Geografia': 2, 'Educação Física': 1, 'Física': 1, 'Química': 1, 'Biologia': 1 };
   const cotasDe = nv => nv === 'F1I' ? COTAS_20 : COTAS_50;
-  const totalDe = nv => nv === 'F1I' ? 20 : 50;
+  const totalDe = nv => nv === 'F1I' ? 24 : 50;
   const ASSUNTOS_INICIAIS = ['Interpretação de texto: fábula', 'Gramática: substantivo e adjetivo', 'Quatro operações', 'Raciocínio lógico: sequências e padrões', 'Cultura e sociedade: povos indígenas e matriz africana',
     'Minha história: família, comunidade e tempo', 'Regiões brasileiras', 'Continentes e países', 'Meio ambiente e sustentabilidade', 'Jogos e brincadeiras populares', 'Danças', 'Ciências: luz, sombra e som',
-    'Ciências: misturas e transformações no dia a dia', 'Cadeia e teia alimentar', 'Seres vivos, ambiente e cuidados com o corpo'];
+    'Ciências: misturas e transformações no dia a dia', 'Cadeia e teia alimentar', 'Seres vivos, ambiente e cuidados com o corpo',
+    'Tabuada e multiplicação', 'Números até 1000: contagem, ordem e valor posicional', 'Adição e subtração no dia a dia', 'Dinheiro: cédulas, moedas e troco',
+    'Medidas e tempo: horas, calendário e comprimento', 'Formas geométricas e figuras', 'Dobro, metade e primeiras tabuadas', 'Problemas, tabelas e gráficos simples'];
   const COTAS = COTAS_50;
   const ORDEM_DISC = Object.keys(COTAS);
   const ORDEM_DISCURSIVA = ['Português', 'História', 'Biologia', 'Geografia', 'Matemática', 'Física', 'Química', 'Educação Física'];
@@ -427,6 +431,67 @@ export function criarServidor(io) {
     return true;
   }
   // chamado pelo agendamento (pg_cron) a cada 15 minutos
+
+  // ================== AVISOS NO CELULAR (Web Push: VAPID + aes128gcm, só WebCrypto) ==================
+  const b64u = buf => { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const deB64u = str => { const s = String(str).replace(/-/g, '+').replace(/_/g, '/'); const p = s + '='.repeat((4 - s.length % 4) % 4); const bin = atob(p); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
+  const junta = (...xs) => { const n = xs.reduce((s, x) => s + x.length, 0); const o = new Uint8Array(n); let i = 0; xs.forEach(x => { o.set(x, i); i += x.length; }); return o; };
+  const txtB = s => new TextEncoder().encode(s);
+  async function hmac(chave, dados) { const k = await crypto.subtle.importKey('raw', chave, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); return new Uint8Array(await crypto.subtle.sign('HMAC', k, dados)); }
+  async function vapidChaves() {
+    let dados = await io.carregar(); let c = N.sistema(dados, 'pushChaves').resultado; if (c) return c;
+    const par = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', par.privateKey); const pub = b64u(await crypto.subtle.exportKey('raw', par.publicKey));
+    dados = await io.carregar(); const x = N.sistema(dados, 'pushSalvarChaves', { jwk: jwk, pub: pub }); await gravar(x);
+    return { jwk: jwk, pub: pub };
+  }
+  async function vapidJWT(aud, c) {
+    const cab = b64u(txtB(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+    const corpo = b64u(txtB(JSON.stringify({ aud: aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://fabianobarbosa018-estrela.github.io/' })));
+    const k = await crypto.subtle.importKey('jwk', c.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    const ass = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, k, txtB(cab + '.' + corpo));
+    return cab + '.' + corpo + '.' + b64u(ass);
+  }
+  // RFC 8291 (aes128gcm)
+  async function cifrarPush(sub, texto) {
+    const uaPub = deB64u(sub.keys.p256dh), auth = deB64u(sub.keys.auth);
+    const par = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', par.publicKey));
+    const uaKey = await crypto.subtle.importKey('raw', uaPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    const segredo = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, par.privateKey, 256));
+    const prkKey = await hmac(auth, segredo);
+    const ikm = await hmac(prkKey, junta(txtB('WebPush: info\0'), uaPub, asPub, new Uint8Array([1])));
+    const sal = crypto.getRandomValues(new Uint8Array(16));
+    const prk = await hmac(sal, ikm);
+    const cek = (await hmac(prk, junta(txtB('Content-Encoding: aes128gcm\0'), new Uint8Array([1])))).slice(0, 16);
+    const nonce = (await hmac(prk, junta(txtB('Content-Encoding: nonce\0'), new Uint8Array([1])))).slice(0, 12);
+    const k = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
+    const cifra = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, k, junta(txtB(texto), new Uint8Array([2]))));
+    const cab = new Uint8Array(21); cab.set(sal, 0); new DataView(cab.buffer).setUint32(16, 4096); cab[20] = 65;
+    return junta(cab, asPub, cifra);
+  }
+  async function enviarPushes(envios) {
+    const c = await vapidChaves(); let ok = 0, falhas = 0; const mortos = [];
+    for (const env of envios || []) {
+      const texto = JSON.stringify(env.msg);
+      for (const sub of env.subs || []) {
+        try {
+          const corpo = await cifrarPush(sub, texto);
+          const r = await io.fetch(sub.endpoint, { method: 'POST', headers: { 'TTL': '43200', 'Urgency': 'high', 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream',
+            'Authorization': 'vapid t=' + await vapidJWT(new URL(sub.endpoint).origin, c) + ', k=' + c.pub }, body: corpo });
+          if (r.status >= 200 && r.status < 300) ok++;
+          else { falhas++; if (r.status === 404 || r.status === 410) mortos.push(sub.endpoint); else if (typeof console !== 'undefined') console.error('push', r.status); }
+        } catch (e) { falhas++; if (typeof console !== 'undefined') console.error('push', String(e && e.message || e)); }
+      }
+    }
+    if (mortos.length) { try { const x = N.sistema(await io.carregar(), 'pushRemover', { endpoints: mortos }); await gravar(x); } catch (e) { } }
+    return { enviados: ok, falhas: falhas, removidos: mortos.length };
+  }
+  async function executarPush(p) {
+    if (p.acao === 'chave') return { ok: true, d: { chave: (await vapidChaves()).pub } };
+    const r = await enviarPushes(p.envios); r.alunos = p.alunos; r.aparelhos = (p.envios || []).reduce((s, e) => s + (e.subs || []).length, 0);
+    return { ok: true, d: r };
+  }
   async function desafioCron(b, dados) {
     const seg = N.sistema(dados, 'segredo').resultado;
     if (!seg || String(b.segredo || '') !== seg) return { ok: false, erro: 'Não autorizado.' };
@@ -439,8 +504,11 @@ export function criarServidor(io) {
       const t = Date.now(); const atrasado = est.pendentes.some(nv => est.abertura[nv] && est.abertura[nv] <= t + 5 * 60e3);
       prep = await desafioPreparar({ usarIA: !atrasado });
     }
-    return { ok: true, d: { manutencao: m.resultado, dia: est.dia, preparados: prep.preparados } };
+    let avisos = null;
+    try { dados = await io.carregar(); const pp = N.sistema(dados, 'pushPendentes'); await gravar(pp); if (pp.resultado && pp.resultado.length) avisos = await enviarPushes(pp.resultado); }
+    catch (e) { if (typeof console !== 'undefined') console.error('push cron', String(e && e.message || e)); }
+    return { ok: true, d: { manutencao: m.resultado, dia: est.dia, preparados: prep.preparados, avisos: avisos } };
   }
   async function instalar() { const x = N.instalar(await io.carregar()); await gravar(x); return x.msgs; }
-  return { processar, instalar, nucleo: N };
+  return { processar, instalar, nucleo: N, _teste: { cifrarPush, vapidJWT } };
 }

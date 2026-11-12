@@ -28,7 +28,7 @@ const P = abrir(); await P.login('professor', 'Prof@2026'); await P.espera(() =>
 t('menu do professor tem Banco de Atividades', !!P.$('.hub [data-go="p_banco"]') && !P.$('#nav [data-go="p_banco"]'));
 P.click('.hub [data-go="p_banco"]'); await P.espera(() => P.$('[data-a="banDisc"]'));
 t('mostra as 8 disciplinas', P.$$('[data-a="banDisc"]').length === 8, P.$$('[data-a="banDisc"]').length);
-t('mostra o total de questões', /726 questões/.test(P.txt('#main')), P.txt('.ph'));
+t('mostra o total de questões', /845 questões/.test(P.txt('#main')), P.txt('.ph'));
 P.click('[data-a="banDisc"][data-id="historia"]'); await P.espera(() => P.$$('.banA').length);
 t('lista os 12 assuntos de História', P.$$('.banA').length === 12, P.$$('.banA').length);
 P.set('#banNivel', 'EM'); await P.espera(() => P.$$('.banA').length && P.$$('.banA').length < 12);
