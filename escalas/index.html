@@ -29,16 +29,22 @@ a{color:var(--pri2)}
 .app{display:flex;min-height:100vh}
 /* Sidebar */
 .side{width:236px;background:var(--pri);color:#e6f1f3;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0;z-index:30}
-.brand{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+.brand{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
 .brand b{display:block;font-size:15px;font-weight:800;letter-spacing:.2px;color:#fff}
 .brand small{opacity:.75;font-size:12px}
 .brand-logo{display:block;width:170px;max-width:100%;height:auto;margin:0 0 10px}
 .nav{padding:10px 8px;flex:1;overflow:auto}
-.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#d6e7ea;text-decoration:none;font-weight:500;margin-bottom:2px}
+.nav-g{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:rgba(255,255,255,.55);font-weight:700;padding:14px 12px 6px}
+.nav-g:first-child{padding-top:4px}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;color:#d6e7ea;text-decoration:none;font-weight:500;margin-bottom:2px}
 .nav a:hover{background:rgba(255,255,255,.08)}
 .nav a.on{background:#fff;color:var(--pri);font-weight:700}
 .nav svg{width:18px;height:18px;flex-shrink:0}
-.side-foot{padding:12px 16px;font-size:12px;border-top:1px solid rgba(255,255,255,.1);opacity:.85}
+.side-foot{padding:12px 16px;font-size:12px;border-top:1px solid rgba(255,255,255,.1);color:#d6e7ea}
+.sync-l{display:flex;align-items:center;gap:8px;font-size:13px}
+.sync-l b{color:#fff}
+.sync-r{margin-top:3px;opacity:.85;line-height:1.35}
+.side-foot .small{opacity:.85}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#9ca3af}
 .dot.g{background:#4ade80}.dot.y{background:#facc15}
 /* Main */
@@ -264,14 +270,14 @@ table.folha.vt .edit-click{cursor:pointer}
 <body>
 <div class="app" id="app">
   <aside class="side" id="side">
-    <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Escalas e folgas de funcionários</small></div>
+    <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Gestão operacional</small></div>
     <nav class="nav" id="nav"></nav>
-    <button class="atu side-atu" data-act="atualizarSistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>Atualizar sistema</button>
+    <button class="atu side-atu" data-act="atualizarSistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg><span class="atu-t">Atualizar sistema</span></button>
     <div class="side-foot" id="storeStatus"><span class="dot"></span>Conectando…</div>
   </aside>
   <div class="shade" id="shade"></div>
   <div class="main">
-    <div class="top"><button class="burger" id="burger" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><img class="top-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="topTitle">Escalas</b><button class="atu" data-act="atualizarSistema" aria-label="Atualizar sistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>Atualizar</button></div>
+    <div class="top"><button class="burger" id="burger" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><img class="top-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="topTitle">Escalas</b><button class="atu" data-act="atualizarSistema" aria-label="Atualizar sistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg><span class="atu-t">Atualizar</span></button></div>
     <div class="content" id="view"><div class="loading"><div class="spin"></div>Carregando dados…</div></div>
   </div>
 </div>
@@ -1122,6 +1128,8 @@ const Store = {
     const ant = this.filas[chave] || Promise.resolve();
     const p = ant.catch(() => { }).then(fn);
     this.filas[chave] = p;
+    this.pendentes = (this.pendentes || 0) + 1;
+    p.then(() => { }, () => { }).then(() => { this.pendentes--; atualizarStatus(); });
     return p;
   },
   aplicar(col, id, limpo) {
@@ -1203,7 +1211,7 @@ const Nuvem = {
     const r = await this.rpc('esc_ler', { p_desde: null });
     Object.assign(S, { setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
-    S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true;
+    S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true; S.sincAt = new Date();
     this.guardarCopia(); render(); atualizarStatus();
   },
   async sincronizar() {
@@ -1213,7 +1221,7 @@ const Nuvem = {
       if (S.offline) return await this.carregarTudo();
       const r = await this.rpc('esc_ler', { p_desde: S.desde });
       if (r.docs && r.docs.length) { this.aplicarDocs(r.docs); this.guardarCopia(); agendarRender(); }
-      S.desde = r.agora; if (S.semRede) { S.semRede = false; atualizarStatus(); }
+      S.desde = r.agora; S.sincAt = new Date(); if (S.semRede) S.semRede = false; atualizarStatus();
     } catch (e) {
       if (e.code === 'SESSAO_INVALIDA') return this.sair(true);
       if (e.code === 'SEM_CONEXAO' && !S.semRede) { S.semRede = true; atualizarStatus(); }
@@ -1277,6 +1285,16 @@ function atualizarStatus() {
   else if (S.modo === 'nuvem') h = S.precisaLogin ? '<span class="dot"></span>Aguardando senha' : (S.offline || S.semRede) ? '<span class="dot y"></span>Sem internet — só consulta' : '<span class="dot g"></span>Salvo na nuvem';
   else h = window.STANDALONE ? '<span class="dot g"></span>Salvo neste aparelho — faça backups' : '<span class="dot y"></span>Salvo só neste navegador — faça backups';
   if (S.somenteLeitura && S.modo !== 'nuvem') h += '<br><span class="small">Modo somente leitura</span>';
+  const pend = Store.pendentes || 0;
+  const estado = !S.modo ? ['', 'Conectando…'] : S.modo === 'nuvem'
+    ? (S.precisaLogin ? ['y', 'Aguardando senha'] : (S.offline || S.semRede) ? ['y', 'Sem conexão'] : pend > 0 ? ['y', 'Gravando alterações…'] : ['g', 'Conectado'])
+    : S.modo === 'db' ? (S.lento ? ['y', 'Conectado (conexão lenta)'] : ['g', 'Conectado'])
+    : (window.STANDALONE ? ['g', 'Salvo neste aparelho'] : ['y', 'Salvo só neste navegador']);
+  const sincOk = S.modo === 'nuvem' && !S.precisaLogin && !(S.offline || S.semRede) && pend === 0;
+  const quando = S.sincAt ? S.sincAt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Recife' }).replace(',', '') : '';
+  h = '<div class="sync-l"><span class="dot ' + estado[0] + '"></span><b>' + estado[1] + '</b></div>'
+    + '<div class="sync-r small">' + (S.modo === 'nuvem' ? (sincOk ? 'Dados sincronizados' : 'Alterações ainda não enviadas') + (quando ? ' · última sincronização ' + quando : '') : 'Faça backups regulares') + '</div>';
+  if (S.somenteLeitura && S.modo !== 'nuvem') h += '<div class="small">Modo somente leitura</div>';
   el.innerHTML = h;
   document.getElementById('brandName').textContent = S.config.nomeHotel || 'Gestão de Escalas';
 }
@@ -1894,7 +1912,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '11/11 23:10';
+const VERSAO_APP = '11/11 23:12';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -1902,19 +1920,20 @@ async function atualizarSistema() {
   if (_atualizando) return;
   _atualizando = true;
   const btns = document.querySelectorAll('[data-act="atualizarSistema"]');
-  btns.forEach(b => b.classList.add('girando'));
+  btns.forEach(b => { b.classList.add('girando'); b.disabled = true; const t = b.querySelector('.atu-t'); if (t) t.textContent = 'Atualizando…'; });
   try {
     if (S.modo === 'nuvem' && !S.precisaLogin) {
       await Promise.allSettled(Object.values(Store.filas)); // deixa terminar o que está sendo salvo
       await Nuvem.carregarTudo();
     }
+    btns.forEach(b => { const t = b.querySelector('.atu-t'); if (t) t.textContent = 'Atualizado ✓'; });
     toast('Atualizado! Carregando a versão mais nova… (versão desta tela: ' + VERSAO_APP + ')');
     try { await fetch(location.pathname + '?v=' + Date.now(), { cache: 'reload' }); await fetch(location.pathname, { cache: 'reload' }); } catch (e) { }
     setTimeout(() => location.replace(location.pathname + '?v=' + Date.now() + (location.hash || '')), 500);
   } catch (e) {
     toast(e && e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Não foi possível atualizar. Tente de novo.');
     _atualizando = false;
-    btns.forEach(b => b.classList.remove('girando'));
+    btns.forEach(b => { b.classList.remove('girando'); b.disabled = false; const t = b.querySelector('.atu-t'); if (t) t.textContent = b.classList.contains('side-atu') ? 'Atualizar sistema' : 'Atualizar'; });
   }
 }
 function toast(msg) {
@@ -1996,7 +2015,8 @@ function alertasGerais() {
    ===================================================================== */
 function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
-  document.getElementById('nav').innerHTML = ROTAS.map(([k, t]) => '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '">' + ic(k) + t + '</a>').join('');
+  const GRUPOS_MENU = [['Gestão', ['painel', 'mensal', 'funcionarios', 'setores']], ['Financeiro e controle', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup']]];
+  document.getElementById('nav').innerHTML = GRUPOS_MENU.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '">' + ic(k) + (r ? r[1] : k) + '</a>'; }).join('')).join('');
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
   atualizarStatus();
   const v = document.getElementById('view');
