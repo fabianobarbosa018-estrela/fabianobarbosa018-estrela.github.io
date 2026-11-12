@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:40';
+const VERSAO_APP = '12/11 00:45';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2343,6 +2343,7 @@ function vMensal() {
   <div class="row mt" style="gap:6px">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
   <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
+  ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status === 'aprovada') ? `<div class="row mt"><span class="small muted">Editar escala aprovada:</span>${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status === 'aprovada').map(s => `<button class="btn pri sm" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar ${semanaLabel(s)}</button>`).join('')}</div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
@@ -3594,7 +3595,7 @@ document.addEventListener('click', async ev => {
       try { await Store.set('escalas', sem, Object.assign({}, e, { status: 'aprovada', aprovadaEm: agoraISO(), alteracoes: (e.alteracoes || []).concat([{ ts: agoraISO(), texto: 'Escala aprovada' }]).slice(-200) })); log('escala', 'Escala aprovada', sem); toast('Escala aprovada.'); } catch (x) { }
       return;
     }
-    case 'editarAprovada': return abrirEdicaoAprovada(UI.semana);
+    case 'editarAprovada': return abrirEdicaoAprovada(el.dataset.sem || UI.semana);
     case 'reabrir': {
       const e = S.escalas[sem];
       if (!await confirmar('Reabrir escala?', '<p>A escala volta para <b>rascunho</b> para permitir alterações. Depois, aprove novamente.</p>', 'Reabrir')) return;
