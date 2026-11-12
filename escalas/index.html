@@ -1937,7 +1937,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 00:05';
+const VERSAO_APP = '12/11 00:20';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2481,17 +2481,22 @@ function abrirFormFunc(f) {
     const id = (f && f.id) || uid('f');
     // vale-transporte: um novo valor passa a valer a partir do mês atual (os meses anteriores mantêm o valor antigo)
     const vAnt = C.vtValorEm(f, C.hojeISO()), vS = vAnt && vAnt.fixo ? '' : (fd.get('vtValor') || '').trim(), vV = numBR(vS), vQ = numBR(fd.get('vtQtd') || '1');
-    let vt = (f && f.vt) || undefined;
+    let vt = (f && f.vt) || undefined, vtMudou = false;
     if (vS && !(vV >= 0)) return toast('Valor da passagem inválido.');
     if (vS && !(vQ >= 0 && vQ === Math.round(vQ))) return toast('Passagens por dia: use um número inteiro.');
     if (vS && (!vAnt || vAnt.valor !== Math.round(vV * 100) / 100 || vAnt.qtd !== vQ)) {
       const hist = ((f && f.vt && f.vt.hist) || []).slice(), desde = hist.length ? C.hojeISO().slice(0, 7) + '-01' : '2000-01-01';
-      vt = { hist: hist.filter(x => x.desde !== desde).concat([{ desde, valor: Math.round(vV * 100) / 100, qtd: vQ }]).sort((a, b) => a.desde.localeCompare(b.desde)), nao: false };
+      // o novo valor vale do início do mês atual. Registros do mês até hoje são substituídos (senão um valor de dia 07 prevaleceria); meses anteriores ficam intactos
+      const hoje = C.hojeISO();
+      vt = { hist: hist.filter(x => !(x.desde >= desde && x.desde <= hoje)).concat([{ desde, valor: Math.round(vV * 100) / 100, qtd: vQ }]).sort((a, b) => a.desde.localeCompare(b.desde)), nao: false };
+      vtMudou = true;
     }
     if (vt) novo.vt = vt;
     if (f) { const extra = Object.assign({}, f); delete extra.id; Object.keys(novo).forEach(k => delete extra[k]); Object.assign(novo, extra); }
+    const totAntes = vtTotalPainel();
     try {
       await Store.set('funcionarios', id, novo);
+      if (vtMudou) { fecharModal(w); vtMostrarAlteracao(nome, vAnt && vAnt.total ? rs(vAnt.valor) + ' × ' + vAnt.qtd + '/dia' : 'sem valor', rs(vV) + ' × ' + vQ + '/dia', totAntes); }
       if (!f) log('funcionario', 'Cadastrado: ' + nome + ' (' + nomeSetor(setorId) + ')');
       else {
         const mud = [];
@@ -2502,7 +2507,7 @@ function abrirFormFunc(f) {
         if (JSON.stringify(f.ferias || []) !== JSON.stringify(ferias)) mud.push('férias: ' + (ferias.map(p => C.dataBR(p.ini) + ' a ' + C.dataBR(p.fim)).join(', ') || 'nenhuma'));
         log('funcionario', 'Editado: ' + nome + (mud.length ? ' — ' + mud.join('; ') : ''));
       }
-      fecharModal(w); toast('Funcionário salvo.');
+      if (!vtMudou) fecharModal(w), toast('Funcionário salvo.');
     } catch (e) { }
   };
   w.querySelector('[data-x=save]').onclick = salvar;
@@ -3181,6 +3186,22 @@ function vtEditarDia(fid, d) {
     if (ok) { fecharModal(w); toast('Ajuste salvo.'); }
   };
 }
+/* Total geral de VT pendente, exatamente o número do cartão do painel. null quando não é possível calcular. */
+function vtTotalPainel() { const v = vtProximo(); return v.estado === 'ok' ? v.valor : null; }
+/* Confirmação de uma alteração de passagem: valor anterior, diferença e novo total geral do painel */
+function vtMostrarAlteracao(nome, antes, depois, totAntes) {
+  const tot = vtTotalPainel();
+  const dif = totAntes != null && tot != null ? r2(tot - totAntes) : null;
+  const txtDif = dif == null ? 'Total pendente não calculado: confira as escalas e o valor de passagem.' : dif > 0.004 ? 'Acréscimo de ' + rs(dif) : dif < -0.004 ? 'Desconto de ' + rs(-dif) : 'Sem alteração no total pendente (a mudança não cai no período em aberto).';
+  const w = abrirModal(`<div class="mh">Alteração do vale-transporte</div><div class="mbd">
+    <p><b>${esc(nome)}</b></p>
+    <p class="small">Passagem anterior: <b>${esc(antes)}</b><br>Passagem nova: <b>${esc(depois)}</b></p>
+    <p>${esc(txtDif)}</p>
+    <p>Total geral de VT pendente: <b>${totAntes == null ? 'Não calculado' : rs(totAntes)}</b> → <b>${tot == null ? 'Não calculado' : rs(tot)}</b></p>
+    <p class="small muted">Este é o mesmo número do cartão Vale-transporte no painel.</p></div>
+    <div class="mf"><button class="btn pri" data-x="c">Entendi</button></div>`);
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+}
 function vtEditarValor(fid) {
   const f = funcPorId(fid); if (!f) return;
   const hist = ((f.vt && f.vt.hist) || []).slice().sort((a, b) => a.desde.localeCompare(b.desde));
@@ -3224,10 +3245,12 @@ function vtEditarValor(fid) {
       }
       nh = hist.filter(x => x.desde !== desde).concat([ent]).sort((a, b) => a.desde.localeCompare(b.desde));
     }
+    const totAntes = vtTotalPainel(), vAntes = C.vtValorEm(f, C.hojeISO());
     try {
       await Store.set('funcionarios', f.id, Object.assign({}, f, { vt: { hist: nh, nao }, atualizadoEm: agoraISO() }));
       log('vt', 'Vale-transporte de ' + f.nome + ': ' + (nao ? 'não recebe' : desc(ent)));
-      fecharModal(w); toast('Valor salvo.');
+      fecharModal(w);
+      if (ent || nao) vtMostrarAlteracao(f.nome, vAntes && vAntes.total ? rs(vAntes.valor) + ' × ' + vAntes.qtd + '/dia' : (vAntes && vAntes.fixo ? 'valor fixo' : 'sem valor'), nao ? 'não recebe VT' : desc(ent), totAntes); else toast('Valor salvo.');
     } catch (e) { }
   };
 }
