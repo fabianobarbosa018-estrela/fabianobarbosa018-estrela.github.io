@@ -291,6 +291,71 @@ table.folha.vt .edit-click{cursor:pointer}
 .vtres td.r,.vtres th.r,table.list td.r,table.list th.r{text-align:right;white-space:nowrap}
 .vtres tfoot td{background:#f3f7e9;border-top:2px solid var(--line)}
 
+/* ===== Painel estilo "Pro Max" (escuro, vidro e detalhes dourados) ===== */
+.pm{position:relative;color:#f8fafc;border-radius:20px;padding:18px 16px 26px;overflow:hidden;background-color:#070d11;background-image:radial-gradient(circle at 0% 30%,rgba(16,130,118,.28) 0%,transparent 48%),radial-gradient(circle at 100% 30%,rgba(16,130,118,.22) 0%,transparent 46%),radial-gradient(circle at 50% 0%,rgba(18,72,81,.35) 0%,transparent 40%)}
+.pm h1{color:#f8fafc;font-size:26px;font-weight:700;letter-spacing:-.5px;margin:0}
+.pm .pm-head .sub{color:#94a3b8;font-size:13.5px;margin:4px 0 16px}
+.pm .l,.pm .x{color:#94a3b8}
+.pm .x{font-size:12px;color:#7c8d9b}
+.pm .n{color:#f8fafc}
+.pm .secao{color:#94a3b8;margin:22px 0 10px}
+.pm-card{display:block;background:rgba(18,28,35,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:15px;box-shadow:0 8px 24px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06);color:#f8fafc;text-decoration:none;position:relative}
+a.pm-card:hover{background:rgba(24,37,46,.85);border-color:rgba(52,211,153,.3)}
+.pm-ct{font-size:14px;color:#f8fafc}
+.pm-ct span{color:#94a3b8}
+.pm-muted{color:#7c8d9b;font-size:13px;margin:0}
+.pm-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pm-kpi{display:flex;align-items:flex-start;gap:11px;background:rgba(18,28,35,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06);color:#f8fafc;text-decoration:none;min-width:0}
+.pm-kpi.c-gold{border-color:rgba(212,163,89,.28)}
+.pm-kpi.c-teal{border-color:rgba(94,234,212,.25)}
+.pm-kpi.kpi-link:hover{transform:translateY(-2px)}
+.pm-ico{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1)}
+.pm-ico svg{width:18px;height:18px}
+.c-teal .pm-ico{background:linear-gradient(135deg,rgba(20,125,114,.55),rgba(20,80,90,.5));color:#5eead4}
+.c-gold .pm-ico{background:linear-gradient(135deg,rgba(212,163,89,.45),rgba(90,70,40,.45));color:#e9c58a}
+.pm-kt{flex:1;min-width:0}
+.pm-kt .l{font-size:12.5px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-kt .n{font-size:24px;font-weight:700;line-height:1;letter-spacing:-.4px}
+.pm-kt .x{font-size:11.5px;margin-top:4px;line-height:1.3}
+.pm-kpi{position:relative}
+.pm-ring{width:22px;height:22px;transform:rotate(-90deg);position:absolute;right:12px;top:12px}
+.pm-kt .l{white-space:normal;padding-right:26px;line-height:1.25}
+.pm-rbg{fill:none;stroke:rgba(255,255,255,.12);stroke-width:3}
+.pm-rfg{fill:none;stroke-width:3;stroke-linecap:round}
+.r-teal{stroke:#5eead4}
+.r-gold{stroke:#d4a359}
+.pm-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pm-chip{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);padding:5px 12px 5px 6px;border-radius:999px;font-size:13px;font-weight:500;color:#f8fafc}
+.pm-av{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#fff}
+.av-t{background:rgba(20,125,114,.7);border:1px solid rgba(94,234,212,.5)}
+.av-s{background:rgba(51,65,85,.75);border:1px solid rgba(148,163,184,.35)}
+.pm-situ{display:block;padding-right:40px}
+.pm-situ-t{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.pm-situ-t .pm-ct{font-size:15px;font-weight:600}
+.pm-chev{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:22px;color:#94a3b8}
+.pm .badge{box-shadow:0 0 12px rgba(16,185,129,.15)}
+.pm .badge.b-ok{background:rgba(16,185,129,.14);border:1px solid rgba(52,211,153,.45);color:#34d399}
+.pm .badge.b-draft{background:rgba(212,163,89,.14);border:1px solid rgba(212,163,89,.45);color:#e9c58a}
+.pm .badge.b-err{background:rgba(248,113,113,.14);border:1px solid rgba(248,113,113,.45);color:#fca5a5}
+.pm .fin{background:linear-gradient(160deg,rgba(20,32,39,.94),rgba(12,20,26,.96));border:1px solid rgba(212,163,89,.45);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 0 0 1px rgba(94,234,212,.12);color:#f8fafc}
+.pm .fin .l{color:#94a3b8;font-size:14px}
+.pm .fin .fin-v{color:#f8fafc;font-size:30px}
+.pm .fin .x{color:#94a3b8}
+.pm .fin .x b{color:#f8fafc}
+.pm .atalho{background:rgba(18,28,35,.72);border-color:rgba(255,255,255,.09);color:#e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.pm .atalho svg{color:#5eead4}
+.pm .atalho:hover{border-color:rgba(94,234,212,.35)}
+.pm .card{background:rgba(18,28,35,.72);border-color:rgba(255,255,255,.09);color:#f8fafc}
+.pm .alert{background:rgba(255,255,255,.04)}
+.pm .alert.e{background:rgba(248,113,113,.12);color:#fca5a5}
+.pm .alert.w{background:rgba(212,163,89,.12);color:#fde68a}
+.pm .alert.i{background:rgba(94,234,212,.08);color:#a7f3d0}
+.pm .alert.s{background:rgba(52,211,153,.1);color:#86efac}
+.pm .catb{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12);color:#94a3b8}
+.pm .catb.on{background:#0d4a5a;border-color:#5eead4;color:#fff}
+.pm .alert a{color:#5eead4}
+@media (max-width:480px){.pm{padding:14px 10px 22px}.pm-kt .n{font-size:22px}}
+
 /* ===== Visual refinado (tema claro e escuro automático) ===== */
 :root{
   --bg:#f3f5f8; --card:#ffffff; --ink:#0b1220; --ink2:#475467; --ink3:#8a94a6; --line:#e4e8ee;
@@ -2034,7 +2099,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 01:02';
+const VERSAO_APP = '12/11 01:08';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2293,17 +2358,23 @@ function vPainel() {
   const cont = {}; al.forEach(a => { cont[a.cat] = (cont[a.cat] || 0) + 1; });
   const fAl = UI.alertaCat || null, visAl = fAl ? al.filter(a => a.cat === fAl) : al;
   const catsOk = Object.keys(nomes).filter(k => cont[k]);
-  return `
-  <div class="row mb"><div><h1>Painel</h1><p class="sub" style="margin:0">${esc(S.config.nomeHotel || '')} · hoje é ${diaHoje}, ${C.dataBR(hoje)}</p></div></div>
+  const pct = (a, b) => b > 0 ? Math.round(a / b * 100) : 0;
+  const ring = (p, cls) => { const r = 9, c = 2 * Math.PI * r, q = Math.max(0, Math.min(100, p)); return `<svg class="pm-ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="pm-rbg" cx="12" cy="12" r="${r}"/><circle class="pm-rfg ${cls}" cx="12" cy="12" r="${r}" stroke-dasharray="${(q / 100 * c).toFixed(2)} ${c.toFixed(2)}"/></svg>`; };
+  const ini = n => (n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+  const setoresAtivos = S.setores.filter(s => ativos.some(f => f.setorId === s.id)).length;
+  const folgNomes = hojeC.folg;
+  const sitTxt = escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Publicada</span>' : '<span class="badge b-draft">Rascunho</span>') : '<span class="badge b-err">Não gerada</span>';
+  return `<div class="pm">
+  <div class="pm-head"><h1>Painel</h1><p class="sub">${esc(S.config.nomeHotel || '')} · hoje é ${diaHoje}, ${C.dataBR(hoje)}</p></div>
 
-  <div class="kpis">
-    <div class="card kpi"><div class="kico">${ic('users')}</div><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s)</div></div>
-    <div class="card kpi"><div class="kico">${ic('setores')}</div><div class="l">Setores</div><div class="n">${S.setores.length}</div><div class="x">${S.setores.filter(s => ativos.some(f => f.setorId === s.id)).length} com funcionários ativos</div></div>
-    <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="trab"><div class="kico">${ic('check')}</div><div class="l">Trabalhando hoje</div><div class="n">${escA ? trabHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
-    <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="folg"><div class="kico">${ic('calendar')}</div><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
+  <div class="pm-kpis">
+    <div class="pm-kpi c-teal"><div class="pm-ico">${ic('users')}</div><div class="pm-kt"><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s)</div></div>${ring(pct(ativos.length, S.funcionarios.length), 'r-teal')}</div>
+    <div class="pm-kpi c-gold"><div class="pm-ico">${ic('setores')}</div><div class="pm-kt"><div class="l">Setores</div><div class="n">${S.setores.length}</div><div class="x">${setoresAtivos} com funcionários ativos</div></div>${ring(pct(setoresAtivos, S.setores.length), 'r-gold')}</div>
+    <a class="pm-kpi c-teal kpi-link" href="#painel" data-act="verHoje" data-tipo="trab"><div class="pm-ico">${ic('check')}</div><div class="pm-kt"><div class="l">Trabalhando hoje</div><div class="n">${escA ? trabHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></div>${ring(escA ? pct(trabHoje, ativos.length) : 0, 'r-teal')}</a>
+    <a class="pm-kpi c-gold kpi-link" href="#painel" data-act="verHoje" data-tipo="folg"><div class="pm-ico">${ic('calendar')}</div><div class="pm-kt"><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></div>${ring(escA ? pct(folgHoje, ativos.length) : 0, 'r-gold')}</a>
   </div>
-  ${escA ? `<div class="card mt"><div class="l">Quem está de folga hoje · ${diaHoje}</div><div style="margin-top:8px">${hojeC.folg.length ? hojeC.folg.map(n => `<span class="chip" style="font-size:15px;padding:6px 12px;margin:0 6px 6px 0;display:inline-block">${esc(n)}</span>`).join('') : '<p class="muted small" style="margin:0">Ninguém de folga hoje.</p>'}</div></div>` : ''}
-  <a class="card kpi-link situ mt" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="l">Situação da escala desta semana</div><div class="situ-b">${escA ? (escA.status === 'aprovada' ? '<span class="badge b-ok">Publicada</span>' : '<span class="badge b-draft">Rascunho · aguardando aprovação</span>') : '<span class="badge b-err">Não gerada</span>'}</div><div class="x">${semanaLabel(sem)} · toque para abrir</div></a>
+  ${escA ? `<div class="pm-card mt"><div class="pm-ct">Quem está de folga hoje · <span>${diaHoje}</span></div><div class="pm-chips">${folgNomes.length ? folgNomes.map((n, i) => `<span class="pm-chip"><span class="pm-av ${i % 2 ? 'av-s' : 'av-t'}">${esc(ini(n))}</span>${esc(n)}</span>`).join('') : '<p class="pm-muted">Ninguém de folga hoje.</p>'}</div></div>` : ''}
+  <a class="pm-card pm-situ mt kpi-link" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="pm-situ-t"><span class="pm-ct">Situação da escala desta semana</span>${sitTxt}</div><div class="pm-muted">${semanaLabel(sem)} · toque para abrir</div><span class="pm-chev">›</span></a>
 
   <h3 class="secao">Financeiro · próximo pagamento</h3>
   <div class="grid g2">
@@ -2339,7 +2410,8 @@ function vPainel() {
     ${catsOk.length ? `<div class="cats mt">${catsOk.map(k => `<button class="catb${fAl === k ? ' on' : ''}" data-act="alertaCat" data-cat="${k}">${nomes[k]} <b>${cont[k]}</b></button>`).join('')}</div>` : ''}
     <div class="mt">${visAl.length ? visAl.slice(0, 12).map(a => `<div class="alert ${a.t}"><span class="ic">${a.t === 'e' ? '!' : 'i'}</span><div>${esc(a.m)} ${a.link ? `<a href="#${a.link}" ${a.sem ? `data-act="irSemana" data-sem="${a.sem}"` : ''}>Abrir</a>` : ''}</div></div>`).join('') + (visAl.length > 12 ? `<div class="small muted">+ ${visAl.length - 12} alerta(s)</div>` : '')
       : '<div class="alert s"><span class="ic">✓</span><div>Nenhum problema encontrado.</div></div>'}</div>
-  </div>`;
+  </div>
+</div>`;
 }
 
 /* ---------------- ESCALA SEMANAL ---------------- */
