@@ -1922,7 +1922,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '11/11 23:16';
+const VERSAO_APP = '11/11 23:17';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2052,22 +2052,23 @@ function servPendentes(mes) {
   const lista = S.prestadores.map(p => ({ p, c: servCalc(mes, p.id) })).filter(o => o.c.saldo > 0.005);
   return { valor: r2(lista.reduce((a, o) => a + o.c.saldo, 0)), qtd: lista.length, lista };
 }
+function contagemSemana(semana, setorF) {
+  const esc = S.escalas[semana], dd = C.diasDaSemana(semana);
+  const out = dd.map(d => ({ d, trab: [], folg: [] }));
+  if (esc) Object.keys(esc.atribuicoes || {}).forEach(id => {
+    const f = funcPorId(id);
+    if (!f || !f.ativo || (setorF && f.setorId !== setorF)) return;
+    dd.forEach((d, i) => { const st = C.statusDia(esc.atribuicoes[id], d, f, true); if (st === 'F') out[i].folg.push(f.nome); else if (st === 'T' || st === 'X') out[i].trab.push(f.nome); });
+  });
+  out.forEach(o => { o.trab.sort(); o.folg.sort(); });
+  return out;
+}
 function vPainel() {
   const hoje = C.hojeISO(), sem = C.inicioSemana(hoje);
   const ativos = S.funcionarios.filter(f => f.ativo), inat = S.funcionarios.length - ativos.length;
   const escA = S.escalas[sem];
   // quem trabalha e quem folga em cada dia da semana: só funcionários ativos (e só o setor escolhido, se houver)
-  const contagem = (semana, setorF) => {
-    const esc = S.escalas[semana], dd = C.diasDaSemana(semana);
-    const out = dd.map(d => ({ d, trab: [], folg: [] }));
-    if (esc) Object.keys(esc.atribuicoes || {}).forEach(id => {
-      const f = funcPorId(id);
-      if (!f || !f.ativo || (setorF && f.setorId !== setorF)) return;
-      dd.forEach((d, i) => { const st = C.statusDia(esc.atribuicoes[id], d, f, true); if (st === 'F') out[i].folg.push(f.nome); else if (st === 'T' || st === 'X') out[i].trab.push(f.nome); });
-    });
-    out.forEach(o => { o.trab.sort(); o.folg.sort(); });
-    return out;
-  };
+  const contagem = contagemSemana;
   const semVista = UI.painelSem || sem, setorF = UI.painelSetor || '';
   const escV = S.escalas[semVista];
   const vista = contagem(semVista, setorF);
@@ -2100,8 +2101,8 @@ function vPainel() {
   <div class="kpis">
     <div class="card kpi"><div class="kico">${ic('users')}</div><div class="l">Funcionários ativos</div><div class="n">${ativos.length}</div><div class="x">${inat} inativo(s) · ${S.funcionarios.length} cadastrados</div></div>
     <div class="card kpi"><div class="kico">${ic('setores')}</div><div class="l">Setores</div><div class="n">${S.setores.length}</div><div class="x">${S.setores.filter(s => ativos.some(f => f.setorId === s.id)).length} com funcionários ativos</div></div>
-    <div class="card kpi"><div class="kico">${ic('check')}</div><div class="l">Trabalhando hoje</div><div class="n">${escA ? trabHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></div>
-    <div class="card kpi"><div class="kico">${ic('calendar')}</div><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></div>
+    <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="trab"><div class="kico">${ic('check')}</div><div class="l">Trabalhando hoje</div><div class="n">${escA ? trabHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
+    <a class="card kpi kpi-link" href="#painel" data-act="verHoje" data-tipo="folg"><div class="kico">${ic('calendar')}</div><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></a>
     <a class="card kpi kpi-link" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="kico">${ic('edit')}</div><div class="l">Escalas aguardando aprovação</div><div class="n">${aguard.length}</div><div class="x">${aguard.length ? 'toque para abrir' : 'nenhuma pendente'}</div></a>
     <a class="card kpi kpi-link" href="#servicos"><div class="kico">${ic('wallet')}</div><div class="l">Serviços pendentes</div><div class="n">R$ ${servMoeda(pend.valor)}</div><div class="x">${pend.qtd} prestador(es) com saldo a pagar</div></a>
   </div>
@@ -3361,6 +3362,15 @@ document.addEventListener('click', async ev => {
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
+    case 'verHoje': {
+      const hj = C.hojeISO(), c = contagemSemana(C.inicioSemana(hj), '')[C.diaSemana(hj)];
+      const quem = el.dataset.tipo === 'trab' ? c.trab : c.folg;
+      const titulo = el.dataset.tipo === 'trab' ? 'Trabalhando hoje' : 'De folga hoje';
+      abrirModal(`<h2>${titulo} <span class="muted small">· ${C.DIAS[C.diaSemana(hj)].toLowerCase()}, ${C.dataBR(hj)}</span></h2>
+        <p class="muted">${quem.length} funcionário(s)</p>
+        ${quem.length ? quem.map(n => `<div class="chip" style="font-size:15px;padding:6px 12px;margin:4px 6px 4px 0">${esc(n)}</div>`).join('') : '<p class="muted">Ninguém nesta situação hoje.</p>'}`);
+      return;
+    }
     case 'painelSem': { const k = +el.dataset.d; const base = UI.painelSem || C.inicioSemana(C.hojeISO()); UI.painelSem = k === 0 ? null : C.addDias(base, 7 * k); UI.painelDia = undefined; render(); return; }
     case 'painelDia': { const i = +el.dataset.i; const ja = el.classList.contains('sel'); UI.painelDia = ja ? null : i; render(); return; }
     case 'irGerar': UI.semana = el.dataset.sem; return;
