@@ -185,10 +185,16 @@ export function criarServidor(io) {
     if (!a) {   // assunto escrito pela IA: escolhe o assunto do banco com mais palavras em comum
       const alvo = palavras(b.assunto + ' ' + b.assunto + ' ' + b.enunciado).filter(w => !PAL_VAZIAS.has(w));
       let melhor = null, pts = 0;
-      cand.forEach(x => { const voc = new Set(palavras(x.a + ' ' + x.a + ' ' + x.t).map(w => w.slice(0, 6))); const p = alvo.reduce((s, w) => s + (voc.has(w.slice(0, 6)) ? 1 : 0), 0) + niveis.indexOf(x.n) * -0.5; if (p > pts) { pts = p; melhor = x; } });
-      if (pts >= 1) a = melhor;
+      const unicos = [...new Set(alvo.map(w => w.slice(0, 6)))];
+      cand.forEach(x => {
+        const vocA = new Set(palavras(x.a + ' ' + x.t).map(w => w.slice(0, 6)));
+        const vocQ = new Set(palavras(x.q.map(q => q[2] + ' ' + (q[0] === 'm' ? q[5] : q[0] === 'v' ? q[4] : q[3])).join(' ')).map(w => w.slice(0, 6)));
+        const p = unicos.reduce((s, w) => s + (vocA.has(w) ? 1 : vocQ.has(w) ? 0.6 : 0), 0) - niveis.indexOf(x.n) * 0.5;
+        if (p > pts) { pts = p; melhor = x; }
+      });
+      if (pts >= 1.5) a = melhor; else if (melhor && pts > 0) { a = melhor; var aproxIA = true; }
     }
-    let aprox = false;
+    let aprox = typeof aproxIA !== 'undefined' && !!aproxIA;
     if (!a && cand.length) { a = cand.filter(x => x.n === niveis[0])[0] || cand[0]; aprox = true; }   // sem assunto parecido: revisão geral da matéria
     if (!a) return base;
     return { aproximado: aprox, disciplina: D.nome, assunto: a.a, nivel: NIVEL[a.n] || a.n, texto: a.t, video: videoDe(D, a, b.videos), exemplo: exemploDe(a, b.excluir, b.nivel === 'F1I' ? 1 : 2) };
@@ -544,5 +550,5 @@ const COTAS_20 = { 'Português': 4, 'Matemática': 12, 'História': 2, 'Geografi
     return { ok: true, d: { manutencao: m.resultado, dia: est.dia, preparados: prep.preparados, avisos: avisos } };
   }
   async function instalar() { const x = N.instalar(await io.carregar()); await gravar(x); return x.msgs; }
-  return { processar, instalar, nucleo: N, _teste: { cifrarPush, vapidJWT } };
+  return { processar, instalar, nucleo: N, _teste: { cifrarPush, vapidJWT, estudoDoBanco } };
 }
