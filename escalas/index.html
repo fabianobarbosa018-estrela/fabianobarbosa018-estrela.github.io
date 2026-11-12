@@ -32,6 +32,7 @@ a{color:var(--pri2)}
 .brand{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
 .brand b{display:block;font-size:15px;font-weight:800;letter-spacing:.2px;color:#fff}
 .brand small{opacity:.75;font-size:12px}
+.brand-logo{display:block;width:170px;max-width:100%;height:auto;margin:0 0 10px}
 .nav{padding:10px 8px;flex:1;overflow:auto}
 .nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#d6e7ea;text-decoration:none;font-weight:500;margin-bottom:2px}
 .nav a:hover{background:rgba(255,255,255,.08)}
@@ -43,7 +44,8 @@ a{color:var(--pri2)}
 /* Main */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .top{display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--pri);color:#fff;position:sticky;top:0;z-index:20}
-.top b{font-size:15px}
+.top b{font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-logo{height:26px;width:auto;display:block;flex-shrink:0}
 .burger{background:none;border:0;color:#fff;padding:6px;cursor:pointer}
 .atu{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .atu:active{background:rgba(255,255,255,.28)}
@@ -252,14 +254,14 @@ table.folha.vt .edit-click{cursor:pointer}
 <body>
 <div class="app" id="app">
   <aside class="side" id="side">
-    <div class="brand"><b id="brandName">Gestão de Escalas</b><small>Escalas e folgas de funcionários</small></div>
+    <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Escalas e folgas de funcionários</small></div>
     <nav class="nav" id="nav"></nav>
     <button class="atu side-atu" data-act="atualizarSistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>Atualizar sistema</button>
     <div class="side-foot" id="storeStatus"><span class="dot"></span>Conectando…</div>
   </aside>
   <div class="shade" id="shade"></div>
   <div class="main">
-    <div class="top"><button class="burger" id="burger" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><b id="topTitle">Escalas</b><button class="atu" data-act="atualizarSistema" aria-label="Atualizar sistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>Atualizar</button></div>
+    <div class="top"><button class="burger" id="burger" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><img class="top-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="topTitle">Escalas</b><button class="atu" data-act="atualizarSistema" aria-label="Atualizar sistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>Atualizar</button></div>
     <div class="content" id="view"><div class="loading"><div class="spin"></div>Carregando dados…</div></div>
   </div>
 </div>
@@ -1739,6 +1741,24 @@ const SERV_TOP = '#C4D79B', SERV_DATA = '#B7DEE8', SERV_WEEK = '#E4DFEC', SERV_B
 const servFill = (x, c) => (typeof x === 'function' ? x(c) : x);
 const servEstiloPDF = st => { const s = {}; if (st.fill) s.fillColor = rgb(st.fill); if (st.cor) s.textColor = rgb(st.cor); if (st.bold) s.fontStyle = 'bold'; return s; };
 
+// Logo do hotel no topo dos PDFs (canto superior esquerdo). Se a imagem não carregar, o PDF sai como antes.
+let _logoPdf = null;
+async function logoPdfData() {
+  if (_logoPdf !== null) return _logoPdf;
+  try {
+    const r = await fetch('logo.png');
+    if (!r.ok) throw new Error('logo');
+    const blob = await r.blob();
+    _logoPdf = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
+  } catch (e) { _logoPdf = ''; }
+  return _logoPdf;
+}
+async function pdfCabecalho(doc, yPadrao) {
+  const img = await logoPdfData();
+  if (img) { try { doc.addImage(img, 'PNG', 6, 2, 22.8, 8); return 12; } catch (e) { } }
+  return yPadrao;
+}
+
 async function servPDF(paraImprimir) {
   try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
   catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
@@ -1785,8 +1805,9 @@ async function servPDF(paraImprimir) {
       : { content: '', styles: {} });
     body.push(row);
   });
+  const ytopo = await pdfCabecalho(doc, 8);
   doc.autoTable({
-    head: topo, body, startY: 8, theme: 'grid', margin: { left: 6, right: 6 },
+    head: topo, body, startY: ytopo, theme: 'grid', margin: { left: 6, right: 6 },
     styles: { font: 'helvetica', fontSize: fs, cellPadding: 0.3, minCellHeight: 3.3, halign: 'center', valign: 'middle', lineColor: [0, 0, 0], lineWidth: 0.15, textColor: [0, 0, 0] },
     headStyles: { textColor: [0, 0, 0], fontStyle: 'bold' },
     columnStyles: { 0: { cellWidth: 34, halign: 'left' }, [nc - 1]: { cellWidth: 24 } },
@@ -1855,7 +1876,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '11/11 20:03';
+const VERSAO_APP = '11/11 22:47';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2638,8 +2659,9 @@ async function exportarPDF(paraImprimir, opts) {
   const nomeW = mes ? 30 : 60;
   const diaW = (W - 16 - nomeW) / n;
   const colStyles = { 0: { cellWidth: nomeW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: diaW };
+  const ytopo = await pdfCabecalho(doc, 10);
   doc.autoTable({
-    head, body, startY: 10, theme: 'grid', margin: { left: 8, right: 8 },
+    head, body, startY: ytopo, theme: 'grid', margin: { left: 8, right: 8 },
     styles: { font: 'helvetica', fontSize: mes ? 7.5 : 10, fontStyle: 'bold', halign: 'center', valign: 'middle', cellPadding: mes ? 1 : 2, lineColor: preto, lineWidth: 0.2, textColor: preto, minCellHeight: mes ? 7 : 9 },
     headStyles: { textColor: preto, fontStyle: 'bold' },
     columnStyles: colStyles, tableLineColor: preto, tableLineWidth: 0.5
@@ -3107,8 +3129,9 @@ async function vtPDF(per, imprimir) {
   const dataW = 15, colW = (W - 12 - dataW) / n;
   const colStyles = { 0: { cellWidth: dataW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: colW };
   const nl = fim - ini + 1 + (per === 'mes' ? 2 : 0);
+  const ytopo = await pdfCabecalho(doc, 6);
   doc.autoTable({
-    head, body, foot, startY: 6, theme: 'grid', margin: { left: 6, right: 6 }, showFoot: 'lastPage',
+    head, body, foot, startY: ytopo, theme: 'grid', margin: { left: 6, right: 6 }, showFoot: 'lastPage',
     styles: { font: 'helvetica', fontSize: n > 14 ? 6 : 7, halign: 'center', valign: 'middle', cellPadding: nl > 20 ? 0.6 : 1.2, lineColor: preto, lineWidth: 0.15, textColor: preto, minCellHeight: nl > 20 ? 4.1 : 6, overflow: 'linebreak' },
     headStyles: { textColor: preto, fontStyle: 'bold', fontSize: n > 14 ? 7 : 8 }, footStyles: { textColor: preto, fontStyle: 'bold' },
     columnStyles: colStyles
