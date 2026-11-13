@@ -356,6 +356,84 @@ body.ly-on .ly-fundo{opacity:1;pointer-events:auto}body.ly-on .ly-drawer{transfo
 @media(max-width:360px){.top .logo b{display:none}}
 .ly-avisos{display:grid;gap:8px;margin-top:12px}.ly-avisos>*{margin:0!important}
 @media(min-width:640px) and (max-width:899px){.ly-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* ================= DESIGN SYSTEM (todas as telas) ================= */
+body.pf-professor{--pri:#2f5bea;--pri2:#eaf0ff;--pri3:#1d43c4;--ly-g:linear-gradient(135deg,#2f5bea 0%,#4a55ee 55%,#6d4ae6 100%)}
+body.pf-admin{--pri:#5b45e0;--pri2:#efecff;--pri3:#4330c0;--ly-g:linear-gradient(135deg,#4338ca 0%,#5b45e0 50%,#8b5cf6 100%)}
+body.pf-aluno{--pri:#0b8bd6;--pri2:#e4f4fd;--pri3:#086aa6;--ly-g:linear-gradient(135deg,#0ea5e9 0%,#2f6fea 60%,#6d4ae6 100%)}
+html,body{background:#f4f6fb!important}
+#app{background:none!important}
+#mascote{display:none!important}
+main{padding-top:20px}
+/* cabeçalho de cada tela */
+.ph{margin-bottom:16px}
+.ph h1{font-size:23px;letter-spacing:-.4px}
+.ph-tema{background:#fff!important;border:1px solid #edf0f7!important;box-shadow:0 4px 18px rgba(31,52,120,.06)!important;border-radius:22px!important;min-height:112px;padding:20px 150px 20px 22px}
+.ph-tema::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:5px;border-radius:0 6px 6px 0;background:var(--ly-g);z-index:2}
+.ph-bolhas{background:radial-gradient(circle at 95% 50%,var(--pri2) 0 88px,transparent 89px)!important;opacity:1}
+.ph-ilu{width:140px;height:108px;right:8px}
+.ph-tema h1{font-size:23px}
+@media(max-width:600px){.ph-tema{padding:16px 92px 16px 18px;min-height:96px;border-radius:20px!important}.ph-tema h1{font-size:20px}.ph-ilu{width:88px;height:74px;right:2px}.ph-bolhas{background:radial-gradient(circle at 100% 50%,var(--pri2) 0 58px,transparent 59px)!important}}
+/* cartões, listas e indicadores */
+.card,.q,.qed,.stat,.it,.tbl,.empty{border-color:#edf0f7!important}
+.it{border-radius:16px;padding:12px 14px;box-shadow:0 2px 10px rgba(31,52,120,.05)}
+.it:hover{transform:none;box-shadow:0 8px 20px rgba(31,52,120,.09);border-color:#dfe5f3!important}
+.it .ic{width:44px;height:44px;border-radius:14px;background:var(--pri2)}
+.ic-tema{box-shadow:none!important}
+.stat{border-radius:18px;box-shadow:0 2px 12px rgba(31,52,120,.05);background:#fff!important;position:relative;overflow:hidden;padding:16px}
+.stat::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:var(--pri)}
+.stat-tema::after{display:none}
+.stat-azul::before{background:#2f5bea}.stat-verde::before{background:#16a34a}.stat-laranja::before{background:#ea580c}.stat-roxo::before{background:#7c3aed}
+.stat b{font-size:27px}
+.empty{background:#fff!important;border:1px solid #edf0f7;border-radius:20px}
+.tbl{border-radius:16px;box-shadow:0 2px 10px rgba(31,52,120,.04)}
+th{background:#f7f8fc}
+tr:hover td{background:#fafbff}
+/* botões e controles */
+.btn{border-radius:12px;font-weight:800;transition:transform .1s,box-shadow .15s,background .15s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--pri)!important;border-color:var(--pri)!important;box-shadow:0 6px 16px color-mix(in srgb,var(--pri) 30%,transparent)}
+.btn.pri:hover{background:var(--pri3)!important}
+.tabs{gap:8px;padding-bottom:2px}
+.tabs button{border-radius:999px;padding:8px 14px;border-color:#e3e8f3;background:#fff;color:#55617a;min-height:38px}
+.tabs button.on{background:var(--pri)!important;border-color:var(--pri)!important;color:#fff!important;box-shadow:0 4px 12px color-mix(in srgb,var(--pri) 28%,transparent)}
+.seg button.on,.hub button.on{color:var(--pri)!important}
+.hub{background:#e9edf6;border-radius:16px}
+.hub .novo{background:var(--pri)!important}
+input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select{border-radius:12px;border-color:#dfe4ef;background:#fff}
+input:focus,textarea:focus,select:focus{border-color:var(--pri)!important;box-shadow:0 0 0 3px var(--pri2)!important}
+.chk input,.ch input,.rf-op input{accent-color:var(--pri)}
+.qn{background:var(--pri);border-radius:10px}
+.qpts{color:var(--pri3);background:var(--pri2)}
+.ch{border-radius:14px}.ch.sel{border-color:var(--pri);background:var(--pri2)}
+.apoio{border-left-color:var(--pri);background:#f7f9fd}
+.bar i{background:var(--pri)}
+.role{background:var(--pri2);color:var(--pri3)}
+/* avisos */
+.note,.info,.msg{border-radius:14px;border:1px solid transparent;padding:12px 14px}
+.note{background:#fff8e8;border-color:#fde9b8}.info{background:var(--pri2);color:var(--pri3);border-color:color-mix(in srgb,var(--pri) 18%,transparent)}.msg{border-color:#c9eedb}
+/* janelas */
+.sheet{background:#f6f8fc;border-radius:24px 24px 0 0;padding:20px 16px calc(22px + env(safe-area-inset-bottom))}
+@media(min-width:700px){.sheet{border-radius:24px}}
+.x{background:#fff;border:1px solid #e3e8f3;border-radius:12px;width:38px;height:38px;padding:0}
+#toast{border-radius:14px;box-shadow:0 10px 30px rgba(15,23,42,.25)}
+/* menu do computador */
+@media(min-width:900px){
+  .shell{grid-template-columns:260px 1fr;gap:8px;max-width:1280px}
+  .shell .nav{background:#fff;border:1px solid #edf0f7;border-radius:22px;margin:20px 0 20px 16px!important;padding:14px 10px!important;box-shadow:0 4px 18px rgba(31,52,120,.06);gap:2px;max-height:calc(100vh - 110px);overflow-y:auto;top:84px!important}
+  .shell .nav .ly-it,.shell .nav .ly-sair{min-height:44px;padding:7px 10px;font-size:14.5px}
+  .shell .nav .ly-ic{width:32px;height:32px;font-size:16px;border-radius:10px}
+  .shell .nav .ly-sec{margin:12px 8px 4px}
+  .ly-navu{display:flex;gap:10px;align-items:center;padding:10px;border-radius:16px;background:var(--ly-g);color:#fff;margin-bottom:4px}
+  .ly-navu .ly-un b{font-size:14.5px}.ly-av.sm{width:40px;height:40px;font-size:14px}
+}
+.ly-navu{display:none}
+@media(min-width:900px){.ly-navu{display:flex}}
+.ly-it.on{background:var(--pri2)!important;color:var(--pri)!important}.ly-it.on .ly-l{color:var(--pri)!important}
+/* login */
+.auth{background:radial-gradient(900px 480px at 0% 0%,#dfe7ff 0,transparent 60%),radial-gradient(900px 480px at 100% 100%,#ece4ff 0,transparent 60%),#f4f6fb!important}
+.auth .card{border-radius:24px;padding:22px;box-shadow:0 18px 50px rgba(31,52,120,.12)}
+@media(max-width:560px){.grid.g3:has(>.stat){grid-template-columns:repeat(3,minmax(0,1fr))}.grid.g2:has(>.stat),.grid.g4:has(>.stat){grid-template-columns:repeat(2,minmax(0,1fr))}.grid:has(>.stat) .stat{padding:12px 10px 12px 14px}.grid:has(>.stat) .stat b{font-size:23px}.grid:has(>.stat) .stat span{font-size:12px;line-height:1.25;display:block}}
+.ly-sair{text-decoration:none}
 </style>
 </head>
 <body>
@@ -1992,8 +2070,8 @@ const LY_PERFIL={aluno:'Aluno',professor:'Professor',admin:'Administrador'};
 // seções do menu lateral (usa só as páginas que já existem)
 const LY_SECOES={
   admin:[['Principal',['ad_inicio','__alunos','__professores','ad_usuarios']],['Acompanhamento',['p_pendentes','p_faltas','p_reforco','p_redacoes','p_correcoes']],
-    ['Pedagógico',['p_turmas','p_atividades','__desafio','__banco']],['Gestão',['ad_relatorios','ad_config','ad_ia']],['Conta',['atualizacoes','perfil']]],
-  professor:[['Principal',['p_inicio','p_turmas','p_atividades','__desafio','__banco']],['Acompanhamento',['p_pendentes','p_faltas','p_reforco','p_redacoes','p_correcoes']],
+    ['Pedagógico',['p_turmas','p_atividades']],['Gestão',['ad_relatorios','ad_config','ad_ia']],['Conta',['atualizacoes','perfil']]],
+  professor:[['Principal',['p_inicio','p_turmas','p_atividades']],['Acompanhamento',['p_pendentes','p_faltas','p_reforco','p_redacoes','p_correcoes']],
     ['Relatórios',['p_relatorios']],['Conta',['atualizacoes','perfil']]],
   aluno:[['Estudos',['a_inicio','a_atividades','__lista','a_biblioteca','a_tutor']],['Minha vida escolar',['a_notas','a_turmas']],['Conta',['atualizacoes','perfil']]]
 };
@@ -2002,7 +2080,7 @@ const LY_EXTRA={__alunos:['ad_usuarios','🎒','Alunos',{perfil:'aluno'}],__prof
 const LY_NOMES={ad_inicio:'Início (painel administrativo)',ad_usuarios:'Todos os usuários',a_atividades:'Prova do dia'};
 const LY_COR=['#2f5bea','#7c3aed','#0891b2','#16a34a','#ea580c','#db2777','#ca8a04','#4f46e5'];
 function lyItens(){
-  const pf=S.u.perfil;const menu=MENUS[pf]||[];const porId={};menu.forEach(m=>{porId[m[0]]=m});
+  const pf=S.u.perfil;const menu=lyMenu();const porId={};menu.forEach(m=>{porId[m[0]]=m});
   const usados=new Set();const secs=[];
   (LY_SECOES[pf]||[]).forEach(([t,ids])=>{const L=[];ids.forEach(id=>{
     if(LY_EXTRA[id]){const [v,ic,l,p]=LY_EXTRA[id];if(VIEWS[v]&&(pf!=='aluno'||v.indexOf('a_')===0))L.push({v,ic,l,p:p||{},k:id})}
@@ -2011,6 +2089,7 @@ function lyItens(){
   if(resto.length)secs.splice(Math.max(1,secs.length-1),0,['Mais',resto]);
   return secs;
 }
+function lyMenu(){return (MENUS[S.u.perfil]||[]).filter(([k])=>(k!=='p_ia'||S.iaAtiva)&&(k!=='a_tutor'||S.iaTutor))}
 function lyIniciais(n){const p=String(n||'').trim().split(/\s+/);return ((p[0]||'')[0]||'')+((p.length>1?p[p.length-1]:'')[0]||'')}
 function lyAtivo(it){const at=MENU_DE[S.view]||S.view;if(it.v!==at)return false;if(it.p&&it.p.perfil)return (S.p&&S.p.perfil)===it.p.perfil;return !(S.view==='ad_usuarios'&&S.p&&S.p.perfil&&it.k==='ad_usuarios')}
 function lyDrawerHtml(){
@@ -2018,7 +2097,7 @@ function lyDrawerHtml(){
   return `<div class="ly-dh"><div class="ly-logo"><div class="mk">🎓</div><b>Sala Digital</b></div><button class="ly-x" data-a="lyFechar" aria-label="Fechar menu">✕</button></div>
   <div class="ly-user"><div class="ly-av ${u.perfil}">${esc(lyIniciais(u.nome).toUpperCase())||'👤'}</div><div class="ly-un"><b>${esc(u.nome)}</b><span class="role ${u.perfil}">${LY_PERFIL[u.perfil]}</span></div></div>
   <nav class="ly-menu">${lyItens().map(([t,L])=>`<div class="ly-sec">${esc(t)}</div>${L.map((it,i)=>{const b=S.badge[it.v];return `<button class="ly-it${lyAtivo(it)?' on':''}" data-go="${it.v}"${Object.keys(it.p).length?` data-p="${P(it.p)}"`:''}><span class="ly-ic" style="--c:${LY_COR[i%LY_COR.length]}">${it.ic}</span><span class="ly-l">${esc(it.l)}</span>${b?`<span class="bdg">${b==='novo'?'novo':b}</span>`:''}</button>`}).join('')}`).join('')}</nav>
-  <button class="ly-sair" data-a="lySair"><span class="ly-ic" style="--c:#dc2626">🚪</span><span class="ly-l">Sair</span></button>`;
+  <a href="#" class="ly-sair" data-a="lySair"><span class="ly-ic" style="--c:#dc2626">🚪</span><span class="ly-l">Sair</span></a>`;
 }
 // barra inferior (celular): 4 atalhos por perfil
 function lyBarra(){
@@ -2048,7 +2127,7 @@ ACOES.lyIr=(d)=>{fechar();go(d.v)};
 function lyAbrirMenu(){const d=$('#lyDrawer');if(!d)return;d.innerHTML=lyDrawerHtml();document.body.classList.add('ly-on');LY.aberto=true;d.setAttribute('aria-hidden','false');const on=d.querySelector('.ly-it.on');if(on)on.scrollIntoView({block:'center'})}
 function lyFecharMenu(){document.body.classList.remove('ly-on');LY.aberto=false;const d=$('#lyDrawer');if(d)d.setAttribute('aria-hidden','true')}
 ACOES.lyAbrir=()=>lyAbrirMenu();ACOES.lyFechar=()=>lyFecharMenu();
-ACOES.lySair=()=>{lyFecharMenu();if(ACOES.sair)ACOES.sair({},null,null);else sairLocal()};
+ACOES.lySair=()=>{lyFecharMenu();['pf-aluno','pf-professor','pf-admin'].forEach(c=>document.body.classList.remove(c));if(ACOES.sair)ACOES.sair({},null,null);else sairLocal()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&LY.aberto)lyFecharMenu()});
 // fecha o menu ao navegar
 {const _go=go;go=function(v,p){lyFecharMenu();return _go(v,p)}}
@@ -2058,6 +2137,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&LY.aberto)lyFecharM
   const app=$('#app');if(app&&!$('#lyDrawer')){app.insertAdjacentHTML('beforeend',`<div class="ly-fundo" data-a="lyFechar"></div><aside class="ly-drawer" id="lyDrawer" aria-hidden="true"></aside><nav class="ly-barra" id="lyBarra"></nav>`)}
   const who=$('#who');if(who){const b=who.querySelector('b');if(b)b.textContent=String(S.u.nome||'').split(' ')[0]}
   const bar=$('#lyBarra');if(bar)bar.innerHTML=lyBarra();document.body.classList.toggle('ly-semBarra',S.view==='a_prova');
+  ['pf-aluno','pf-professor','pf-admin'].forEach(c=>document.body.classList.remove(c));document.body.classList.add('pf-'+S.u.perfil);
+  const nav=$('#nav');if(nav)nav.innerHTML=`<div class="ly-navu"><div class="ly-av sm">${esc(lyIniciais(S.u.nome).toUpperCase())}</div><div class="ly-un"><b>${esc(S.u.nome)}</b><span class="role ${S.u.perfil}">${LY_PERFIL[S.u.perfil]}</span></div></div>`+lyItens().map(([t,L])=>`<div class="ly-sec">${esc(t)}</div>${L.map((it,i)=>{const b=S.badge[it.v];return `<button class="ly-it${lyAtivo(it)?' on':''}" data-go="${it.v}"${Object.keys(it.p).length?` data-p="${P(it.p)}"`:''}><span class="ly-ic" style="--c:${LY_COR[i%LY_COR.length]}">${it.ic}</span><span class="ly-l">${esc(it.l)}</span>${b?`<span class="bdg">${b==='novo'?'novo':b}</span>`:''}</button>`}).join('')}`).join('')+`<a href="#" class="ly-sair" data-a="lySair"><span class="ly-ic" style="--c:#dc2626">🚪</span><span class="ly-l">Sair</span></a>`;
   if(LY.aberto){const d=$('#lyDrawer');if(d)d.innerHTML=lyDrawerHtml()}}}
 // depois de cada tela: atualiza contadores da barra e monta o novo Início
 {const _render=render;render=async function(){const r=await _render.apply(this,arguments);try{lyDepois()}catch(e){}return r}}
@@ -2067,12 +2148,12 @@ function lyDepois(){if(!S.u)return;const bar=$('#lyBarra');if(bar)bar.innerHTML=
 const LY_ATALHOS={
   admin:[['__alunos','Alunos','Cadastro e acesso'],['__professores','Professores','Equipe e turmas'],['p_pendentes','Quem não fez','Prova de hoje'],['p_faltas','Notas e faltas','Quadro e avisos às mães'],['p_redacoes','Redações','Correção completa'],['p_reforco','Reforço','Por aluno'],['ad_relatorios','Relatórios','Desempenho geral'],['ad_config','Configurações','Ajustes do sistema']],
   professor:[['p_turmas','Turmas','Alunos e códigos'],['p_atividades','Atividades','Criar e publicar'],['p_pendentes','Quem não fez','Prova de hoje'],['p_faltas','Notas e faltas','Quadro e avisos às mães'],['p_correcoes','Correções','Entregas para corrigir'],['p_redacoes','Redações','Correção completa'],['p_reforco','Reforço','Por aluno'],['p_relatorios','Relatórios','Desempenho da turma']],
-  aluno:[['a_atividades','Prova do dia','Fazer a prova de hoje'],['__lista','Atividades','Do professor'],['a_biblioteca','Biblioteca','Vídeos e explicações'],['a_tutor','Tutor IA','Tire suas dúvidas'],['a_notas','Minhas notas','Resultados'],['a_turmas','Turmas','Minhas turmas']]
+  aluno:[['a_atividades','Prova do dia','Fazer a prova de hoje'],['__lista','Atividades do professor','Exercícios e trabalhos'],['a_biblioteca','Biblioteca','Vídeos e explicações'],['a_tutor','Tutor IA','Tire suas dúvidas'],['a_notas','Minhas notas','Resultados'],['a_turmas','Turmas','Minhas turmas']]
 };
 const LY_FUNDO=['#e8efff','#f1e9ff','#e0f7fb','#e3f8ea','#fff0e3','#ffe8f2','#fff7d6','#ecebff'];
 function lyInicio(){
-  const m=$('#main');if(!m||m.querySelector('.ly-hero'))return;const u=S.u;const pf=u.perfil;const menu=MENUS[pf]||[];const porId={};menu.forEach(x=>{porId[x[0]]=x});
-  const at=(LY_ATALHOS[pf]||[]).map(([k,l,d])=>{if(LY_EXTRA[k]){const [v,ic,,p]=LY_EXTRA[k];return VIEWS[v]&&(porId[v]||pf==='aluno')?{v,ic,l,d,p:p||{}}:null}
+  const m=$('#main');if(!m||m.querySelector('.ly-hero'))return;const u=S.u;const pf=u.perfil;const menu=lyMenu();const porId={};menu.forEach(x=>{porId[x[0]]=x});
+  const at=(LY_ATALHOS[pf]||[]).map(([k,l,d])=>{if(LY_EXTRA[k]){const [v,ic,,p]=LY_EXTRA[k];return VIEWS[v]&&(porId[v]||v==='a_lista')?{v,ic,l,d,p:p||{}}:null}
     return porId[k]&&VIEWS[k]?{v:k,ic:porId[k][1],l,d,p:{}}:null}).filter(Boolean);
   if(pf==='aluno'&&typeof alunoCache!=='undefined'&&alunoCache){const n=alunoCache.atividades.filter(x=>x.tipo!=='desafio'&&(x.situacao==='pendente'||x.situacao==='atrasada'&&x.podeEnviar)).length;at.forEach(x=>{if(x.v==='a_lista'&&n)x.d=n+' pendente'+(n>1?'s':'')})}
   const h=new Date().getHours();const sd=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
