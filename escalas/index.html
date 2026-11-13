@@ -467,6 +467,12 @@ table.list tr:hover td{background:#f8fbfc}
   :root:not([data-theme="light"]) table.svc tr.svc-sum td{background:#17212b}
   :root:not([data-theme="light"]) table.svc .svc-in{color:var(--ink)}
   :root:not([data-theme="light"]) .vtres tfoot td{background:#17212b}
+  /* campos de digitação (inclusive os de tabela) ficam legíveis no escuro */
+  :root:not([data-theme="light"]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button]):not([type=submit]),
+  :root:not([data-theme="light"]) textarea,
+  :root:not([data-theme="light"]) select{background:#0e161e !important;color:#f1f5f9 !important;border-color:#2c3a48 !important;color-scheme:dark}
+  :root:not([data-theme="light"]) input:focus,:root:not([data-theme="light"]) select:focus,:root:not([data-theme="light"]) textarea:focus{background:#0b1218 !important;color:#ffffff !important}
+  :root:not([data-theme="light"]) input::placeholder{color:#6f8090}
   /* a folha impressa (papel) continua clara */
   :root:not([data-theme="light"]) .folha-wrap{background:#fff}
 }
@@ -2121,7 +2127,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '12/11 01:15';
+const VERSAO_APP = '13/11 12:55';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
