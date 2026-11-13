@@ -1653,6 +1653,7 @@ const servLotesDefault = mes => [
 ];
 /* Lotes de um grupo no mês. Sem lotes salvos, vale o padrão (dia 15 e fim do mês) */
 function servLotesMes(mes, grupo) {
+  if (grupo === 'todos') grupo = 'diaria'; // a visão 'todos' usa os períodos (dia 15 / fim do mês) de referência
   const doc = S.servicos[mes + '__lotes'];
   const todos = doc && Array.isArray(doc.lotes) ? doc.lotes : servLotesDefault(mes);
   return todos.filter(x => (x.grupo || 'outros') === grupo).slice().sort((a, b) => a.de - b.de);
@@ -1669,7 +1670,7 @@ function servDiasSemLote(mes, grupo) {
   return out;
 }
 /* Prestadores do grupo escolhido na tela */
-const servPrestadoresGrupo = () => servPrestadores().filter(p => grupoDe(p) === (UI.servGrupo || 'diaria'));
+const servPrestadoresGrupo = () => (UI.servGrupo === 'todos' ? servPrestadores() : servPrestadores().filter(p => grupoDe(p) === (UI.servGrupo || 'diaria')));
 
 /* Cálculo de um prestador num mês, lote a lote. Cada lote tem valor, data, % (mensal/combinado) e pago.
    O saldo anterior entra no 1º lote. Descontos, adiantamentos e extras entram no lote da data (sem data: último lote). */
@@ -1745,7 +1746,7 @@ function servPerSel(lotes) {
   if (v === 'mes') return 'mes';
   return lotes.some(x => x.id === v) ? v : (lotes[0] ? lotes[0].id : 'mes');
 }
-const servGrupoNome = { diaria: 'Diaristas', outros: 'Mensais, combinados e extras' };
+const servGrupoNome = { diaria: 'Diaristas', outros: 'Mensais, combinados e extras', todos: 'TODOS OS SERVIÇOS' };
 function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
@@ -1768,6 +1769,7 @@ function vServicos() {
     <select id="selGrupo" style="flex:1;min-width:220px">${Object.keys(servGrupoNome).map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
+  <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label>
   <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkAmbos" ${UI.servAmbos ? 'checked' : ''}> Imprimir e exportar os dois grupos (diaristas e mensais, um arquivo para cada)</label></div>`;
   if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
   const pend = servPendentes(mes);
@@ -1805,7 +1807,7 @@ function vServicos() {
   if (lote) {
     corpo += `<tr class="svc-sum"><td class="svc-dia">${esc(lote.nome.toUpperCase())}</td>${calcs.map(c => {
       const x = c.pagos[idx];
-      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(lote.id)}">Pago ✓ · desfazer</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(lote.id)}">Marcar como pago</button>`}</td>`;
+      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Pago ✓ · desfazer</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Marcar como pago</button>`}</td>`;
     }).join('')}</tr>`;
   }
   corpo += `<tr><td class="svc-dia">Ajustes</td>${vis.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
@@ -1814,6 +1816,7 @@ function vServicos() {
     <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela: toque num dia vazio de diarista e a diária cadastrada entra sozinha. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do lote escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p></div>`;
   if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
   h += `<div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
+  <div class="row mt"><button class="btn" data-act="servFechPdf">${ic('pdf')} Fechamento (PDF)</button><button class="btn pri" data-act="servFechPrint">Imprimir fechamento</button></div>
   <p class="small muted mt">Baixar, Excel e Imprimir saem só do lote e do grupo escolhidos acima.</p>`;
   return h;
 }
@@ -1909,10 +1912,11 @@ async function servPagar(mes, pid, loteId) {
 }
 /* Marca como pago, de uma vez, todos os pendentes do grupo escolhido num lote */
 async function servPagarGrupo(mes, loteId) {
-  const lote = servLotesMes(mes, UI.servGrupo || 'diaria').find(x => x.id === loteId);
+  const lotesG = servLotesMes(mes, UI.servGrupo || 'diaria'), idxG = lotesG.findIndex(x => x.id === loteId);
+  const lote = lotesG[idxG];
   if (!lote) return;
   const alvo = servPrestadoresGrupo().filter(p => S.servicos[servKey(mes, p.id)]).map(p => {
-    const c = servCalc(mes, p.id), x = c.pagos.find(y => y.id === loteId);
+    const c = servCalc(mes, p.id), x = c.pagos[idxG];
     return { c, x, pid: p.id };
   }).filter(o => o.x && !o.x.pago && o.x.valor > 0);
   if (!alvo.length) return toast('Nada pendente neste grupo para este lote.');
@@ -1924,7 +1928,7 @@ async function servPagarGrupo(mes, loteId) {
   if (!ok) return;
   for (const o of alvo) {
     const novo = Object.assign({}, servPagosDoc(o.c.l));
-    novo[loteId] = Object.assign({}, novo[loteId], { pago: true, valorPago: o.x.valor });
+    novo[o.x.id] = Object.assign({}, novo[o.x.id], { pago: true, valorPago: o.x.valor });
     try { await servSalvar(mes, o.pid, { pagos: novo }); } catch (e) { }
   }
   log('servicos', 'Pagos em lote: ' + lote.nome + ' · ' + alvo.length + ' pessoa(s) · R$ ' + servMoeda(total));
@@ -2044,7 +2048,7 @@ function servModelo(mes) {
   const linhas = lote ? SERV_LINHAS_PER(idx) : servLinhasMes(lotes);
   const gTxt = ' · ' + servGrupoNome[g].toUpperCase();
   const sub = servMesNome(mes) + (lote ? ' · ' + lote.nome.toUpperCase() + ' · DIAS ' + d2(lote.de) + ' A ' + d2(Math.min(lote.ate, ult)) : ' · MÊS INTEIRO') + gTxt;
-  const arq = (lote ? servSlug(lote.nome) : 'mes-inteiro') + (g === 'diaria' ? '-diaristas' : '-demais');
+  const arq = (lote ? servSlug(lote.nome) : 'mes-inteiro') + (g === 'diaria' ? '-diaristas' : g === 'todos' ? '-todos' : '-demais');
   return { mes, per: lote ? 'lote' : 'mes', lote, idx, P: { arq }, ativos, calcs, dias, linhas, titulo: 'SERVIÇOS PRESTADOS', sub };
 }
 const SERV_PAL = ['#B4C6E7', '#CCECF0', '#E2EFDA', '#FFF2CC', '#F8CBAD', '#DDEBF7', '#E4DFEC', '#D9E1F2'];
@@ -2156,6 +2160,49 @@ async function servPDF(paraImprimir) {
   await salvarArquivo('servicos-prestados-' + m.mes + '-' + m.P.arq + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
 }
 
+/* Fechamento: uma linha por prestador com saldo em aberto no lote escolhido (dia 20 = dias 1 a 15; dia 5 = fim do mês) */
+function servFechamentoDados(mes, grupo, loteId, anteriores) {
+  const base = servLotesMes(mes, grupo), idx = base.findIndex(x => x.id === loteId);
+  if (idx < 0) return null;
+  const lote = base[idx], linhas = [];
+  servPrestadores().filter(p => grupo === 'todos' || grupoDe(p) === grupo).forEach(p => {
+    if (!S.servicos[servKey(mes, p.id)]) return;
+    const c = servCalc(mes, p.id), ate = anteriores ? c.pagos.slice(0, idx + 1) : [c.pagos[idx]];
+    const total = r2(ate.reduce((a, x) => a + (x ? x.valor : 0), 0));
+    const pago = r2(ate.reduce((a, x) => a + (x && x.pago ? (x.valorPago != null ? x.valorPago : x.valor) : 0), 0));
+    const saldo = r2(total - pago);
+    if (!(saldo > 0)) return;
+    linhas.push({ nome: _capNome(p.nome || ''), cat: grupoDe(p) === 'diaria' ? 'Diarista' : 'Serviço prestado', total, pago, saldo, data: c.pagos[idx] ? c.pagos[idx].data : '' });
+  });
+  linhas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  return { lote, linhas };
+}
+async function servFechamento(paraImprimir) {
+  if (!await servPDFLibs()) return;
+  const mes = UI.servMes, grupo = UI.servGrupo || 'diaria';
+  const lotes = servLotesMes(mes, grupo), sel = servPerSel(lotes);
+  if (!lotes.some(x => x.id === sel)) return toast('Escolha um lote (dia 20 ou dia 5) para o fechamento.');
+  const d = servFechamentoDados(mes, grupo, sel, UI.servFechAnt !== false);
+  if (!d || !d.linhas.length) return toast('Nenhum prestador com saldo em aberto neste lote.');
+  const { lote, linhas } = d, dd2 = dd => String(dd).padStart(2, '0'), ult = servDiasDoMes(mes);
+  const doc = servPDFNovo();
+  const ytopo = await pdfCabecalho(doc, 8);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('FECHAMENTO DE PAGAMENTOS', 6, ytopo + 4);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.text(servMesNome(mes) + ' · ' + lote.nome + ' · dias ' + dd2(lote.de) + ' a ' + dd2(Math.min(lote.ate, ult)) + ' · ' + servGrupoNome[grupo].toLowerCase() + (UI.servFechAnt !== false ? ' · com saldos anteriores em aberto' : ''), 6, ytopo + 10);
+  const tot = k => r2(linhas.reduce((a, l) => a + l[k], 0));
+  doc.autoTable({
+    head: [['Prestador', 'Categoria', 'Total a receber', 'Já pago', 'Saldo pendente', 'Data prevista']],
+    body: linhas.map(l => [l.nome, l.cat, servMoeda(l.total), servMoeda(l.pago), servMoeda(l.saldo), l.data ? C.dataBR(l.data) : '—']),
+    foot: [['TOTAL', '', servMoeda(tot('total')), servMoeda(tot('pago')), servMoeda(tot('saldo')), '']],
+    startY: ytopo + 14, theme: 'grid', margin: { left: 6, right: 6 },
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 1.6, halign: 'right', textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.15 },
+    headStyles: { fillColor: rgb(SERV_TOP), textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+    footStyles: { fillColor: rgb(SERV_TOP), textColor: [0, 0, 0], fontStyle: 'bold' },
+    columnStyles: { 0: { halign: 'left', cellWidth: 80 }, 1: { halign: 'left' }, 5: { halign: 'center' } }
+  });
+  await salvarArquivo('fechamento-' + mes + '-' + servSlug(lote.nome) + '-' + grupo + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
+}
 async function servXls(unico) {
   if (UI.servAmbos && !unico) return servPorGrupos(servXls);
   try { await carregarScript('libs/exceljs.min.js'); } catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de Excel.</p>'); }
@@ -3890,6 +3937,8 @@ document.addEventListener('click', async ev => {
     case 'ajFechar': fecharModal(el.closest('.mbg')); return;
     case 'servPdf': return servPDF(false);
     case 'servPrint': return servPDF(true);
+    case 'servFechPdf': return servFechamento(false);
+    case 'servFechPrint': return servFechamento(true);
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
     case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
@@ -4060,6 +4109,7 @@ document.addEventListener('change', ev => {
   if (t.id === 'selGrupo') { UI.servGrupo = t.value; render(); return; }
   if (t.id === 'chkSoValor') { UI.servSoValor = t.checked; return; }
   if (t.id === 'chkAmbos') { UI.servAmbos = t.checked; return; }
+  if (t.id === 'chkFechAnt') { UI.servFechAnt = t.checked; return; }
   if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
   else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
   else if (t.id === 'vtMes' && t.value) { UI.vtMes = t.value; render(); }
