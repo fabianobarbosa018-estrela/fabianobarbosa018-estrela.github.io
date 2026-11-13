@@ -235,6 +235,22 @@ t('não acompanhar tira das faltas', !r.d.grupos.some(g => g.alunos.some(x => x.
   r = await api(A, 'estudoVideoSalvar', { disciplina: 'Matemática', assunto: 'x', link: 'https://youtu.be/abcdefghijk' }); t('aluno não troca vídeo', !r.ok);
   r = await api(A, 'bibliotecaTexto', { disciplina: 'matematica', assunto: 0 }); t('Biblioteca também traz vídeo e exemplo', r.ok && r.d.video && r.d.exemplo, r.d);
 }
+// ---- quem ainda não fez a prova de hoje (aba "Quem não fez", usa desafioQuadro) ----
+{
+  await q("update sd_usuarios set data = data - 'faltaIgnorar'");
+  await q("delete from sd_atividades where data->>'tipo' = 'desafio'"); await q("delete from sd_entregas");
+  await api(P, 'desafioConfigSalvar', { meu: { ativo: true, abertura: '00:00', encerramento: '23:59', diasPrazo: 0, liberar: 'encerramento', duracaoMin: 0, diasSemana: [0, 1, 2, 3, 4, 5, 6] } });
+  r = await api(A, 'desafioHoje'); const pq = r.d.desafios[0];
+  const situ = async () => { const x = await api(P, 'desafioQuadro'); for (const tu of x.d.turmas) { const j = tu.provas.findIndex(p => p.id === pq.id); if (j >= 0) return { p: tu.provas[j], al: tu.alunos.map(a => ({ id: a.id, nome: a.nome, ...a.provas[j] })) }; } return null; };
+  let sq = await situ(); t('quem não fez: todos começam como "ainda não fez"', sq && !sq.p.encerrada && sq.p.titulo && sq.al.length >= 1 && sq.al.every(a => a.s === 'aberta'), sq);
+  await api(A, 'desafioIniciar', { id: pq.id });
+  const [aq] = await q("select data from sd_atividades where id = $1", [pq.id]);
+  await api(A, 'salvarRascunho', { id: pq.id, respostas: aq.data.questoes.map((x, i) => i < 3 ? (x.tipo === 'vf' ? true : x.tipo === 'disc' ? 'abc' : 0) : null) });
+  sq = await situ(); const la = sq.al.find(a => a.s === 'fazendo'); t('quem não fez: aluno fazendo com progresso', la && la.respondidas === 3 && la.total === aq.data.questoes.length, sq.al);
+  await api(A, 'enviarAtividade', { id: pq.id, respostas: aq.data.questoes.map(x => x.correta === undefined ? 'resposta' : x.correta) });
+  sq = await situ(); const lf = sq.al.find(a => a.s === 'corrigida'); t('quem não fez: quem entregou aparece com nota e hora', lf && typeof lf.nota === 'number' && lf.em, sq.al);
+  r = await api(A, 'desafioQuadro'); t('aluno não acessa o quadro', !r.ok);
+}
 // ---- dias da prova ----
 const hojeS = new Date(Date.now() - 3 * 3600e3).getUTCDay();
 await q("delete from sd_atividades where data->>'tipo' = 'desafio'");

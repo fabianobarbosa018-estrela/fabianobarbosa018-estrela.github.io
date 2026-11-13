@@ -424,14 +424,14 @@ rota_('desafioQuadro', PROF, false, u => {
     const mats = all_('Matriculas').filter(m => m.turmaId === tu.id && m.status === 'aprovado');
     const alunos = mats.map(m => get_('Usuarios', m.alunoId)).filter(al => al && al.perfil === 'aluno' && al.status === 'ativo').sort((a, b) => (a.nome < b.nome ? -1 : 1));
     return { id: tu.id, nome: tu.nome, serie: tu.serie || '',
-      provas: provas.map(a => ({ id: a.id, dia: a.desafio.dia, extra: !!a.desafio.extra, encerrada: a.encerramento < t, encerramento: a.encerramento, notaMax: notaMax_(a) })),
+      provas: provas.map(a => ({ id: a.id, dia: a.desafio.dia, extra: !!a.desafio.extra, encerrada: a.encerramento < t, encerramento: a.encerramento, abertura: a.abertura, titulo: a.titulo, notaMax: notaMax_(a) })),
       alunos: alunos.map(al => {
         const m = mats.find(x => x.alunoId === al.id);
-        return { id: al.id, nome: al.nome, ignorar: !!al.faltaIgnorar, avisos: Array.isArray(al.pushSubs) && al.pushSubs.length > 0, provas: provas.map(a => {
+        return { id: al.id, nome: al.nome, responsavel: al.responsavelNome || '', telefone: al.responsavelTelefone || '', ignorar: !!al.faltaIgnorar, avisos: Array.isArray(al.pushSubs) && al.pushSubs.length > 0, provas: provas.map(a => {
           const e = all_('Entregas').find(x => x.atividadeId === a.id && x.alunoId === al.id);
           if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return { s: 'nova' };
           if (!e) return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'aberta' };
-          if (e.status === 'rascunho') return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'fazendo', inicio: e.iniciadoEm || null };
+          if (e.status === 'rascunho') return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'fazendo', inicio: e.iniciadoEm || null, respondidas: (e.respostas || []).filter(r => r !== null && r !== undefined && r !== '').length, total: (a.questoes || []).length };
           return { s: e.status === 'corrigida' ? 'corrigida' : 'enviada', nota: e.nota, notaMax: e.notaMax || notaMax_(a), em: e.enviadoEm, entregaId: e.id, auto: !!e.autoEnviada };
         }) };
       }) };

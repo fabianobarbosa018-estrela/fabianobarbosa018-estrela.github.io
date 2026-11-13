@@ -1620,8 +1620,12 @@ queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;
 ACOES.avisoIr=()=>{fechar();go('a_atividades')};
 /* =================== ATUALIZAÇÕES DO SISTEMA =================== */
 const NOVIDADES=[
+ {v:'2026-11-12c',t:'Quem ainda não fez a prova',p:['professor','admin'],itens:[
+  ['professor','⏳ Nova aba <b>Quem não fez</b>: mostra, em tempo real, quem ainda não começou, quem está fazendo (e quantas respondeu) e quem já entregou a prova de hoje, com a nota.'],
+  ['professor','💬 Botão para avisar a mãe no WhatsApp com mensagem pronta, e 🔔 para avisar os alunos no celular. O número de pendentes aparece no menu e no Início.']]},
  {v:'2026-11-12b',t:'Estudar o assunto',p:['professor','admin','aluno'],itens:[
   ['aluno','📚 Em cada questão da Prova do dia há o botão <b>Estudar o assunto</b>: abre um vídeo explicativo, um texto curto e um exemplo resolvido.'],
+  ['professor','⏳ Nova aba <b>Quem não fez</b>: mostra na hora quem ainda não fez a prova do dia, quem está fazendo (e quantas questões já respondeu) e quem entregou, com botão para cobrar a mãe no WhatsApp.'],
   ['todos','🎬 82 vídeos escolhidos para os assuntos do 1º ao 9º ano. A Biblioteca também mostra o vídeo e o exemplo.'],
   ['professor','✏️ O professor pode trocar o vídeo de qualquer assunto: abra Estudar o assunto e toque em <b>Trocar vídeo</b>.']]},
  {v:'2026-11-12',t:'Notas, faltas e avisos',p:['professor','admin','aluno'],itens:[
@@ -1729,6 +1733,53 @@ queueMicrotask(()=>{if(typeof provaMostrar!=='function')return;const orig=provaM
 /* Biblioteca: mostra vídeo e exemplo também */
 ACOES.bibLer=async(d,b)=>{await busy(b,async()=>{try{const r=await api('bibliotecaTexto',{disciplina:BIB.disc,assunto:+d.i});
   modal(estudoHtml(r,S.iaTutor?`<button class="btn full" data-a="bibTutor" style="margin-top:12px">🤖 Tirar dúvidas com o Tutor IA</button>`:''))}catch(e){toast(e.message)}})};
+/* =================== QUEM AINDA NÃO FEZ A PROVA =================== */
+['professor','admin'].forEach(p=>{const i=MENUS[p].findIndex(m=>m[0]==='p_faltas');MENUS[p].splice(i,0,['p_pendentes','⏳','Quem não fez'])});
+const PEND={dia:null,q:null};
+function pendHoje(){return new Date(Date.now()-3*3600e3).toISOString().slice(0,10)}
+function pendHora(ms){return new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+function pendDias(q){const s=new Set();q.turmas.forEach(tu=>tu.provas.forEach(p=>s.add(p.dia)));return [...s].sort().reverse()}
+// alunos de um dia, agrupados por situação
+function pendLinhas(q,dia){const out=[];q.turmas.forEach(tu=>{tu.provas.forEach((p,j)=>{if(p.dia!==dia)return;tu.alunos.forEach(al=>{const c=al.provas[j];if(!c||c.s==='nova')return;out.push({tu,p,al,c})})})});return out}
+function pendMsgMae(al,p){const mae=al.responsavel?ftPrimeiro(al.responsavel):'';const n=ftPrimeiro(al.nome);
+  return `Olá${mae?', '+mae:''}! Tudo bem? 😊\n\nAqui é da Sala Digital. ${n} ainda não fez a Prova do dia de hoje. Ela fica aberta até as ${pendHora(p.encerramento)} e leva pouco tempo.\n\nPode lembrar ${n} de entrar e fazer? Obrigado!`}
+VIEWS.p_pendentes=async function(){
+  const q=await api('desafioQuadro');PEND.q=q;const dias=pendDias(q);
+  if(!dias.length)return `<div class="ph"><div><h1>⏳ Quem não fez a prova</h1></div></div><div class="info">Ainda não há Prova do dia liberada.</div>`;
+  const dia=PEND.dia&&dias.indexOf(PEND.dia)>=0?PEND.dia:dias[0];PEND.dia=dia;
+  const L=pendLinhas(q,dia).filter(x=>!x.al.ignorar);
+  const naoFez=L.filter(x=>x.c.s==='aberta'||x.c.s==='faltou'),fazendo=L.filter(x=>x.c.s==='fazendo'),fez=L.filter(x=>x.c.s==='corrigida'||x.c.s==='enviada'),extra=L.filter(x=>x.c.s==='extra');
+  const aberta=L.some(x=>!x.p.encerrada);const fecha=L.length?Math.max(...L.map(x=>x.p.encerramento)):0;
+  if(dia===pendHoje())S.badge.p_pendentes=aberta?naoFez.length+fazendo.length:0;
+  const linha=(x,extraHtml)=>`<div class="it"><div class="ic">🎒</div><div class="mid"><div class="t">${esc(x.al.nome)}${x.al.avisos?' <span title="Avisos no celular ativados">🔔</span>':''}</div><div class="s">${esc(x.tu.nome)}${x.al.responsavel?' · mãe/resp.: '+esc(ftPrimeiro(x.al.responsavel)):''}</div></div><div class="end">${extraHtml}</div></div>`;
+  const idx=x=>L.indexOf(x);
+  return `<div class="ph"><div><h1>⏳ Quem não fez a prova</h1><p>Situação de cada aluno na Prova do dia</p></div></div>
+  <div class="ft-tabs" style="margin-bottom:12px">${dias.slice(0,7).map(d=>`<a href="#" data-a="pendDia" data-d="${d}" style="${d===dia?'background:var(--pri);color:#fff':''}">${d===pendHoje()?'Hoje':esc(ftDia(d))}</a>`).join('')}</div>
+  <div class="grid g3" style="margin-bottom:14px">
+    <div class="stat"><b style="color:#dc2626">${naoFez.length}</b><span>${aberta?'⏳ ainda não fizeram':'✘ não fizeram'}</span></div>
+    <div class="stat"><b style="color:#b45309">${fazendo.length}</b><span>✍️ fazendo agora</span></div>
+    <div class="stat"><b style="color:#15803d">${fez.length}</b><span>✅ entregaram</span></div></div>
+  ${aberta?`<div class="note">🕐 A prova está aberta até as <b>${pendHora(fecha)}</b>. Ainda dá tempo de cobrar quem não fez.</div>`:`<div class="info">🔒 Prova encerrada. Quem não fez ficou com falta (veja em <a href="#" data-go="p_faltas">Notas e faltas</a> a mensagem para a mãe).</div>`}
+  <div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 10px">${aberta?'⏳ Ainda não fizeram':'✘ Não fizeram'} (${naoFez.length})</h3>
+    ${naoFez.length?`<div class="list">${naoFez.map(x=>linha(x,aberta?`<button class="btn sm" data-a="pendMae" data-i="${idx(x)}" style="background:#25d366;color:#fff;border-color:#25d366">💬 Cobrar</button>`:'<span class="pill pendente">falta</span>')).join('')}</div>`:(fazendo.length?'<p class="muted" style="margin:0">Todos já começaram. Veja abaixo quem ainda está fazendo.</p>':'<p class="muted" style="margin:0">🎉 Todo mundo já fez!</p>')}
+    ${aberta&&naoFez.length+fazendo.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" data-a="pushAvisarAgora">🔔 Avisar no celular quem não fez</button><button class="btn" data-a="pendCopiar">📋 Copiar lista</button></div>`:''}</div>
+  ${fazendo.length?`<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 10px">✍️ Fazendo agora (${fazendo.length})</h3><div class="list">${fazendo.map(x=>linha(x,`<span class="small"><b>${x.c.respondidas||0}</b> de ${x.c.total||'?'} respondidas</span>${aberta?` <button class="btn sm" data-a="pendMae" data-i="${idx(x)}" style="background:#25d366;color:#fff;border-color:#25d366">💬</button>`:''}`)).join('')}</div></div>`:''}
+  <div class="card"><h3 style="margin:0 0 10px">✅ Entregaram (${fez.length})</h3>${fez.length?`<div class="list">${fez.sort((a,b)=>(a.c.em||0)-(b.c.em||0)).map(x=>linha(x,`<b style="color:#15803d;font-size:16px">${nota(x.c.nota,x.c.notaMax)}</b><div class="small muted">às ${pendHora(x.c.em)}${x.c.auto?' ⏱':''}</div>`)).join('')}</div>`:'<p class="muted" style="margin:0">Ninguém entregou ainda.</p>'}</div>
+  ${extra.length?`<p class="small muted" style="margin-top:10px">Prova extra (não obrigatória): ${extra.length} aluno(s) não fizeram.</p>`:''}`;
+};
+ACOES.pendDia=(d,b,ev)=>{if(ev)ev.preventDefault();PEND.dia=d.d;go('p_pendentes')};
+ACOES.pendMae=(d)=>{const x=pendLinhas(PEND.q,PEND.dia).filter(y=>!y.al.ignorar)[+d.i];if(!x)return;const txt=pendMsgMae(x.al,x.p);
+  let n=String(x.al.telefone||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(txt)}`,'_blank');if(!x.al.telefone)toast('Escolha a conversa da mãe no WhatsApp.')};
+ACOES.pendCopiar=async()=>{const L=pendLinhas(PEND.q,PEND.dia).filter(y=>!y.al.ignorar&&(y.c.s==='aberta'||y.c.s==='fazendo'));
+  const txt=`⏳ Ainda não fizeram a Prova do dia (${PEND.dia===pendHoje()?'hoje':ftDia(PEND.dia)}):\n`+L.map(y=>`• ${y.al.nome}${y.c.s==='fazendo'?` (começou: ${y.c.respondidas||0} de ${y.c.total} respondidas)`:''}`).join('\n')+(L.length?`\n\nA prova fica aberta até as ${pendHora(L[0].p.encerramento)}.`:'');
+  toast(await ftCopiar(txt)?'Lista copiada!':'Não deu para copiar.')};
+/* aviso no Início do professor: quantos ainda não fizeram hoje */
+queueMicrotask(()=>{['p_inicio','ad_inicio'].forEach(v=>{const orig=VIEWS[v];if(!orig)return;VIEWS[v]=async function(p){
+  const [r,q]=await Promise.all([orig(p),api('desafioQuadro').catch(()=>null)]);if(!q)return r;const hoje=pendHoje();
+  const L=pendLinhas(q,hoje).filter(x=>!x.al.ignorar&&!x.p.encerrada);const n=L.filter(x=>x.c.s==='aberta'||x.c.s==='fazendo').length;S.badge.p_pendentes=n;
+  if(!L.length)return r;const h=typeof r==='string'?r:r.html;
+  const faixa=`<div class="note" style="cursor:pointer" data-go="p_pendentes">${n?`⏳ <b>${n} aluno${n>1?'s':''} ainda não ${n>1?'fizeram':'fez'}</b> a Prova do dia de hoje. Toque para ver quem é e cobrar.`:'✅ <b>Todos os alunos já fizeram</b> a Prova do dia de hoje.'}</div>`;
+  const fin=h.replace(/(<div class="ph">[\s\S]*?<\/div><\/div>)/,m=>m+faixa);return typeof r==='string'?fin:Object.assign({},r,{html:fin})}})});
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
