@@ -2077,14 +2077,16 @@ async function servPorGrupos(fn, arg) {
   try { for (const g of ['diaria', 'outros']) { UI.servGrupo = g; await fn(arg, true); } }
   finally { UI.servGrupo = g0; }
 }
-async function servPDF(paraImprimir, unico) {
-  if (UI.servAmbos && !unico) return servPorGrupos(servPDF, paraImprimir);
-  try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
-  catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
-  const m = servModelo(UI.servMes);
-  if (!m.ativos.length) return toast('Nada para exportar.');
+async function servPDFLibs() {
+  try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); return true; }
+  catch (e) { modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); return false; }
+}
+function servPDFNovo() {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  return new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+}
+/* Desenha uma planilha de serviços numa página (ou na página atual do mesmo PDF) */
+async function servPDFDesenhar(doc, m) {
   const n = m.ativos.length, fs = n > 8 ? 5.5 : 6.5, nc = n + 2;
   const cor = i => SERV_PAL[i % SERV_PAL.length];
   const dd2 = dd => String(dd).padStart(2, '0');
@@ -2132,6 +2134,25 @@ async function servPDF(paraImprimir, unico) {
     columnStyles: { 0: { cellWidth: 34, halign: 'left' }, [nc - 1]: { cellWidth: 24 } },
     tableLineColor: [0, 0, 0], tableLineWidth: 0.4
   });
+}
+/* Um PDF só com os dois grupos, uma planilha por página */
+async function servPDFAmbos(paraImprimir) {
+  if (!await servPDFLibs()) return;
+  const g0 = UI.servGrupo, ms = [];
+  try { for (const g of ['diaria', 'outros']) { UI.servGrupo = g; const m = servModelo(UI.servMes); if (m.ativos.length) ms.push(m); } }
+  finally { UI.servGrupo = g0; }
+  if (!ms.length) return toast('Nada para exportar.');
+  const doc = servPDFNovo();
+  for (let i = 0; i < ms.length; i++) { if (i) doc.addPage(); await servPDFDesenhar(doc, ms[i]); }
+  await salvarArquivo('servicos-prestados-' + ms[0].mes + '-diaristas-e-mensais' + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
+}
+async function servPDF(paraImprimir) {
+  if (UI.servAmbos) return servPDFAmbos(paraImprimir);
+  if (!await servPDFLibs()) return;
+  const m = servModelo(UI.servMes);
+  if (!m.ativos.length) return toast('Nada para exportar.');
+  const doc = servPDFNovo();
+  await servPDFDesenhar(doc, m);
   await salvarArquivo('servicos-prestados-' + m.mes + '-' + m.P.arq + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
 }
 
