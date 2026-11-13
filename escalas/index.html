@@ -2530,7 +2530,12 @@ function vPainel() {
   const ativos = S.funcionarios.filter(f => f.ativo), inat = S.funcionarios.length - ativos.length;
   const escA = S.escalas[sem];
   const hojeC = contagemSemana(sem, '')[C.diaSemana(hoje)];
-  const trabHoje = hojeC.trab.length, folgHoje = hojeC.folg.length;
+  // afastados hoje (atestado, afastamento, falta): vêm dos ajustes do VT do mês; quem está afastado não conta como trabalhando
+  const TIPOS_AFAST = { atestado: 'Atestado', afast: 'Afastado', faltaJ: 'Falta justificada', falta: 'Falta' };
+  const ajHoje = (vtDoc(hoje.slice(0, 7)).ajustes) || {};
+  const afastados = ativos.map(f => { const a = (ajHoje[f.id] || {})[hoje]; return a && TIPOS_AFAST[a.t] ? { nome: f.nome, tipo: TIPOS_AFAST[a.t] } : null; }).filter(Boolean);
+  const nomesAfast = afastados.map(a => a.nome);
+  const trabHoje = hojeC.trab.filter(n => !nomesAfast.includes(n)).length, folgHoje = hojeC.folg.length;
   const diaHoje = C.DIAS[C.diaSemana(hoje)].toLowerCase();
   const sp = servProximo(), vp = vtProximo();
   const finV = r => `<div class="fin-v">${r.estado === 'ok' ? 'R$ ' + servMoeda(r.valor) : r.estado === 'nc' ? 'Não calculado' : 'Nada pendente'}</div>`;
@@ -2555,6 +2560,7 @@ function vPainel() {
     <a class="pm-kpi c-gold kpi-link" href="#painel" data-act="verHoje" data-tipo="folg"><div class="pm-ico">${ic('calendar')}</div><div class="pm-kt"><div class="l">De folga hoje</div><div class="n">${escA ? folgHoje : '—'}</div><div class="x">${escA ? diaHoje : 'sem escala nesta semana'}</div></div>${ring(escA ? pct(folgHoje, ativos.length) : 0, 'r-gold')}</a>
   </div>
   ${escA ? `<div class="pm-card mt"><div class="pm-ct">Quem está de folga hoje · <span>${diaHoje}</span></div><div class="pm-chips">${folgNomes.length ? folgNomes.map((n, i) => `<span class="pm-chip"><span class="pm-av ${i % 2 ? 'av-s' : 'av-t'}">${esc(ini(n))}</span>${esc(n)}</span>`).join('') : '<p class="pm-muted">Ninguém de folga hoje.</p>'}</div></div>` : ''}
+  ${afastados.length ? `<div class="pm-card mt"><div class="pm-ct">Afastados hoje · <span>${diaHoje}</span></div><div class="pm-chips">${afastados.map((a, i) => `<span class="pm-chip"><span class="pm-av ${i % 2 ? 'av-s' : 'av-t'}">${esc(ini(a.nome))}</span>${esc(a.nome)} <span class="pm-muted">· ${esc(a.tipo)}</span></span>`).join('')}</div></div>` : ''}
   <a class="pm-card pm-situ mt kpi-link" href="#mensal" data-act="irSemana" data-sem="${sem}"><div class="pm-situ-t"><span class="pm-ct">Situação da escala desta semana</span>${sitTxt}</div><div class="pm-muted">${semanaLabel(sem)} · toque para abrir</div><span class="pm-chev">›</span></a>
 
   <h3 class="secao"><span class="pm-gold">Financeiro</span> · próximo pagamento</h3>
