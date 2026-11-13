@@ -283,6 +283,7 @@ function alvo_(a, alunoId, minhas) {
   const ts = (a.turmas || []).filter(t => minhas.indexOf(t) >= 0);
   if (!ts.length) return false;
   if (a.alunos && a.alunos.length) return a.alunos.indexOf(alunoId) >= 0;
+  if (typeof reforcoExclui_ === 'function' && reforcoExclui_(a, alunoId)) return false;
   return true;
 }
 function alunosAlvo_(a) {
@@ -290,6 +291,7 @@ function alunosAlvo_(a) {
   let ids = all_('Matriculas').filter(m => ts.indexOf(m.turmaId) >= 0 && m.status === 'aprovado').map(m => m.alunoId);
   ids = ids.filter((x, i) => ids.indexOf(x) === i);
   if (a.alunos && a.alunos.length) ids = ids.filter(x => a.alunos.indexOf(x) >= 0);
+  else if (typeof reforcoExclui_ === 'function' && a.tipo === 'desafio') ids = ids.filter(x => !reforcoExclui_(a, x));
   return ids.filter(id => get_('Usuarios', id));
 }
 function notaMax_(a) { return (a.questoes || []).reduce((s, q) => s + (Number(q.pontos) || 0), 0); }
@@ -704,7 +706,7 @@ rota_('relatorioTurma', PROF, false, (u, d) => {
   const linhas = alunos.map(al => {
     let soma = 0, max = 0;
     const cel = ativs.map(a => {
-      const alvo = !(a.alunos && a.alunos.length) || a.alunos.indexOf(al.id) >= 0;
+      const alvo = (!(a.alunos && a.alunos.length) || a.alunos.indexOf(al.id) >= 0) && !(typeof reforcoExclui_ === 'function' && reforcoExclui_(a, al.id));
       if (!alvo) return { s: 'na' };
       const e = entregaDe_(a.id, al.id);
       if (e && e.status === 'corrigida') { soma += e.nota; max += e.notaMax; return { s: 'corrigida', n: e.nota, m: e.notaMax }; }
@@ -1308,7 +1310,8 @@ function desafioEstado_(dia) {
 /* ---- rotas ---- */
 function desafioVisao_(a, u, t) {
   const e = entregaDe_(a.id, u.id);
-  const o = { id: a.id, titulo: a.titulo, nivel: a.desafio.nivel, nivelNome: DESAFIO_NIVEIS[a.desafio.nivel], dia: a.desafio.dia, qtd: (a.questoes || []).length,
+  const discsQ = (a.questoes || []).map(q => q.disciplina).filter((x, i, L) => x && L.indexOf(x) === i);
+  const o = { id: a.id, titulo: a.titulo, nivel: a.desafio.nivel, nivelNome: DESAFIO_NIVEIS[a.desafio.nivel], dia: a.desafio.dia, qtd: (a.questoes || []).length, reforco: !!a.desafio.reforco, discs: discsQ,
     abertura: a.abertura, encerramento: a.encerramento, situacao: situacao_(a, e, t), podeEnviar: podeEnviar_(a, t), rascunho: !!(e && e.status === 'rascunho'),
     respondidas: e ? (e.respostas || []).filter(x => x !== null && x !== undefined && x !== '').length : 0, liberado: !!a.notasLiberadas,
     duracaoMin: Number(a.desafio.duracaoMin) || 0, iniciadoEm: e && e.iniciadoEm || null, fim: provaFim_(a, e && e.status === 'rascunho' ? e : null),
@@ -1444,6 +1447,7 @@ function desafioFaltas_(u) {
   provas.forEach(a => {
     mats.filter(m => (a.turmas || []).indexOf(m.turmaId) >= 0).forEach(m => {
       if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return;       // entrou na turma depois da prova
+      if (!provaPara_(a, m.alunoId)) return;                              // prova individual de outro aluno, ou aluno com reforço
       if (ents[a.id + '|' + m.alunoId]) return;
       const al = get_('Usuarios', m.alunoId); if (!al || al.perfil !== 'aluno' || al.status !== 'ativo') return;
       const x = porAluno[al.id] || (porAluno[al.id] = { alunoId: al.id, nome: al.nome, turma: turmas[m.turmaId].nome, responsavel: al.responsavelNome || '', telefone: al.responsavelTelefone || '',
@@ -1498,12 +1502,13 @@ rota_('desafioQuadro', PROF, false, u => {
     const mats = all_('Matriculas').filter(m => m.turmaId === tu.id && m.status === 'aprovado');
     const alunos = mats.map(m => get_('Usuarios', m.alunoId)).filter(al => al && al.perfil === 'aluno' && al.status === 'ativo').sort((a, b) => (a.nome < b.nome ? -1 : 1));
     return { id: tu.id, nome: tu.nome, serie: tu.serie || '',
-      provas: provas.map(a => ({ id: a.id, dia: a.desafio.dia, extra: !!a.desafio.extra, encerrada: a.encerramento < t, encerramento: a.encerramento, abertura: a.abertura, titulo: a.titulo, notaMax: notaMax_(a) })),
+      provas: provas.map(a => ({ id: a.id, dia: a.desafio.dia, extra: !!a.desafio.extra, reforco: a.desafio.reforco ? nomeU_(a.desafio.alunoId) : '', encerrada: a.encerramento < t, encerramento: a.encerramento, abertura: a.abertura, titulo: a.titulo, notaMax: notaMax_(a) })),
       alunos: alunos.map(al => {
         const m = mats.find(x => x.alunoId === al.id);
         return { id: al.id, nome: al.nome, responsavel: al.responsavelNome || '', telefone: al.responsavelTelefone || '', ignorar: !!al.faltaIgnorar, avisos: Array.isArray(al.pushSubs) && al.pushSubs.length > 0, provas: provas.map(a => {
           const e = all_('Entregas').find(x => x.atividadeId === a.id && x.alunoId === al.id);
           if ((m.decididoEm || m.criadoEm || 0) > a.encerramento) return { s: 'nova' };
+          if (!provaPara_(a, al.id)) return { s: 'na' };
           if (!e) return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'aberta' };
           if (e.status === 'rascunho') return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'fazendo', inicio: e.iniciadoEm || null, respondidas: (e.respostas || []).filter(r => r !== null && r !== undefined && r !== '').length, total: (a.questoes || []).length };
           return { s: e.status === 'corrigida' ? 'corrigida' : 'enviada', nota: e.nota, notaMax: e.notaMax || notaMax_(a), em: e.enviadoEm, entregaId: e.id, auto: !!e.autoEnviada };
@@ -1598,6 +1603,105 @@ rota_('estudoVideoSalvar', PROF, true, (u, d) => {
   if (m) v[chave] = m[1]; else delete v[chave];
   PROPS().setProperty('VIDEOS_ASSUNTO', JSON.stringify(v)); return { ok: true, video: m ? m[1] : '' };
 });
+
+// ================== PLANO DE REFORÇO (prova e atividade só com as matérias/assuntos escolhidos para o aluno) ==================
+// O aluno com reforço ativo deixa de receber a Prova do dia geral e passa a ter, todo dia, uma prova individual
+// e uma atividade individual montadas só com os assuntos escolhidos pelo professor.
+const REFORCO_DISC = ['Português', 'Matemática', 'História', 'Geografia', 'Educação Física', 'Física', 'Química', 'Biologia'];
+function reforcoDe_(al) { const r = al && al.reforco; return r && r.ativo ? r : null; }
+// esta prova geral do dia NÃO é para este aluno (ele tem reforço)?
+function reforcoExclui_(a, alunoId) {
+  if (!a || a.tipo !== 'desafio' || !a.desafio || a.desafio.reforco || (a.alunos && a.alunos.length)) return false;
+  const r = reforcoDe_(get_('Usuarios', alunoId)); return !!(r && a.desafio.dia >= (r.desde || ''));
+}
+function provaPara_(a, alunoId) { return (!(a.alunos && a.alunos.length) || a.alunos.indexOf(alunoId) >= 0) && !reforcoExclui_(a, alunoId); }
+function reforcoResumo_(al) {
+  const r = al.reforco || {};
+  return { ativo: !!r.ativo, discs: r.discs || {}, nProva: r.nProva || 20, nAtiv: r.nAtiv || 10, atividade: r.atividade !== false, desde: r.desde || '' };
+}
+rota_('reforcoListar', PROF, false, u => {
+  const adm = u.perfil === 'admin';
+  const turmas = all_('Turmas').filter(x => !x.arquivada && (adm || x.professorId === u.id));
+  const vistos = {}; const L = [];
+  turmas.forEach(tu => all_('Matriculas').filter(m => m.turmaId === tu.id && m.status === 'aprovado').forEach(m => {
+    if (vistos[m.alunoId]) return; const al = get_('Usuarios', m.alunoId); if (!al || al.perfil !== 'aluno' || al.status !== 'ativo') return;
+    vistos[al.id] = 1; L.push({ id: al.id, nome: al.nome, turma: tu.nome, serie: tu.serie || '', nivel: turmaNivel_(tu), reforco: reforcoResumo_(al) });
+  }));
+  L.sort((a, b) => (a.nome < b.nome ? -1 : 1));
+  return { alunos: L, disciplinas: REFORCO_DISC };
+});
+rota_('reforcoSalvar', PROF, true, (u, d) => {
+  const al = alunoDoProf_(u, d.alunoId);
+  const discs = {}; let nAss = 0;
+  Object.keys(d.discs || {}).forEach(k => {
+    if (REFORCO_DISC.indexOf(k) < 0) return;
+    const L = (Array.isArray(d.discs[k]) ? d.discs[k] : []).map(x => txt_(x, 120)).filter(Boolean).slice(0, 30);
+    discs[k] = L.filter((x, i) => L.indexOf(x) === i); nAss += discs[k].length;
+  });
+  const ativo = !!d.ativo;
+  if (ativo && !Object.keys(discs).length) erro_('Escolha pelo menos uma matéria.');
+  if (ativo && !nAss) erro_('Escolha pelo menos um assunto.');
+  const antes = al.reforco || {};
+  const hoje = diaLocal_(agora_());
+  al.reforco = { ativo: ativo, discs: discs, nProva: Math.max(6, Math.min(50, Math.round(Number(d.nProva) || 20))), nAtiv: Math.max(4, Math.min(30, Math.round(Number(d.nAtiv) || 10))),
+    atividade: d.atividade !== false, desde: ativo ? (antes.ativo ? (antes.desde || hoje) : hoje) : '', uso: antes.uso || {}, atualizadoEm: agora_(), por: u.id };
+  upd_('Usuarios', al);
+  // monta já a prova e a atividade de hoje
+  return ativo ? { __desafio: { reforco: true }, ok: true } : { ok: true };
+});
+// alunos que precisam de prova/atividade de reforço hoje
+function reforcoEstado_(dia) {
+  const t = agora_(); const ds = diaSemana_(dia); const out = [];
+  all_('Usuarios').filter(al => al.perfil === 'aluno' && al.status === 'ativo' && reforcoDe_(al)).forEach(al => {
+    const r = al.reforco;
+    const mats = all_('Matriculas').filter(m => m.alunoId === al.id && m.status === 'aprovado').map(m => get_('Turmas', m.turmaId)).filter(tu => tu && !tu.arquivada);
+    if (!mats.length) return;
+    const tu = mats[0]; const cf = desafioCfgProf_(tu.professorId);
+    if (!cf.ativo || cf.diasSemana.indexOf(ds) < 0) return;
+    const turmas = mats.filter(x => x.professorId === tu.professorId).map(x => x.id);
+    const meus = all_('Atividades').filter(a => a.reforco && a.reforco.alunoId === al.id && a.reforco.dia === dia);
+    const precisaProva = !meus.some(a => a.tipo === 'desafio');
+    const precisaAtiv = r.atividade !== false && !meus.some(a => a.tipo !== 'desafio');
+    if (!precisaProva && !precisaAtiv) return;
+    out.push({ alunoId: al.id, nome: al.nome, professorId: tu.professorId, turmas: turmas, nivel: turmaNivel_(tu), discs: r.discs, nProva: r.nProva || 20, nAtiv: r.nAtiv || 10,
+      uso: r.uso || {}, precisaProva: precisaProva, precisaAtiv: precisaAtiv });
+  });
+  return { dia: dia, alunos: out };
+}
+function reforcoCriar_(x) {
+  const al = get_('Usuarios', x.alunoId); const r = reforcoDe_(al); if (!r) return 0;
+  const dia = x.dia; const est = reforcoEstado_(dia).alunos.find(y => y.alunoId === al.id); if (!est) return 0;
+  const cf = desafioCfgProf_(est.professorId); const pz = desafioPrazo_(dia, cf);
+  const discs = Object.keys(r.discs).join(' e ');
+  const prepara = qs => limpaQuestoes_(qs).map((q, i) => { q.disciplina = txt_(qs[i].disciplina, 40); if (qs[i].assunto) q.assunto = txt_(qs[i].assunto, 120); return q; });
+  let n = 0;
+  if (est.precisaProva && Array.isArray(x.prova) && x.prova.length) {
+    const qs = prepara(x.prova);
+    ins_('Atividades', { id: uid_('a'), professorId: est.professorId, titulo: 'Prova do dia — ' + dataBR_(dia) + ' · Reforço: ' + discs,
+      tipo: 'desafio', disciplina: discs.length > 40 ? 'Reforço' : discs,
+      instrucoes: 'Prova de reforço feita só para você, com ' + qs.length + ' questões de ' + discs + '. Se tiver dúvida, toque em "📚 Estudar o assunto" na questão. Responda tudo e clique em FINALIZAR E ENVIAR PROVA antes do horário limite.',
+      turmas: est.turmas.slice(), alunos: [al.id], abertura: pz.abertura, encerramento: pz.encerramento, aceitaAtraso: false,
+      questoes: qs, status: 'publicada', notasLiberadas: false, criadoEm: agora_(), atualizadoEm: agora_(), reforco: { alunoId: al.id, dia: dia },
+      desafio: { dia: dia, nivel: est.nivel, origem: 'banco', liberar: cf.liberar, duracaoMin: cf.duracaoMin, reforco: true, alunoId: al.id } });
+    n++;
+  }
+  if (est.precisaAtiv && Array.isArray(x.ativ) && x.ativ.length) {
+    const qs = prepara(x.ativ);
+    ins_('Atividades', { id: uid_('a'), professorId: est.professorId, titulo: 'Atividade de reforço — ' + dataBR_(dia) + ' · ' + discs, tipo: 'exercicio', disciplina: discs.length > 60 ? 'Reforço' : discs,
+      instrucoes: 'Atividade para treinar ' + discs + '. Use o botão "📚 Estudar o assunto" sempre que tiver dúvida. A nota aparece assim que você enviar.',
+      turmas: est.turmas.slice(), alunos: [al.id], abertura: pz.abertura, encerramento: tsLocal_(dia, '23:00', 1), aceitaAtraso: true,
+      questoes: qs, status: 'publicada', notasLiberadas: true, criadoEm: agora_(), atualizadoEm: agora_(), reforco: { alunoId: al.id, dia: dia } });
+    n++;
+  }
+  if (n) {
+    const uso = Object.assign({}, r.uso || {}); (x.usados || []).forEach(h => { uso[String(h).slice(0, 20)] = dia; });
+    const limite = diaLocal_(agora_() - 90 * 864e5); Object.keys(uso).forEach(k => { if (uso[k] < limite) delete uso[k]; });
+    al.reforco.uso = uso; upd_('Usuarios', al);
+  }
+  return n;
+}
+DESAFIO_SIS.reforcoEstado = a => reforcoEstado_(a.dia);
+DESAFIO_SIS.reforcoCriar = x => reforcoCriar_(x);
 
   function preparar(dados) {
     _cache = {}; _ops = []; _upl = []; _rm = []; _rpc = []; _kv = {};

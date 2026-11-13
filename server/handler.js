@@ -18,6 +18,8 @@ export function criarServidor(io) {
     if (b.acao === 'desafioCron') return desafioCron(b, dados);
     if (ACOES_DESAFIO.indexOf(b.acao) >= 0) {   // garante que ninguém fica sem o desafio do dia (reserva do banco)
       try { if (await desafioReserva(dados)) dados = await io.carregar(); } catch (e) { if (typeof console !== 'undefined') console.error('desafio reserva', String(e && e.message || e)); }
+      try { const re = N.sistema(dados, 'reforcoEstado', { dia: N.sistema(dados, 'dia').resultado }).resultado; if (re && re.alunos.length && (await reforcoPreparar()).length) dados = await io.carregar(); }
+      catch (e) { if (typeof console !== 'undefined') console.error('reforco reserva', String(e && e.message || e)); }
     }
     const x = N.executar(dados, String(b.token || ''), String(b.acao || ''), b.d || {});
     let resp = x.resposta;
@@ -34,6 +36,7 @@ export function criarServidor(io) {
       if (resp.d && resp.d.__assinar) resp = { ok: true, d: await io.assinar(resp.d.__assinar) };
       else if (resp.d && resp.d.__ia) resp = await executarIA(resp.d.__ia);
       else if (resp.d && resp.d.__banco) resp = await executarBanco(resp.d.__banco);
+      else if (resp.d && resp.d.__desafio && resp.d.__desafio.reforco) { let feitos = []; try { feitos = await reforcoPreparar(); } catch (e) { if (typeof console !== 'undefined') console.error('reforco', String(e && e.message || e)); } resp = { ok: true, d: { ok: true, criados: feitos } }; }
       else if (resp.d && resp.d.__desafio) resp = { ok: true, d: await desafioPreparar({ usarIA: true }) };
       else if (resp.d && resp.d.__push) resp = await executarPush(resp.d.__push);
       if (b.acao === 'desafioPainel' && resp.ok) resp.d.iaChave = !!(io.chaveGemini || io.chaveIA);
@@ -461,6 +464,59 @@ const COTAS_20 = { 'Português': 4, 'Matemática': 12, 'História': 2, 'Geografi
     }
     return { preparados: out };
   }
+  // ---- Plano de reforço: prova e atividade individuais, só com os assuntos escolhidos ----
+  // divide n entre as matérias; em cada matéria alterna os assuntos e prefere as questões usadas há mais tempo
+  function montarReforco(B, cfg, n, comDisc, usadas, uso) {
+    const discs = Object.keys(cfg.discs || {}).filter(d => (cfg.discs[d] || []).length);
+    if (!discs.length) return [];
+    const base = Math.floor(n / discs.length); let sobra = n - base * discs.length;
+    const out = [];
+    discs.forEach(disc => {
+      const quer = base + (sobra-- > 0 ? 1 : 0); if (quer <= 0) return;
+      const D = B.disciplinas.find(x => DISC_BANCO[x.id] === disc); if (!D) return;
+      const nomes = cfg.discs[disc].map(normTxt);
+      const asss = D.assuntos.filter(a => nomes.indexOf(normTxt(a.a)) >= 0);
+      if (!asss.length) return;
+      const filas = asss.map(a => ({ a: a, qs: embaralhar(a.q.slice()).map(q => ({ q: q, h: hashQ(q[2]) })).filter(c => !usadas.has(c.h))
+        .sort((x, y) => ((uso[x.h] || '') < (uso[y.h] || '') ? -1 : (uso[x.h] || '') > (uso[y.h] || '') ? 1 : 0)) }));
+      const nd = comDisc && quer >= 4 ? 1 : 0;
+      const pega = (filtro, k) => {
+        const sel = []; let i = 0, vazias = 0;
+        while (sel.length < k && vazias < filas.length) {
+          const f = filas[i++ % filas.length]; const j = f.qs.findIndex(c => filtro(c.q));
+          if (j < 0) { vazias++; continue; } vazias = 0;
+          const c = f.qs.splice(j, 1)[0]; usadas.add(c.h); sel.push({ c: c, a: f.a });
+        }
+        return sel;
+      };
+      const objs = pega(q => q[0] !== 'd', quer - nd); const dis = nd ? pega(q => q[0] === 'd', nd) : [];
+      // se faltar objetiva, completa com discursiva (e vice-versa)
+      const falta = quer - objs.length - dis.length; const extra = falta > 0 ? pega(() => true, falta) : [];
+      objs.concat(extra, dis).forEach(x => { const q = converter(x.c.q, x.a); delete q.dificuldade; q.disciplina = disc; q.assunto = x.a.a; q._h = x.c.h; out.push(q); });
+    });
+    const ordemT = { mc: 0, vf: 1, disc: 2 };
+    out.sort((x, y) => (discs.indexOf(x.disciplina) - discs.indexOf(y.disciplina)) || (ordemT[x.tipo] - ordemT[y.tipo]));
+    return out;
+  }
+  async function reforcoPreparar() {
+    let dados = await io.carregar();
+    const dia = N.sistema(dados, 'dia').resultado;
+    const est = N.sistema(dados, 'reforcoEstado', { dia: dia }).resultado;
+    if (!est || !est.alunos.length) return [];
+    const chave = N.sistema(dados, 'bancoChave').resultado; if (!chave) return [];
+    const B = await abrirBanco(chave); const feitos = [];
+    for (const al of est.alunos) {
+      const usadas = new Set(); const uso = al.uso || {};
+      const prova = al.precisaProva ? montarReforco(B, al, al.nProva, true, usadas, uso) : [];
+      const ativ = al.precisaAtiv ? montarReforco(B, al, al.nAtiv, false, usadas, uso) : [];
+      const hs = prova.concat(ativ).map(q => q._h); prova.concat(ativ).forEach(q => { delete q._h; });
+      if (!prova.length && !ativ.length) continue;
+      dados = await io.carregar();
+      const x = N.sistema(dados, 'reforcoCriar', { dia: dia, alunoId: al.alunoId, prova: prova, ativ: ativ, usados: hs }); await gravar(x);
+      feitos.push({ aluno: al.nome, prova: prova.length, atividade: ativ.length });
+    }
+    return feitos;
+  }
   // reserva imediata: se já passou do horário de abertura e o desafio de algum nível não existe, monta com o banco
   async function desafioReserva(dados) {
     const t = Date.now();
@@ -544,10 +600,12 @@ const COTAS_20 = { 'Português': 4, 'Matemática': 12, 'História': 2, 'Geografi
       const t = Date.now(); const atrasado = est.pendentes.some(nv => est.abertura[nv] && est.abertura[nv] <= t + 5 * 60e3);
       prep = await desafioPreparar({ usarIA: !atrasado });
     }
+    let reforco = [];
+    try { reforco = await reforcoPreparar(); } catch (e) { if (typeof console !== 'undefined') console.error('reforco cron', String(e && e.message || e)); }
     let avisos = null;
     try { dados = await io.carregar(); const pp = N.sistema(dados, 'pushPendentes'); await gravar(pp); if (pp.resultado && pp.resultado.length) avisos = await enviarPushes(pp.resultado); }
     catch (e) { if (typeof console !== 'undefined') console.error('push cron', String(e && e.message || e)); }
-    return { ok: true, d: { manutencao: m.resultado, dia: est.dia, preparados: prep.preparados, avisos: avisos } };
+    return { ok: true, d: { manutencao: m.resultado, dia: est.dia, preparados: prep.preparados, reforco: reforco, avisos: avisos } };
   }
   async function instalar() { const x = N.instalar(await io.carregar()); await gravar(x); return x.msgs; }
   return { processar, instalar, nucleo: N, _teste: { cifrarPush, vapidJWT, estudoDoBanco } };

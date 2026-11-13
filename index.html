@@ -281,7 +281,7 @@ main>*:first-child{animation:surgir .35s ease}
 .ft-tabs a{display:inline-block;padding:6px 12px;margin:0 6px 6px 0;border-radius:999px;background:#eef2ff;color:#3730a3;text-decoration:none;font-weight:600;font-size:14px}
 .aviso-prova{border-left:5px solid #f59e0b;animation:avisoBrilho 2.4s ease-in-out infinite}@keyframes avisoBrilho{50%{box-shadow:0 0 0 6px rgba(245,158,11,.18)}}
 .aviso-pulo{display:inline-block;animation:avisoPulo 1.2s ease-in-out infinite}@keyframes avisoPulo{50%{transform:translateY(-8px) rotate(-6deg)}}
-.estudo-linha{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 4px}.estudo-btn{background:#ecfdf5;color:#047857;border-color:#a7f3d0;font-weight:700}
+.rf-ativ{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:2px solid #f59e0b;background:#fffbeb;color:#78350f;border-radius:16px;padding:12px 14px;margin:0 0 14px;cursor:pointer;font:inherit}.rf-ativ .rf-ir{margin-left:auto;font-weight:900;background:#f59e0b;color:#fff;border-radius:999px;padding:6px 12px;white-space:nowrap}.rf-disc{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:8px 0;background:var(--card,#fff)}.rf-disc summary{cursor:pointer;padding:4px 0}.rf-ass{display:grid;gap:4px;margin-top:6px}.rf-op{display:flex;gap:10px;align-items:flex-start;padding:6px 2px;cursor:pointer;line-height:1.3}.rf-op input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--pri)}.estudo-linha{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 4px}.estudo-btn{background:#ecfdf5;color:#047857;border-color:#a7f3d0;font-weight:700}
 .est-sec{font-weight:800;color:var(--pri);margin:12px 0 6px}.est-video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000}.est-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .est-ex{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;margin-top:12px}.est-ex-t{font-weight:800;color:#b45309;margin-bottom:6px}.est-op{margin:6px 0;padding-left:18px}.est-op li.ok{color:#15803d;font-weight:700}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -1139,11 +1139,11 @@ VIEWS.a_atividades=async function(){
     else if(x.enviadoEm){estado=`<div class="pv-est">✅ Prova entregue ${quando(x.enviadoEm)}</div>${x.acertos!==undefined?`<div class="dz-placar"><span class="ok">✔ ${x.acertos} acertos</span><span class="bad">✘ ${x.erros} erros</span>${x.discPendentes?`<span>✍️ ${x.discPendentes} discursiva${x.discPendentes>1?'s':''} em correção</span>`:''}</div>`:''}${x.liberado&&x.nota!==undefined?`<div class="pv-est">Nota: <b>${nota(x.nota,x.notaMax)}</b></div>`:''}`;
       botao=`<button class="btn pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">${x.liberado?'VER RESULTADO E GABARITO':'VER MINHA PROVA'}</button>`}
     else{estado=`<div class="pv-est">⏰ Prova encerrada sem entrega.</div>`;botao=x.liberado?`<button class="btn pv-btn" data-go="a_prova" data-p="${P({id:x.id})}">VER GABARITO</button>`:''}
-    return `<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">${esc(x.nivelNome||'')} · ${x.dia.split('-').reverse().join('/')}</div>
-      <div class="pv-campos"><div><span>Aluno(a)</span><b>${esc(S.u.nome)}</b></div><div><span>Turma</span><b>${esc(tur.nome||'—')}</b></div><div><span>Série</span><b>${esc(tur.serie||'—')}</b></div><div><span>Questões</span><b>${x.qtd} · 8 disciplinas</b></div><div><span>Início</span><b>${quando(x.abertura)}</b></div><div><span>Encerramento</span><b>${quando(x.encerramento)}</b></div></div>
+    return `<div class="pv-folha pv-capa"><div class="pv-tit">PROVA DO DIA</div><div class="pv-sub">${x.reforco?'🎯 Reforço: '+esc((x.discs||[]).join(' e ')):esc(x.nivelNome||'')} · ${x.dia.split('-').reverse().join('/')}</div>
+      <div class="pv-campos"><div><span>Aluno(a)</span><b>${esc(S.u.nome)}</b></div><div><span>Turma</span><b>${esc(tur.nome||'—')}</b></div><div><span>Série</span><b>${esc(tur.serie||'—')}</b></div><div><span>Questões</span><b>${x.qtd} · ${x.reforco&&x.discs&&x.discs.length?esc(x.discs.join(' e ')):(x.discs&&x.discs.length||8)+' disciplinas'}</b></div><div><span>Início</span><b>${quando(x.abertura)}</b></div><div><span>Encerramento</span><b>${quando(x.encerramento)}</b></div></div>
       ${estado}${botao}</div>`}).join('');
   const hist=H.lista.filter(x=>!h.desafios.some(d=>d.id===x.id));
-  return `<div class="ph"><div><h1>📝 Prova do dia</h1><p>Uma prova por dia com 50 questões de todas as disciplinas.</p></div></div>${corpo}
+  return `<div class="ph"><div><h1>📝 Prova do dia</h1><p>${h.desafios.some(x=>x.reforco)?'Sua prova de reforço de hoje, feita só para você.':'Uma prova por dia com 50 questões de todas as disciplinas.'}</p></div></div>${outras.filter(a=>/^Atividade de reforço/.test(a.titulo)&&(a.situacao==='pendente'||a.situacao==='atrasada')).map(a=>`<button class="rf-ativ" data-go="a_fazer" data-p="${P({id:a.id})}"><span style="font-size:28px">🎯</span><span><b>${esc(a.titulo)}</b><br><span class="small">${a.qtd} questões para treinar · a nota sai na hora</span></span><span class="rf-ir">FAZER ▶</span></button>`).join('')}${corpo}
   ${hist.length||H.feitos?`<h3 style="margin:22px 0 8px">📈 Meu histórico</h3><div class="pv-resumo"><span><b>${H.sequencia}🔥</b> dias seguidos</span><span><b>${H.feitos}</b> provas entregues</span><span><b>${H.aproveitamento===null?'—':H.aproveitamento.toLocaleString('pt-BR')+'%'}</b> de acertos</span></div>
    <div class="tbl"><table><tr><th>Data</th><th>Acertos</th><th>Erros</th><th>Nota</th><th></th></tr>${hist.map(x=>`<tr><td>${String(x.dia).split('-').reverse().join('/')}</td><td>${x.acertos??'—'}</td><td>${x.erros??'—'}</td><td>${x.nota!==undefined&&x.nota!==null?nota(x.nota,x.notaMax):x.enviadoEm?'Em correção':'Não entregue'}</td><td>${x.antigo?'':`<button class="btn sm" data-go="a_prova" data-p="${P({id:x.id})}">Ver</button>`}</td></tr>`).join('')}</table></div>`:''}
   <button class="pv-outras" data-go="a_lista">📂 Atividades do professor${outrasPend?` · <b>${outrasPend} pendente${outrasPend>1?'s':''}</b>`:''} →</button>`;
@@ -1542,6 +1542,7 @@ function ftCel(c){
   if(c.s==='fazendo')return '<td class="ft-and">✍️ fazendo</td>';
   if(c.s==='aberta')return '<td class="ft-and">⏳ ainda não fez</td>';
   if(c.s==='extra')return '<td class="muted small" title="Prova extra, não obrigatória">— extra</td>';
+  if(c.s==='na')return '<td class="muted small" title="Esta prova não é para este aluno">·</td>';
   return '<td class="muted small" title="Entrou na turma depois desta prova">—</td>';
 }
 function ftQuadro(q){
@@ -1549,7 +1550,7 @@ function ftQuadro(q){
   return q.turmas.filter(tu=>tu.provas.length&&tu.alunos.length).map(tu=>{
     const ps=tu.provas;const media=al=>{const xs=al.provas.filter(c=>c.notaMax&&(c.s==='corrigida'||c.s==='enviada'));const vs=xs.map(c=>c.nota/c.notaMax);const fz=al.provas.filter(c=>c.s==='faltou').length;return {m:vs.length?nota(vs.reduce((a,b)=>a+b,0)/vs.length,1):'—',fz}};
     return `<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 4px">👥 ${esc(tu.nome)}</h3><p class="small muted" style="margin:0 0 10px">Nota de cada aluno em cada Prova do dia (escala 0–${S.cfg.escalaNota}) e hora em que entregou</p>
-    <div class="tbl ft-tbl"><table><tr><th>Aluno</th>${ps.map(p=>`<th>${esc(ftDia(p.dia).replace(/^(\S{3})\S*/,'$1'))}${p.extra?'<div class="small muted">extra</div>':''}${!p.encerrada?'<div class="small" style="color:#16a34a">aberta</div>':''}</th>`).join('')}<th>Média</th><th>Faltas</th></tr>
+    <div class="tbl ft-tbl"><table><tr><th>Aluno</th>${ps.map(p=>`<th>${esc(ftDia(p.dia).replace(/^(\S{3})\S*/,'$1'))}${p.extra?'<div class="small muted">extra</div>':''}${p.reforco?`<div class="small muted">🎯 ${esc(p.reforco.split(' ')[0])}</div>`:''}${!p.encerrada?'<div class="small" style="color:#16a34a">aberta</div>':''}</th>`).join('')}<th>Média</th><th>Faltas</th></tr>
     ${tu.alunos.map(al=>{const r=media(al);return `<tr${al.ignorar?' style="opacity:.55"':''}><td><b>${esc(al.nome)}</b>${al.avisos?' <span title="Avisos no celular ativados">🔔</span>':''}</td>${al.provas.map(ftCel).join('')}<td><b>${r.m}</b></td><td>${r.fz?`<span style="color:#dc2626;font-weight:700">${r.fz}</span>`:'0'}</td></tr>`}).join('')}</table></div></div>`}).join('');
 }
 function ftLembrete(d){return `Bom dia, turma! ☀️\n\n📝 A Prova do dia de hoje já está liberada na Sala Digital, das ${d.abertura} às ${d.encerramento}.\n\nEntre, faça com calma e clique em FINALIZAR E ENVIAR PROVA. A nota sai na hora!\n\n👉 ${SITE_URL}`}
@@ -1620,6 +1621,10 @@ queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;
 ACOES.avisoIr=()=>{fechar();go('a_atividades')};
 /* =================== ATUALIZAÇÕES DO SISTEMA =================== */
 const NOVIDADES=[
+ {v:'2026-11-12e',t:'Reforço por aluno',p:['professor','admin','aluno'],itens:[
+  ['professor','🎯 Nova aba <b>Reforço</b>: escolha as matérias e os assuntos que cada aluno precisa treinar. Ele passa a receber todo dia uma prova e uma atividade feitas só com esses assuntos.'],
+  ['professor','📚 Novos assuntos no banco: verbos (conjugação), literatura (gêneros e elementos da narrativa), interpretação de crônica, poema e conto, números naturais e frações (leitura, próprias, impróprias, aparentes e equivalentes).'],
+  ['aluno','📚 As atividades também ganharam o botão <b>Estudar o assunto</b> em cada questão.']]},
  {v:'2026-11-12d',t:'Botão Atualizar no topo',p:['professor','admin','aluno'],itens:[
   ['aluno','🔄 Agora tem um botão <b>Atualizar</b> no topo da tela. Se algo parecer estranho ou faltar alguma novidade, é só tocar nele.'],
   ['professor','🔄 Botão <b>Atualizar</b> fixo no topo para professor, administrador e alunos: limpa a versão guardada no aparelho e carrega a mais nova.']]},
@@ -1743,7 +1748,7 @@ function pendHoje(){return new Date(Date.now()-3*3600e3).toISOString().slice(0,1
 function pendHora(ms){return new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
 function pendDias(q){const s=new Set();q.turmas.forEach(tu=>tu.provas.forEach(p=>s.add(p.dia)));return [...s].sort().reverse()}
 // alunos de um dia, agrupados por situação
-function pendLinhas(q,dia){const out=[];q.turmas.forEach(tu=>{tu.provas.forEach((p,j)=>{if(p.dia!==dia)return;tu.alunos.forEach(al=>{const c=al.provas[j];if(!c||c.s==='nova')return;out.push({tu,p,al,c})})})});return out}
+function pendLinhas(q,dia){const out=[];q.turmas.forEach(tu=>{tu.provas.forEach((p,j)=>{if(p.dia!==dia)return;tu.alunos.forEach(al=>{const c=al.provas[j];if(!c||c.s==='nova'||c.s==='na')return;out.push({tu,p,al,c})})})});return out}
 function pendMsgMae(al,p){const mae=al.responsavel?ftPrimeiro(al.responsavel):'';const n=ftPrimeiro(al.nome);
   return `Olá${mae?', '+mae:''}! Tudo bem? 😊\n\nAqui é da Sala Digital. ${n} ainda não fez a Prova do dia de hoje. Ela fica aberta até as ${pendHora(p.encerramento)} e leva pouco tempo.\n\nPode lembrar ${n} de entrar e fazer? Obrigado!`}
 VIEWS.p_pendentes=async function(){
@@ -1783,6 +1788,44 @@ queueMicrotask(()=>{['p_inicio','ad_inicio'].forEach(v=>{const orig=VIEWS[v];if(
   if(!L.length)return r;const h=typeof r==='string'?r:r.html;
   const faixa=`<div class="note" style="cursor:pointer" data-go="p_pendentes">${n?`⏳ <b>${n} aluno${n>1?'s':''} ainda não ${n>1?'fizeram':'fez'}</b> a Prova do dia de hoje. Toque para ver quem é e cobrar.`:'✅ <b>Todos os alunos já fizeram</b> a Prova do dia de hoje.'}</div>`;
   const fin=h.replace(/(<div class="ph">[\s\S]*?<\/div><\/div>)/,m=>m+faixa);return typeof r==='string'?fin:Object.assign({},r,{html:fin})}})});
+/* =================== PLANO DE REFORÇO (prova e atividade só com as matérias escolhidas) =================== */
+const RF={d:null,idx:null};
+['professor','admin'].forEach(p=>{const i=MENUS[p].findIndex(m=>m[0]==='p_faltas');MENUS[p].splice(i+1,0,['p_reforco','🎯','Reforço'])});
+function rfResumo(r){if(!r||!r.ativo)return '<span class="small muted">Prova normal (todas as matérias)</span>';
+  const ds=Object.keys(r.discs||{}).filter(k=>(r.discs[k]||[]).length);
+  return `<span class="pill corrigida">🎯 Reforço ativo</span> <span class="small">${ds.map(k=>`<b>${esc(k)}</b> (${r.discs[k].length} assunto${r.discs[k].length>1?'s':''})`).join(' · ')}</span><div class="small muted" style="margin-top:4px">Todo dia: prova com ${r.nProva} questões${r.atividade?` + atividade com ${r.nAtiv}`:''}</div>`}
+VIEWS.p_reforco=async function(){
+  const d=await api('reforcoListar');RF.d=d;
+  return `<div class="ph"><div><h1>🎯 Reforço</h1><p>Escolha as matérias e os assuntos que cada aluno precisa treinar</p></div></div>
+  <div class="info small" style="margin-bottom:14px">O aluno com reforço ativo deixa de receber a Prova do dia com todas as matérias. No lugar dela, recebe <b>todo dia</b> uma prova e uma atividade feitas só para ele, com os assuntos escolhidos aqui. Em cada questão há o botão <b>📚 Estudar o assunto</b>.</div>
+  ${d.alunos.length?d.alunos.map(al=>`<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="min-width:0"><b>${esc(al.nome)}</b> <span class="small muted">· ${esc(al.turma)}</span><div style="margin-top:4px">${rfResumo(al.reforco)}</div></div><button class="btn ${al.reforco.ativo?'':'pri'} sm" data-a="rfEditar" data-id="${esc(al.id)}">${al.reforco.ativo?'✏️ Ajustar':'🎯 Configurar'}</button></div>`).join(''):'<div class="card">Nenhum aluno nas suas turmas.</div>'}`;
+};
+async function rfIndice(){if(RF.idx)return RF.idx;RF.idx=await api('bancoIndice');return RF.idx}
+const RF_DISC_ID={'Português':'portugues','Matemática':'matematica','História':'historia','Geografia':'geografia','Educação Física':'educacao_fisica','Física':'fisica','Química':'quimica','Biologia':'ciencias_biologia'};
+ACOES.rfEditar=async(d,b)=>{const al=RF.d.alunos.find(x=>x.id===d.id);if(!al)return;
+  await busy(b,async()=>{let idx;try{idx=await rfIndice()}catch(e){toast(e.message);return}
+    const r=al.reforco;const niv=al.nivel==='EM'?['EM','F2']:al.nivel==='F2'?['F2','F1']:['F1'];
+    const discs=Object.keys(RF_DISC_ID).map(nome=>{const D=idx.disciplinas.find(x=>x.id===RF_DISC_ID[nome]);if(!D)return '';
+      const escolhidos=(r.discs&&r.discs[nome])||[];const ass=D.assuntos.filter(a=>niv.indexOf(a.nivel)>=0||escolhidos.indexOf(a.nome)>=0);
+      const on=escolhidos.length>0;
+      return `<details class="rf-disc"${on?' open':''}><summary><b>${ic(nome)} ${esc(nome)}</b> <span class="small muted" data-rfc="${esc(nome)}">${on?escolhidos.length+' escolhido(s)':''}</span></summary>
+        <div class="rf-ass">${ass.map(a=>`<label class="rf-op"><input type="checkbox" data-rfd="${esc(nome)}" value="${esc(a.nome)}"${escolhidos.indexOf(a.nome)>=0?' checked':''}><span>${esc(a.nome)} <span class="small muted">· ${a.total} questões</span></span></label>`).join('')}</div></details>`}).join('');
+    modal(`<div class="hd"><h2>🎯 Reforço de ${esc(al.nome.split(' ')[0])}</h2><button class="x" data-a="fechar">✕</button></div>
+      <label class="rf-op" style="font-size:16px"><input type="checkbox" id="rfAtivo"${r.ativo?' checked':''}><span><b>Ativar reforço</b> — a prova e a atividade dele serão só com os assuntos marcados abaixo</span></label>
+      <p class="small muted" style="margin:10px 0 6px">Marque os assuntos que ${esc(al.nome.split(' ')[0])} está estudando:</p>${discs}
+      <div class="grid g2" style="margin-top:12px"><label>Questões na prova do dia<input type="number" id="rfNP" min="6" max="50" value="${r.nProva||20}"></label><label>Questões na atividade<input type="number" id="rfNA" min="4" max="30" value="${r.nAtiv||10}"></label></div>
+      <label class="rf-op"><input type="checkbox" id="rfAt"${r.atividade!==false?' checked':''}><span>Mandar também uma <b>atividade de treino</b> todo dia (correção na hora)</span></label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" data-a="fechar">Cancelar</button><button class="btn pri" data-a="rfSalvar" data-id="${esc(al.id)}">Salvar</button></div>`);
+    $$('#sheet [data-rfd]').forEach(el=>el.addEventListener('change',()=>{const n=el.dataset.rfd;const c=$$(`#sheet [data-rfd="${n}"]:checked`).length;const s=$(`#sheet [data-rfc="${n}"]`);if(s)s.textContent=c?c+' escolhido(s)':'';if(el.checked)$('#rfAtivo').checked=true}));
+  })};
+ACOES.rfSalvar=async(d,b)=>{const discs={};$$('#sheet [data-rfd]:checked').forEach(el=>{(discs[el.dataset.rfd]=discs[el.dataset.rfd]||[]).push(el.value)});
+  const ativo=$('#rfAtivo').checked;
+  await busy(b,async()=>{try{const r=await api('reforcoSalvar',{alunoId:d.id,ativo,discs,nProva:+$('#rfNP').value,nAtiv:+$('#rfNA').value,atividade:$('#rfAt').checked});
+    fechar();const c=(r&&r.criados)||[];toast(ativo?(c.length?`Pronto! Prova (${c[0].prova} questões)${c[0].atividade?` e atividade (${c[0].atividade})`:''} de hoje já criadas.`:'Reforço salvo! A partir de agora a prova e a atividade dele são só desses assuntos.'):'Reforço desligado: volta a prova normal.');go('p_reforco')}catch(e){toast(e.message)}})};
+/* atividades comuns também ganham o botão "Estudar o assunto" (quando a questão tem assunto) */
+queueMicrotask(()=>{if(typeof htmlQuestaoAluno!=='function')return;const orig=htmlQuestaoAluno;htmlQuestaoAluno=function(q,i,e,ro){const h=orig(q,i,e,ro);
+  if(!q||!q.assunto||typeof PL==='undefined'||!PL||!PL.a||PL.a.tipo==='desafio')return h;
+  return h.replace(/<\/div>$/,`<div class="estudo-linha"><button type="button" class="btn sm estudo-btn" data-a="estudoAbrir" data-i="${i}">📚 Estudar o assunto</button><span class="small muted">vídeo, explicação e exemplo</span></div></div>`)}});
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
