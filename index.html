@@ -1621,6 +1621,8 @@ queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;
 ACOES.avisoIr=()=>{fechar();go('a_atividades')};
 /* =================== ATUALIZAÇÕES DO SISTEMA =================== */
 const NOVIDADES=[
+ {v:'2026-11-12f',t:'Nota para a mãe',p:['professor','admin'],itens:[
+  ['professor','📤 Quando o aluno entrega a prova, aparece no Início e em <b>Quem não fez → Entregaram</b> o botão <b>💬 Nota p/ mãe</b>, com a mensagem pronta (nota, acertos e erros, redação). Irmãos da mesma mãe vão juntos numa mensagem só.']]},
  {v:'2026-11-12e',t:'Reforço por aluno',p:['professor','admin','aluno'],itens:[
   ['professor','🎯 Nova aba <b>Reforço</b>: escolha as matérias e os assuntos que cada aluno precisa treinar. Ele passa a receber todo dia uma prova e uma atividade feitas só com esses assuntos.'],
   ['professor','📚 Novos assuntos no banco: verbos (conjugação), literatura (gêneros e elementos da narrativa), interpretação de crônica, poema e conto, números naturais e frações (leitura, próprias, impróprias, aparentes e equivalentes).'],
@@ -1772,7 +1774,8 @@ VIEWS.p_pendentes=async function(){
     ${naoFez.length?`<div class="list">${naoFez.map(x=>linha(x,aberta?`<button class="btn sm" data-a="pendMae" data-i="${idx(x)}" style="background:#25d366;color:#fff;border-color:#25d366">💬 Cobrar</button>`:'<span class="pill pendente">falta</span>')).join('')}</div>`:(fazendo.length?'<p class="muted" style="margin:0">Todos já começaram. Veja abaixo quem ainda está fazendo.</p>':'<p class="muted" style="margin:0">🎉 Todo mundo já fez!</p>')}
     ${aberta&&naoFez.length+fazendo.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" data-a="pushAvisarAgora">🔔 Avisar no celular quem não fez</button><button class="btn" data-a="pendCopiar">📋 Copiar lista</button></div>`:''}</div>
   ${fazendo.length?`<div class="card" style="margin-bottom:14px"><h3 style="margin:0 0 10px">✍️ Fazendo agora (${fazendo.length})</h3><div class="list">${fazendo.map(x=>linha(x,`<span class="small"><b>${x.c.respondidas||0}</b> de ${x.c.total||'?'} respondidas</span>${aberta?` <button class="btn sm" data-a="pendMae" data-i="${idx(x)}" style="background:#25d366;color:#fff;border-color:#25d366">💬</button>`:''}`)).join('')}</div></div>`:''}
-  <div class="card"><h3 style="margin:0 0 10px">✅ Entregaram (${fez.length})</h3>${fez.length?`<div class="list">${fez.sort((a,b)=>(a.c.em||0)-(b.c.em||0)).map(x=>linha(x,`<b style="color:#15803d;font-size:16px">${nota(x.c.nota,x.c.notaMax)}</b><div class="small muted">às ${pendHora(x.c.em)}${x.c.auto?' ⏱':''}</div>`)).join('')}</div>`:'<p class="muted" style="margin:0">Ninguém entregou ainda.</p>'}</div>
+  <div class="card"><h3 style="margin:0 0 10px">✅ Entregaram (${fez.length})</h3>${fez.length?`<div class="list">${fez.sort((a,b)=>(a.c.em||0)-(b.c.em||0)).map(x=>linha(x,`<b style="color:#15803d;font-size:16px">${nota(x.c.nota,x.c.notaMax)}</b><div class="small muted">${esc(notaRotulo(x.p))} · às ${pendHora(x.c.em)}${x.c.auto?' ⏱':''}</div><button class="btn sm" data-a="notaMae" data-al="${esc(x.al.id)}" style="margin-top:4px;background:${notaEnviada(x.c.entregaId)?'#e5e7eb;color:#374151;border-color:#d1d5db':'#25d366;color:#fff;border-color:#25d366'}">${notaEnviada(x.c.entregaId)?'✓ nota enviada':'💬 Nota p/ mãe'}</button>`)).join('')}</div>
+    <div style="margin-top:12px"><button class="btn pri" data-a="notasMaes">📤 Mandar as notas para as mães</button></div>`:'<p class="muted" style="margin:0">Ninguém entregou ainda.</p>'}</div>
   ${extra.length?`<p class="small muted" style="margin-top:10px">Prova extra (não obrigatória): ${extra.length} aluno(s) não fizeram.</p>`:''}`;
 };
 ACOES.pendDia=(d,b,ev)=>{if(ev)ev.preventDefault();PEND.dia=d.d;go('p_pendentes')};
@@ -1826,6 +1829,50 @@ ACOES.rfSalvar=async(d,b)=>{const discs={};$$('#sheet [data-rfd]:checked').forEa
 queueMicrotask(()=>{if(typeof htmlQuestaoAluno!=='function')return;const orig=htmlQuestaoAluno;htmlQuestaoAluno=function(q,i,e,ro){const h=orig(q,i,e,ro);
   if(!q||!q.assunto||typeof PL==='undefined'||!PL||!PL.a||PL.a.tipo==='desafio')return h;
   return h.replace(/<\/div>$/,`<div class="estudo-linha"><button type="button" class="btn sm estudo-btn" data-a="estudoAbrir" data-i="${i}">📚 Estudar o assunto</button><span class="small muted">vídeo, explicação e exemplo</span></div></div>`)}});
+
+/* =================== NOTA PARA A MÃE (depois que o aluno entrega a prova) =================== */
+function notaEnvLista(){try{return JSON.parse(localStorage.getItem('sd_notas_env')||'[]')}catch(e){return []}}
+function notaEnviada(id){return !!id&&notaEnvLista().indexOf(id)>=0}
+function notaMarcar(ids){try{const L=notaEnvLista();ids.forEach(i=>{if(i&&L.indexOf(i)<0)L.push(i)});localStorage.setItem('sd_notas_env',JSON.stringify(L.slice(-500)))}catch(e){}}
+function notaRotulo(p){const r=String(p.titulo||'').replace(/^Prova do dia — \S+ · /,'');if(/^(Fund\. I|Fund\. II|Anos iniciais|Médio)$/.test(r))return 'Prova do dia';if(/^Reda/.test(r))return 'Redação';if(/^Reforço/.test(r))return 'Prova do dia (reforço)';return r||'Prova do dia'}
+// grupos por mãe (irmãos juntos) com todas as provas do dia de cada aluno
+function notaGrupos(q,dia){const L=pendLinhas(q,dia).filter(x=>!x.al.ignorar);const G={};
+  L.forEach(x=>{const k=x.al.responsavel?'r:'+normNomeFt(x.al.responsavel):'a:'+x.al.id;const g=G[k]||(G[k]={resp:x.al.responsavel,tel:'',alunos:{}});if(!g.tel&&x.al.telefone)g.tel=x.al.telefone;
+    const a=g.alunos[x.al.id]||(g.alunos[x.al.id]={al:x.al,itens:[]});a.itens.push(x)});
+  return Object.values(G).map(g=>({...g,alunos:Object.values(g.alunos)})).filter(g=>g.alunos.some(a=>a.itens.some(x=>x.c.s==='corrigida'||x.c.s==='enviada')))}
+function normNomeFt(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim()}
+function notaMsg(g,dia){const mae=g.resp?ftPrimeiro(g.resp):'';const esc10=S.cfg.escalaNota||10;const hoje=dia===pendHoje();
+  let t=`Olá${mae?', '+mae:''}! Tudo bem? 😊\n\nAqui é da Sala Digital. ${g.alunos.length>1?'Seguem as notas':'Segue a nota'} da Prova do dia ${hoje?'de hoje':'de '+ftDia(dia)} (${dia.split('-').reverse().slice(0,2).join('/')}):\n`;
+  g.alunos.forEach(a=>{const n=ftPrimeiro(a.al.nome);t+=`\n📝 *${n}*\n`;
+    a.itens.forEach(x=>{const c=x.c,r=notaRotulo(x.p);
+      if(c.s==='corrigida'||c.s==='enviada'){t+=`• ${r}: nota *${nota(c.nota,c.notaMax)}* de ${esc10}`;if(c.objetivas)t+=` (${c.acertos} acerto${c.acertos===1?'':'s'} e ${c.erros} erro${c.erros===1?'':'s'})`;if(c.discPendentes)t+=` — ainda tem resposta escrita em correção`;t+='\n'}
+      else if(c.s==='fazendo')t+=`• ${r}: começou, mas ainda não entregou (${c.respondidas||0} de ${c.total} respondidas)\n`;
+      else if(c.s==='aberta')t+=`• ${r}: ainda não fez (fica aberta até as ${pendHora(x.p.encerramento)})\n`;
+      else if(c.s==='faltou')t+=`• ${r}: não fez\n`});
+    const ns=a.itens.filter(x=>x.c.s==='corrigida'||x.c.s==='enviada').map(x=>x.c.nota/x.c.notaMax);
+    if(ns.length){const m=ns.reduce((p,v)=>p+v,0)/ns.length;t+=m>=0.8?'Excelente resultado! 🌟\n':m>=0.6?'Bom resultado! Vamos continuar estudando. 👏\n':'Precisa reforçar os estudos. Vale rever as questões que errou com o botão "Estudar o assunto". 📚\n'}});
+  return t+`\nQualquer dúvida, estou à disposição. Obrigado! 🙏`}
+function notaWhats(g,txt){let n=String(g.tel||'').replace(/\D/g,'');if(n&&n.length<=11)n='55'+n;return `https://wa.me/${n}?text=${encodeURIComponent(txt)}`}
+function notaIds(g){const o=[];g.alunos.forEach(a=>a.itens.forEach(x=>{if(x.c.entregaId)o.push(x.c.entregaId)}));return o}
+ACOES.notaMae=(d)=>{const gs=notaGrupos(PEND.q,PEND.dia);const g=gs.find(g=>g.alunos.some(a=>a.al.id===d.al));if(!g)return;notaModal([g])};
+ACOES.notasMaes=()=>{const gs=notaGrupos(PEND.q,PEND.dia);if(!gs.length){toast('Ninguém entregou ainda.');return}notaModal(gs)};
+function notaModal(gs){NOTA.gs=gs;
+  modal(`<div class="hd"><h2>📤 Nota para a mãe</h2><button class="x" data-a="fechar">✕</button></div>
+  <p class="small muted" style="margin-top:0">Toque em <b>WhatsApp</b> para abrir a conversa com a mensagem pronta${gs.some(g=>!g.tel)?' (sem telefone cadastrado, você escolhe a conversa da mãe)':''}. Irmãos da mesma mãe vão juntos numa mensagem só.</p>
+  ${gs.map((g,i)=>{const txt=notaMsg(g,PEND.dia);const env=notaIds(g).every(notaEnviada);return `<div class="card" style="margin-bottom:12px"><b>${g.resp?'👩 '+esc(g.resp):'👤 Responsável não cadastrado'}</b> <span class="small muted">· ${g.alunos.map(a=>esc(ftPrimeiro(a.al.nome))).join(', ')}</span>${env?' <span class="pill corrigida">enviada</span>':''}
+    <textarea id="notaTxt${i}" rows="9" style="margin-top:8px;font-size:14px">${esc(txt)}</textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><a class="btn" href="${notaWhats(g,txt)}" target="_blank" rel="noopener" data-a="notaZap" data-i="${i}" style="background:#25d366;color:#fff;border-color:#25d366">💬 WhatsApp</a><button class="btn" data-a="notaCopiar" data-i="${i}">📋 Copiar</button></div></div>`}).join('')}`)}
+const NOTA={gs:[]};
+ACOES.notaZap=(d,b)=>{const g=NOTA.gs[+d.i];const txt=($('#notaTxt'+d.i)||{}).value||notaMsg(g,PEND.dia);window.open(notaWhats(g,txt),'_blank');notaMarcar(notaIds(g));if(!g.tel)toast('Escolha a conversa da mãe no WhatsApp.')};
+ACOES.notaCopiar=async(d)=>{const g=NOTA.gs[+d.i];const txt=($('#notaTxt'+d.i)||{}).value||'';const ok=await ftCopiar(txt);if(ok)notaMarcar(notaIds(g));toast(ok?'Mensagem copiada! Cole no WhatsApp da mãe.':'Não deu para copiar.')};
+/* no Início do professor: avisa quando há notas novas para mandar */
+queueMicrotask(()=>{['p_inicio','ad_inicio'].forEach(v=>{const orig=VIEWS[v];if(!orig)return;VIEWS[v]=async function(p){
+  const r=await orig(p);let q=null;try{q=await api('desafioQuadro')}catch(e){return r}const hoje=pendHoje();
+  const novas=pendLinhas(q,hoje).filter(x=>!x.al.ignorar&&(x.c.s==='corrigida'||x.c.s==='enviada')&&!notaEnviada(x.c.entregaId));if(!novas.length)return r;
+  const nomes=[...new Set(novas.map(x=>ftPrimeiro(x.al.nome)))];
+  const faixa=`<div class="note" style="cursor:pointer;border-color:#25d366;background:#f0fdf4" data-a="notasInicio">📤 <b>${nomes.join(', ')}</b> ${nomes.length>1?'terminaram':'terminou'} a prova de hoje. Toque para mandar a nota para a mãe.</div>`;
+  const h=typeof r==='string'?r:r.html;const i=h.indexOf('</div></div>')+12;const nh=h.slice(0,i)+faixa+h.slice(i);return typeof r==='string'?nh:Object.assign({},r,{html:nh})}})});
+ACOES.notasInicio=async()=>{try{const q=await api('desafioQuadro');PEND.q=q;PEND.dia=pendHoje();const gs=notaGrupos(q,PEND.dia);gs.length?notaModal(gs):toast('Ninguém entregou ainda.')}catch(e){toast(e.message)}};
 
 /* =================== INÍCIO =================== */
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}

@@ -435,7 +435,8 @@ rota_('desafioQuadro', PROF, false, u => {
           if (!provaPara_(a, al.id)) return { s: 'na' };
           if (!e) return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'aberta' };
           if (e.status === 'rascunho') return { s: a.encerramento < t ? (a.desafio.extra ? 'extra' : 'faltou') : 'fazendo', inicio: e.iniciadoEm || null, respondidas: (e.respostas || []).filter(r => r !== null && r !== undefined && r !== '').length, total: (a.questoes || []).length };
-          return { s: e.status === 'corrigida' ? 'corrigida' : 'enviada', nota: e.nota, notaMax: e.notaMax || notaMax_(a), em: e.enviadoEm, entregaId: e.id, auto: !!e.autoEnviada };
+          const rr = desafioResultado_(a, e);
+          return { s: e.status === 'corrigida' ? 'corrigida' : 'enviada', nota: e.nota, notaMax: e.notaMax || notaMax_(a), em: e.enviadoEm, entregaId: e.id, auto: !!e.autoEnviada, acertos: rr.acertos, erros: rr.erros, objetivas: rr.objetivas, discPendentes: rr.discPendentes };
         }) };
       }) };
   }) };
