@@ -57,7 +57,7 @@ textarea{resize:vertical;min-height:80px}
 .top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .top-in{display:flex;align-items:center;gap:10px;padding:10px 16px;max-width:1200px;margin:0 auto}
 .top .logo{margin:0}.top .logo .mk{width:36px;height:36px;font-size:19px;border-radius:11px}.top .logo b{font-size:18px}
-.who{margin-left:auto;text-align:right;font-size:13px;line-height:1.2}.who b{display:block;font-size:14px}
+.who{text-align:right;font-size:13px;line-height:1.2}.top-atu{margin-left:auto;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--pri);background:var(--pri);color:#fff;font:inherit;font-size:13px;font-weight:700;padding:6px 11px;border-radius:999px;cursor:pointer;white-space:nowrap}.top-atu:hover{filter:brightness(1.08)}.top-atu:active{transform:scale(.96)}@media(max-width:420px){.top-atu{padding:6px 9px;font-size:12px}}.who b{display:block;font-size:14px}
 .role{display:inline-block;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:20px;background:var(--pri2);color:var(--pri3)}
 .role.admin{background:var(--viob);color:var(--vio)}.role.aluno{background:var(--okb);color:var(--ok)}
 .nav{display:flex;gap:6px;overflow-x:auto;padding:8px 16px 10px;max-width:1200px;margin:0 auto;scrollbar-width:none}
@@ -372,7 +372,7 @@ let rid=0;
 function shell(){
   const u=S.u;const menu=(MENUS[u.perfil]||[]).filter(([k])=>(k!=='p_ia'||S.iaAtiva)&&(k!=='a_tutor'||S.iaTutor));const ativo=MENU_DE[S.view]||S.view;
   if(!$('#app')){
-    $('#root').innerHTML=`<div id="app"><header class="top"><div class="top-in"><div class="logo"><div class="mk">🎓</div><div><b id="pnome"></b></div></div><div class="who" id="who"></div></div></header><div class="shell"><nav class="nav" id="nav"></nav><main id="main"></main></div></div>`;
+    $('#root').innerHTML=`<div id="app"><header class="top"><div class="top-in"><div class="logo"><div class="mk">🎓</div><div><b id="pnome"></b></div></div><button class="top-atu" data-a="atualizarAgora" title="Atualizar o sistema">🔄 <span>Atualizar</span></button><div class="who" id="who"></div></div></header><div class="shell"><nav class="nav" id="nav"></nav><main id="main"></main></div></div>`;
   }
   $('#pnome').textContent=S.info.nome||'Sala Digital';
   $('#who').innerHTML=`<b>${esc(u.nome)}</b><span class="role ${u.perfil}">${{aluno:'Aluno',professor:'Professor',admin:'Administrador'}[u.perfil]}</span>`;
@@ -1620,6 +1620,9 @@ queueMicrotask(()=>{const orig=VIEWS.a_inicio;if(!orig)return;
 ACOES.avisoIr=()=>{fechar();go('a_atividades')};
 /* =================== ATUALIZAÇÕES DO SISTEMA =================== */
 const NOVIDADES=[
+ {v:'2026-11-12d',t:'Botão Atualizar no topo',p:['professor','admin','aluno'],itens:[
+  ['aluno','🔄 Agora tem um botão <b>Atualizar</b> no topo da tela. Se algo parecer estranho ou faltar alguma novidade, é só tocar nele.'],
+  ['professor','🔄 Botão <b>Atualizar</b> fixo no topo para professor, administrador e alunos: limpa a versão guardada no aparelho e carrega a mais nova.']]},
  {v:'2026-11-12c',t:'Quem ainda não fez a prova',p:['professor','admin'],itens:[
   ['professor','⏳ Nova aba <b>Quem não fez</b>: mostra, em tempo real, quem ainda não começou, quem está fazendo (e quantas respondeu) e quem já entregou a prova de hoje, com a nota.'],
   ['professor','💬 Botão para avisar a mãe no WhatsApp com mensagem pronta, e 🔔 para avisar os alunos no celular. O número de pendentes aparece no menu e no Início.']]},
