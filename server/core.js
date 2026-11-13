@@ -389,6 +389,7 @@ function entregaVisAluno_(a, e) {
     if (a.tipo === 'desafio' && e.status === 'corrigida' && typeof desafioResultado_ === 'function') { const r = desafioResultado_(a, e); c.notaAgora = { nota: e.nota, notaMax: e.notaMax, acertos: r.acertos, erros: r.erros, objetivas: r.objetivas, discursivas: r.discursivas }; }
     delete c.nota; delete c.correcao; delete c.comentario; delete c.historico;
   }
+  if (c.correcao && c.correcao.redacao) { c.correcao = Object.assign({}, c.correcao); delete c.correcao.redacao; }   // a análise completa da redação é só para o professor
   return c;
 }
 rota_('abrirAtividade', ALU, false, (u, d) => {
@@ -451,11 +452,11 @@ rota_('enviarAtividade', ALU, true, (u, d) => {
   const a = ativAluno_(u, d.id); const e = rascunho_(u, a); const t = agora_();
   e.respostas = limpaRespostas_(a, d.respostas);
   if (a.tipo === 'desafio' && typeof desafioCorrigir_ === 'function') desafioCorrigir_(a, e, t);   // prova do dia: nota na hora, inclusive discursivas
-  else { const pend = autoCorrige_(a, e); e.status = pend ? 'enviada' : 'corrigida'; if (!pend) e.corrigidoEm = t; }
+  else { const pend = autoCorrige_(a, e); e.status = pend ? 'enviada' : 'corrigida'; if (!pend) e.corrigidoEm = t; if (typeof redacaoAnaliseAuto_ === 'function') redacaoAnaliseAuto_(a, e); }
   e.enviadoEm = t; e.atualizadoEm = t;
   e.atrasada = !!(a.encerramento && a.encerramento < t);
   upd_('Entregas', e); log_(u, 'entrega', a.id);
-  const out = { enviadoEm: t, protocolo: e.id.toUpperCase(), atrasada: e.atrasada };
+  const out = { enviadoEm: t, protocolo: e.id.toUpperCase(), atrasada: e.atrasada, entregaId: e.id };
   if (a.tipo === 'desafio' && typeof desafioResultado_ === 'function') { out.resultado = desafioResultado_(a, e); out.resultado.nota = e.nota; out.resultado.notaMax = e.notaMax; out.entregaId = e.id; }
   return out;
 });
@@ -1243,7 +1244,8 @@ function desafioCorrigeDisc_(a, e) {
   qs.forEach((q, i) => {
     if (q.tipo !== 'disc' || (c.pontos[i] !== null && c.pontos[i] !== undefined)) return;
     const fotos = (e.fotos || {})[i] || (e.fotos || {})[String(i)];
-    const n = notaDiscAuto_(q, (e.respostas || [])[i], !!(fotos && (fotos.length || Object.keys(fotos).length)));
+    const temFoto = !!(fotos && (fotos.length || Object.keys(fotos).length));
+    const n = ehRedacao_(a, q) ? redacaoAuto_(q, (e.respostas || [])[i], temFoto).n : notaDiscAuto_(q, (e.respostas || [])[i], temFoto);
     c.pontos[i] = n.p; if (!c.comentarios[i]) c.comentarios[i] = n.c; mudou = true;
   });
   if (mudou) { c.autoDisc = true; e.nota = c.pontos.reduce((s, p) => s + (Number(p) || 0), 0); e.notaMax = notaMax_(a); }
@@ -1251,7 +1253,7 @@ function desafioCorrigeDisc_(a, e) {
 }
 // corrige tudo (objetivas + discursivas) e marca a entrega como corrigida
 function desafioCorrigir_(a, e, t) {
-  autoCorrige_(a, e); desafioCorrigeDisc_(a, e);
+  autoCorrige_(a, e); desafioCorrigeDisc_(a, e); redacaoAnaliseAuto_(a, e);
   e.status = 'corrigida'; e.corrigidoEm = t;
 }
 // nota da IA para as discursivas (aplicada pelo servidor quando há chave de IA)
@@ -1271,7 +1273,7 @@ function desafioNotaIA_(x) {
 function desafioPedidoIA_(x) {
   const e = get_('Entregas', x.entregaId); if (!e || !e.correcao || !e.correcao.autoDisc || e.correcao.ia) return null;
   const a = get_('Atividades', e.atividadeId); if (!a || a.tipo !== 'desafio') return null;
-  const itens = []; (a.questoes || []).forEach((q, i) => { const r = String((e.respostas || [])[i] || '').trim(); if (q.tipo === 'disc' && r) itens.push({ i: i, pontos: Number(q.pontos) || 0, enunciado: q.enunciado, texto: (q.textoApoio || '').slice(0, 1500), esperado: q.explicacao || '', resposta: r.slice(0, 2000) }); });
+  const itens = []; (a.questoes || []).forEach((q, i) => { const r = String((e.respostas || [])[i] || '').trim(); if (q.tipo === 'disc' && r && !ehRedacao_(a, q)) itens.push({ i: i, pontos: Number(q.pontos) || 0, enunciado: q.enunciado, texto: (q.textoApoio || '').slice(0, 1500), esperado: q.explicacao || '', resposta: r.slice(0, 2000) }); });
   if (!itens.length) return null;
   return { entregaId: e.id, nivel: a.desafio && a.desafio.nivel, itens: itens, provedor: cfg_().iaProvedor || 'gemini' };
 }
@@ -1703,6 +1705,130 @@ function reforcoCriar_(x) {
 }
 DESAFIO_SIS.reforcoEstado = a => reforcoEstado_(a.dia);
 DESAFIO_SIS.reforcoCriar = x => reforcoCriar_(x);
+
+
+// ================== REDAÇÃO: correção detalhada para o professor ==================
+function ehRedacao_(a, q) { return !!(q && q.tipo === 'disc' && (q.redacao || /^\s*REDA[ÇC][ÃA]O\b/i.test(q.enunciado || '') || (a && a.desafio && a.desafio.redacao))); }
+const NIVEIS_REDACAO = [[0.3, 'Péssimo'], [0.5, 'Fraco'], [0.65, 'Regular'], [0.85, 'Bom'], [2, 'Ótimo']];
+function nivelRedacao_(f) { for (const [lim, n] of NIVEIS_REDACAO) if (f < lim) return n; return 'Ótimo'; }
+// análise automática (sem IA): tamanho, parágrafos, título, tema
+function redacaoAuto_(q, r, temFoto) {
+  const max = Number(q.pontos) || 10; const txt = String(r || '').trim();
+  if (!txt) {
+    const a = { nota: temFoto ? max / 2 : 0, max: max, nivel: temFoto ? 'Enviada por foto' : 'Péssimo', ia: false, palavras: 0, paragrafos: 0,
+      resumo: temFoto ? 'A redação foi enviada por foto. A nota automática é provisória: leia a foto e ajuste a nota se precisar.' : 'O aluno não escreveu a redação.',
+      criterios: [], fortes: [], faltou: temFoto ? [] : ['Escrever a redação'], erros: [], dicas: [], criatividade: '', comentarioAluno: temFoto ? 'Recebemos sua redação por foto. O professor vai ler com atenção.' : 'Você não escreveu a redação. Tente da próxima vez!' };
+    return { n: { p: a.nota, c: a.comentarioAluno + ' (correção automática)' }, a: a };
+  }
+  const pal = palavrasDisc_(txt); const nPal = pal.length;
+  const pars = txt.split(/\n\s*\n|\n(?=\s{2,}|\t)/).map(x => x.trim()).filter(x => x.length > 20);
+  const nPar = Math.max(pars.length, txt.split(/\n/).filter(x => x.trim().length > 40).length >= 3 ? 3 : pars.length);
+  const linhas = txt.split(/\n/).map(x => x.trim()).filter(Boolean);
+  const titulo = linhas.length > 1 && linhas[0].length <= 70 && !/[.!?]$/.test(linhas[0]);
+  const ref = {}; palavrasDisc_((q.explicacao || '') + ' ' + (q.textoApoio || '') + ' ' + (q.enunciado || '')).filter(x => x.length >= 5 && DISC_STOP.indexOf(x) < 0).forEach(x => { ref[x.slice(0, 5)] = 1; });
+  const tema = {}; pal.filter(x => x.length >= 5 && ref[x.slice(0, 5)]).forEach(x => { tema[x.slice(0, 5)] = 1; });
+  const nTema = Object.keys(tema).length; const opina = /\b(eu acho|acredito|na minha opini|penso que|concordo|discordo|defendo)/i.test(txt);
+  const conclui = /\b(portanto|por isso|concluindo|enfim|em resumo|dessa forma|assim,|por fim|concluo)/i.test(txt);
+  const c1 = nTema >= 4 ? 2 : nTema >= 2 ? 1.5 : nTema >= 1 ? 1 : 0.5;                                   // tema
+  const c2 = (titulo ? 0.5 : 0) + (nPar >= 4 ? 1.5 : nPar >= 3 ? 1 : nPar >= 2 ? 0.5 : 0);              // estrutura
+  const c3 = (nPal >= 150 ? 1.5 : nPal >= 100 ? 1 : nPal >= 50 ? 0.5 : 0) + (opina ? 0.5 : 0);          // argumentação
+  const c4 = nPal >= 120 ? 1 : nPal >= 60 ? 0.5 : 0;                                                       // criatividade (sem IA: só estimativa)
+  const c5 = (/[.!?]/.test(txt) ? 0.5 : 0) + (/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(txt) ? 0.5 : 0) + (conclui ? 0.5 : 0); // pontuação e coesão
+  const soma = Math.min(10, c1 + c2 + c3 + c4 + c5); const nota = Math.round(soma / 10 * max * 2) / 2;
+  const faltou = []; if (!titulo) faltou.push('Título'); if (nPar < 3) faltou.push('Separar em parágrafos (introdução, desenvolvimento e conclusão)');
+  if (nPal < 100) faltou.push('Texto mais longo (escreveu ' + nPal + ' palavras; o ideal é pelo menos 120)'); if (!opina) faltou.push('Deixar clara a opinião'); if (!conclui) faltou.push('Conclusão fechando a ideia');
+  if (nTema < 2) faltou.push('Falar mais diretamente sobre o tema');
+  const a = { nota: nota, max: max, nivel: nivelRedacao_(nota / max), ia: false, palavras: nPal, paragrafos: nPar,
+    resumo: 'Correção automática provisória (sem IA): o texto tem ' + nPal + ' palavras e ' + nPar + ' parágrafo(s). Leia a redação para confirmar a nota.',
+    criterios: [{ nome: 'Tema', nota: c1, max: 2 }, { nome: 'Estrutura (título e parágrafos)', nota: c2, max: 2 }, { nome: 'Argumentos e opinião', nota: c3, max: 2 },
+      { nome: 'Criatividade', nota: c4, max: 2 }, { nome: 'Pontuação, ortografia e coesão', nota: c5, max: 2 }].map(x => Object.assign(x, { comentario: '' })),
+    fortes: [], faltou: faltou, erros: [], dicas: [], criatividade: '', comentarioAluno: faltou.length ? 'Para melhorar: ' + faltou.slice(0, 3).join('; ') + '.' : 'Boa redação!' };
+  return { n: { p: nota, c: a.comentarioAluno + ' (correção automática)' }, a: a };
+}
+// guarda também a análise automática (até a IA responder)
+function redacaoAnaliseAuto_(a, e) {
+  const c = e.correcao || (e.correcao = { pontos: [], comentarios: [] }); let n = 0;
+  (a.questoes || []).forEach((q, i) => {
+    if (!ehRedacao_(a, q)) return; c.redacao = c.redacao || {};
+    if (c.redacao[i] && c.redacao[i].ia) return;
+    const fotos = (e.fotos || {})[i] || (e.fotos || {})[String(i)];
+    c.redacao[i] = redacaoAuto_(q, (e.respostas || [])[i], !!(fotos && (fotos.length || Object.keys(fotos).length))).a; n++;
+  });
+  return n;
+}
+// pedido para a IA: redações da entrega
+function redacaoPedido_(x) {
+  const e = get_('Entregas', x.entregaId); if (!e || e.status === 'rascunho') return null; const a = get_('Atividades', e.atividadeId); if (!a) return null;
+  const al = get_('Usuarios', e.alunoId); const itens = [];
+  (a.questoes || []).forEach((q, i) => { if (!ehRedacao_(a, q)) return; const r = String((e.respostas || [])[i] || '').trim(); if (r.length < 20) return;
+    if (!x.forcar && e.correcao && e.correcao.redacao && e.correcao.redacao[i] && e.correcao.redacao[i].ia) return;
+    itens.push({ i: i, pontos: Number(q.pontos) || 10, tema: q.enunciado.slice(0, 1500), apoio: (q.textoApoio || '').slice(0, 1500), criterios: q.explicacao || '', texto: r.slice(0, 6000) }); });
+  if (!itens.length) return null;
+  return { entregaId: e.id, nivel: (a.desafio && a.desafio.nivel) || 'F2', aluno: al ? al.nome.split(' ')[0] : 'o aluno', itens: itens, provedor: cfg_().iaProvedor || 'gemini' };
+}
+function redacaoSalvarIA_(x) {
+  const e = get_('Entregas', x.entregaId); if (!e) return false; const a = get_('Atividades', e.atividadeId); if (!a) return false;
+  const c = e.correcao || (e.correcao = { pontos: [], comentarios: [] }); c.pontos = c.pontos || []; c.comentarios = c.comentarios || []; c.redacao = c.redacao || {};
+  const L = (v, n, m) => (Array.isArray(v) ? v : []).slice(0, n).map(y => txt_(typeof y === 'string' ? y : JSON.stringify(y), m)).filter(Boolean);
+  let mudou = false;
+  (x.analises || []).forEach(r => {
+    const q = (a.questoes || [])[r.i]; if (!ehRedacao_(a, q)) return; const max = Number(q.pontos) || 10;
+    const crit = (Array.isArray(r.criterios) ? r.criterios : []).slice(0, 6).map(k => ({ nome: txt_(k.nome, 60), nota: Math.max(0, Math.min(2, Math.round(Number(k.nota) * 2) / 2 || 0)), max: 2, comentario: txt_(k.comentario, 400) }));
+    let soma = crit.length ? crit.reduce((s, k) => s + k.nota, 0) / (crit.length * 2) * 10 : Number(r.nota);
+    if (!isFinite(soma)) return; soma = Math.max(0, Math.min(10, soma));
+    const nota = Math.round(soma / 10 * max * 2) / 2;
+    c.redacao[r.i] = { nota: nota, max: max, nivel: nivelRedacao_(nota / max), ia: true, palavras: palavrasDisc_((e.respostas || [])[r.i]).length,
+      resumo: txt_(r.resumo, 1200), criatividade: txt_(r.criatividade, 600), criterios: crit, fortes: L(r.fortes, 6, 300), faltou: L(r.faltou, 8, 300),
+      erros: (Array.isArray(r.erros) ? r.erros : []).slice(0, 12).map(z => ({ trecho: txt_(z.trecho, 200), correcao: txt_(z.correcao, 200), tipo: txt_(z.tipo, 40) })).filter(z => z.trecho),
+      dicas: L(r.dicas, 5, 300), comentarioAluno: txt_(r.comentarioAluno, 600), em: agora_() };
+    if (a.tipo === 'desafio') { c.pontos[r.i] = nota; c.comentarios[r.i] = txt_(r.comentarioAluno, 600) + ' (correção automática)'; } else if (!c.comentarios[r.i]) c.comentarios[r.i] = txt_(r.comentarioAluno, 600);
+    mudou = true;
+  });
+  if (!mudou) return false;
+  e.correcao = c; if (a.tipo === 'desafio') { c.autoDisc = true; e.nota = c.pontos.reduce((s, p) => s + (Number(p) || 0), 0); e.notaMax = notaMax_(a); } upd_('Entregas', e); return true;
+}
+DESAFIO_SIS.redacaoPedido = x => redacaoPedido_(x);
+DESAFIO_SIS.redacaoSalvar = x => redacaoSalvarIA_(x);
+function minhasTurmasIds_(u) { return all_('Turmas').filter(x => u.perfil === 'admin' || x.professorId === u.id).map(x => x.id); }
+function redacaoResumo_(a, e) {
+  const c = e.correcao || {}; const out = [];
+  (a.questoes || []).forEach((q, i) => { if (!ehRedacao_(a, q)) return; const an = (c.redacao || {})[i] || null;
+    out.push({ i: i, nota: c.pontos && c.pontos[i] != null ? c.pontos[i] : (an ? an.nota : null), max: Number(q.pontos) || 10, nivel: an ? an.nivel : '', ia: !!(an && an.ia) }); });
+  return out;
+}
+rota_('redacoesListar', PROF, false, u => {
+  const minhas = minhasTurmasIds_(u); const corte = agora_() - 30 * 864e5; const L = [];
+  all_('Atividades').filter(a => (a.turmas || []).some(id => minhas.indexOf(id) >= 0) && (a.questoes || []).some(q => ehRedacao_(a, q))).forEach(a => {
+    all_('Entregas').filter(e => e.atividadeId === a.id && e.status !== 'rascunho' && (e.enviadoEm || 0) >= corte).forEach(e => {
+      redacaoResumo_(a, e).forEach(r => L.push(Object.assign({ entregaId: e.id, atividade: a.titulo, aluno: nomeU_(e.alunoId), alunoId: e.alunoId, em: e.enviadoEm }, r)));
+    });
+  });
+  L.sort((x, y) => (y.em || 0) - (x.em || 0));
+  return { lista: L };
+});
+rota_('redacaoVer', PROF, false, (u, d) => {
+  const e = get_('Entregas', d.entregaId); if (!e) erro_('Entrega não encontrada.'); const a = get_('Atividades', e.atividadeId);
+  if (!a || !(a.turmas || []).some(id => minhasTurmasIds_(u).indexOf(id) >= 0)) erro_('Sem acesso.');
+  const i = d.i !== undefined ? Number(d.i) : (a.questoes || []).findIndex(q => ehRedacao_(a, q)); const q = (a.questoes || [])[i]; if (!ehRedacao_(a, q)) erro_('Esta questão não é redação.');
+  const al = get_('Usuarios', e.alunoId); const fotos = (e.fotos || {})[i] || (e.fotos || {})[String(i)] || [];
+  return { entregaId: e.id, i: i, aluno: al ? al.nome : '', alunoId: e.alunoId, responsavel: al ? al.responsavelNome || '' : '', telefone: al ? al.responsavelTelefone || '' : '',
+    atividade: a.titulo, enviadoEm: e.enviadoEm, tema: q.enunciado, apoio: q.textoApoio || '', texto: String((e.respostas || [])[i] || ''), fotos: Array.isArray(fotos) ? fotos : Object.values(fotos),
+    nota: e.correcao && e.correcao.pontos && e.correcao.pontos[i] != null ? e.correcao.pontos[i] : ((e.correcao && e.correcao.redacao || {})[i] || {}).nota, max: Number(q.pontos) || 10, analise: (e.correcao && e.correcao.redacao || {})[i] || null };
+});
+rota_('redacaoAnalisar', PROF, false, (u, d) => {
+  const e = get_('Entregas', d.entregaId); if (!e) erro_('Entrega não encontrada.'); const a = get_('Atividades', e.atividadeId);
+  if (!a || !(a.turmas || []).some(id => minhasTurmasIds_(u).indexOf(id) >= 0)) erro_('Sem acesso.');
+  return { __redacao: { entregaId: e.id, forcar: true } };
+});
+
+// redações ainda sem análise da IA (ex.: provas enviadas automaticamente no encerramento)
+DESAFIO_SIS.redacaoPendentes = () => {
+  const corte = agora_() - 3 * 864e5; const out = [];
+  all_('Atividades').filter(a => (a.questoes || []).some(q => ehRedacao_(a, q))).forEach(a => all_('Entregas').filter(e => e.atividadeId === a.id && e.status !== 'rascunho' && (e.enviadoEm || 0) >= corte).forEach(e => {
+    const c = e.correcao || {}; if ((a.questoes || []).some((q, i) => ehRedacao_(a, q) && String((e.respostas || [])[i] || '').trim().length >= 20 && !((c.redacao || {})[i] && c.redacao[i].ia) && !((c.redacao || {})[i] && c.redacao[i].tentativas >= 3))) out.push(e.id);
+  }));
+  return out.slice(0, 3);
+};
 
   function preparar(dados) {
     _cache = {}; _ops = []; _upl = []; _rm = []; _rpc = []; _kv = {};
