@@ -672,6 +672,11 @@ table.list tr:hover td{background:#f8fbfc}
 .pmx-fi-v{font-size:13px;font-weight:700;margin-top:6px;line-height:1.3}
 .pmx-fi-big{font-size:22px;font-weight:800}
 @media (min-width:700px){.pmx{max-width:760px;margin:0 auto}.pmx-kpis{grid-template-columns:1fr 1fr 1fr 1fr}}
+.pmx-pd{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.07);font-size:14px}
+.pmx-pd span{color:#4b4a3a}
+.pmx-pd b{color:#0b2e3a;white-space:nowrap}
+.pmx-pd-t{border-bottom:0;font-size:15px;padding-top:8px}
+.pmx-atr{color:#b42318;font-size:11px;margin-left:4px}
 </style>
 </head>
 <body>
@@ -2594,6 +2599,23 @@ const INICIO_CONTROLE = '2026-11';
 /* Próximo pagamento de serviços: a data mais antiga, a partir de INICIO_CONTROLE, com lote ainda com saldo a pagar.
    Meses anteriores a INICIO_CONTROLE são histórico: não entram como pendência.
    Ao marcar o lote como pago, ele sai da lista e o próximo aparece sozinho. Nunca mostra R$ 0,00. */
+/* Saldo em aberto de serviços prestados, por data de pagamento (só o que falta pagar). */
+function servSaldoPorData() {
+  const hoje = C.hojeISO(), datas = {};
+  let semData = 0;
+  servMeses().forEach(mes => S.prestadores.forEach(p => {
+    servCalc(mes, p.id).pagos.forEach(q => {
+      const falta = q.pago ? r2(q.valor - (q.valorPago != null ? q.valorPago : q.valor)) : q.valor;
+      if (!(falta > 0.005)) return;
+      if (mes < INICIO_CONTROLE) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(q.data || '')) { semData++; return; }
+      const d = datas[q.data] || (datas[q.data] = { valor: 0, pids: new Set() });
+      d.valor = r2(d.valor + falta); d.pids.add(p.id);
+    });
+  }));
+  const itens = Object.keys(datas).sort().map(d => ({ data: d, valor: datas[d].valor, qtd: datas[d].pids.size, atraso: d < hoje }));
+  return { itens, semData, total: r2(itens.reduce((t, x) => t + x.valor, 0)) };
+}
 function servProximo(filtro) {
   const hoje = C.hojeISO(), datas = {};
   let semData = 0;
@@ -2712,7 +2734,9 @@ function vPainel() {
   const stOp = !e ? ['Sem escala', 'warn'] : (ocorr.length || e.status !== 'aprovada') ? ['Atenção', 'warn'] : ['Operação normal', 'ok'];
   // ---- financeiro ----
   const sp20 = servProximo(d => d.slice(8, 10) === '20'), sp05 = servProximo(d => d.slice(8, 10) === '05'), spT = servProximo();
-  const pendTxt = spT.estado === 'nc' ? 'Não calculado' : 'R$ ' + servMoeda(spT.total || 0);
+  const saldo = servSaldoPorData();
+  const pendTxt = (saldo.semData ? '<div class="pmx-fi-s">' + saldo.semData + ' lote(s) sem data de pagamento</div>' : '') +
+    (saldo.itens.length ? saldo.itens.map(x => `<div class="pmx-pd"><span>${C.dataBR(x.data)}${x.atraso ? ' <b class="pmx-atr">em atraso</b>' : ''}</span><b>R$ ${servMoeda(x.valor)}</b></div>`).join('') + `<div class="pmx-pd pmx-pd-t"><span>Total em aberto</span><b>R$ ${servMoeda(saldo.total)}</b></div>` : '<div class="pmx-fi-s">Nada em aberto</div>');
   const pagTxt = r => r.estado === 'ok' ? `${C.dataBR(r.data)} · R$ ${servMoeda(r.valor)}${r.atraso ? ' · em atraso' : ''}` : r.estado === 'nc' ? 'Não calculado' : 'Nada em aberto';
   // ---- listas com "Ver todos" ----
   const LIM = 5;
@@ -2789,7 +2813,7 @@ function vPainel() {
   <div class="pmx-fin">
     <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 20</div><div class="pmx-fi-s">Serviços prestados (dias 1 a 15)</div><div class="pmx-fi-v">${pagTxt(sp20)}</div></a>
     <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 05</div><div class="pmx-fi-s">Serviços prestados (dias 16 ao fim do mês)</div><div class="pmx-fi-v">${pagTxt(sp05)}</div></a>
-    <a class="pmx-fi pmx-fi-p" href="#servicos"><div class="pmx-fi-l">Pendências</div><div class="pmx-fi-s">Valores pendentes de serviços</div><div class="pmx-fi-v pmx-fi-big">${pendTxt}</div></a>
+    <a class="pmx-fi pmx-fi-p" href="#servicos"><div class="pmx-fi-l">Pendências</div><div class="pmx-fi-s">Valores pendentes de serviços</div><div class="pmx-fi-v">${pendTxt}</div></a>
   </div>
 
   <h3 class="pmx-h3">Central de alertas</h3>
