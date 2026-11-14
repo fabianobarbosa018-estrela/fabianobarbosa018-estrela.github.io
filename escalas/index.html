@@ -3287,6 +3287,11 @@ async function salvarArquivo(nome, data) {
   }
   try {
     const blob = data instanceof Blob ? data : new Blob([data]);
+    // celular: entrega o arquivo pelo compartilhamento (anexo), sem abrir endereço temporário
+    try {
+      const arq = new File([blob], nome, { type: blob.type || 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [arq] })) { await navigator.share({ files: [arq], title: nome }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
   } catch (e) { modalMsg('Download indisponível', '<p>Este ambiente não permite baixar arquivos.</p>'); }
 }
