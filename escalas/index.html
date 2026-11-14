@@ -539,6 +539,28 @@ table.list tr:hover td{background:#f8fbfc}
   .top{background:linear-gradient(90deg,#0d4a5a,#156a7f)}
   .kpis .card{padding:14px}
 }
+/* Serviços prestados: resumo, chips de período e cartões por prestador (celular) */
+.svc-kpi{flex:1;min-width:150px}
+.svc-kpi-v{font-size:20px;font-weight:800;margin-top:2px}
+.svc-chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.svc-chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:8px 12px;font:inherit;font-weight:700;cursor:pointer;text-align:left;display:flex;flex-direction:column;min-width:160px}
+.svc-chip small{font-weight:400;color:var(--ink2);font-size:12px;margin-top:2px}
+.svc-chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.svc-chip.on small{color:#e6f4f7}
+.svc-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin:12px 0}
+.svc-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--sh)}
+.svc-card.aberto{border-left:4px solid var(--acc)}
+.svc-card.quitado{border-left:4px solid var(--ok)}
+.svc-card-h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.svc-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn);white-space:nowrap}
+.svc-card.quitado .svc-badge{background:var(--ok-bg);color:var(--ok)}
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.svc-grid span{display:block;font-size:11px;color:var(--ink2)}
+.svc-grid b{font-size:14px}
+.svc-grid b.neg{color:var(--err)}
+.svc-pix{font-size:12px;color:var(--ink2);word-break:break-all}
+.svc-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+@media (max-width:820px){.svc-cards{grid-template-columns:1fr}.svc-chip{min-width:0;flex:1 1 140px}}
 </style>
 </head>
 <body>
@@ -1770,7 +1792,7 @@ function vServicos() {
     <button class="btn" data-act="prestLista">Prestadores</button>
   </div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
-    <select id="selPer" style="flex:1;min-width:220px">${lotes.map(x => `<option value="${esc(x.id)}" ${x.id === sel ? 'selected' : ''}>${esc(x.nome)} · dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))}</option>`).join('')}<option value="mes" ${sel === 'mes' ? 'selected' : ''}>Mês inteiro (só para conferir)</option></select>
+    <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(x.nome)}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
     <select id="selGrupo" style="flex:1;min-width:220px">${Object.keys(servGrupoNome).map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
@@ -1788,7 +1810,7 @@ function vServicos() {
   const aPagar = lote ? r2(calcs.reduce((a, c) => a + c.pagos[idx].valor, 0)) : r2(calcs.reduce((a, c) => a + c.liquido, 0));
   const jaPago = lote ? r2(calcs.reduce((a, c) => a + (c.pagos[idx].pago ? (c.pagos[idx].valorPago ?? c.pagos[idx].valor) : 0), 0)) : r2(calcs.reduce((a, c) => a + c.pago, 0));
   h += `<div class="row mb" style="gap:10px;flex-wrap:wrap">
-    ${[[lote ? 'A pagar neste lote' : 'Total a pagar', aPagar], ['Já pago', jaPago], ['Pendente', r2(aPagar - jaPago)]].map(([t, v]) => `<div class="card" style="flex:1;min-width:150px"><div class="small muted">${t}</div><div style="font-size:20px;font-weight:700">R$ ${servMoeda(v)}</div></div>`).join('')}
+    ${[[lote ? 'A receber neste lote' : 'Total a receber', 'R$ ' + servMoeda(aPagar)], ['Já pago', 'R$ ' + servMoeda(jaPago)], ['Saldo pendente', 'R$ ' + servMoeda(r2(aPagar - jaPago))], ['Prestadores', String(vis.length)]].map(([t, v]) => `<div class="card svc-kpi"><div class="small muted">${t}</div><div class="svc-kpi-v">${v}</div></div>`).join('')}
   </div>`;
   const semLote = servDiasSemLote(mes, grupo);
   if (semLote.length) h += `<div class="alert w mb"><span class="ic">i</span><div>Dias sem lote de pagamento (${servGrupoNome[grupo].toLowerCase()}): ${semLote.map(d => dd2(d)).join(', ')}. Eles não entram em nenhum pagamento. Ajuste em "Lotes do mês".</div></div>`;
@@ -1816,6 +1838,17 @@ function vServicos() {
   }
   corpo += `<tr><td class="svc-dia">Ajustes</td>${vis.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
 
+  const pagLinha = c => { if (!lote) return { valor: c.liquido, pago: c.pago, saldo: r2(c.liquido - c.pago), id: null, pagoOk: false }; const x = c.pagos[idx]; const pg = x.pago ? (x.valorPago ?? x.valor) : 0; return { valor: x.valor, pago: pg, saldo: r2(x.valor - pg), id: x.id, pagoOk: !!x.pago }; };
+  h += `<div class="svc-cards">${calcs.map(c => {
+    const q = pagLinha(c), nm = _capNome(c.p.nome || ''), nDias = Object.keys(c.l.dias || {}).length;
+    const pix = c.p.pix ? `<div class="svc-pix">PIX ${esc(c.p.pix)}${c.p.titular ? ' · ' + esc(c.p.titular) : ''}</div>` : '';
+    const acao = lote && q.valor > 0 ? (q.pagoOk ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
+    const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
+    return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}</div></div><span class="svc-badge">${estado}</span></div>
+      <div class="svc-grid"><div><span>Dias trabalhados</span><b>${nDias}</b></div><div><span>A receber</span><b>R$ ${servMoeda(q.valor)}</b></div><div><span>Já pago</span><b>R$ ${servMoeda(q.pago)}</b></div><div><span>Saldo</span><b class="${q.saldo > 0.004 ? 'neg' : ''}">R$ ${servMoeda(q.saldo)}</b></div></div>
+      ${pix}<div class="svc-acoes"><button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>${acao}</div></div>`;
+  }).join('')}</div>`;
+  h += `<p class="small muted" style="margin:4px 0 0">Lançamento dia a dia (planilha):</p>`;
   h += `<div class="card mb"><div class="svc-wrap"><table class="svc">${thead}<tbody>${corpo}</tbody></table></div>
     <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela: toque num dia vazio de diarista e a diária cadastrada entra sozinha. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do lote escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p></div>`;
   if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
@@ -3967,6 +4000,7 @@ document.addEventListener('click', async ev => {
     case 'servFechPrint': return servFechamento(true);
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
+    case 'servPerChip': UI.servPer = el.dataset.id; return render();
     case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
     case 'servLotes': return servLotesEditar(UI.servMes);
     case 'loteAdd': { const w = el.closest('.mbg'), g = el.dataset.sec, n = w.querySelectorAll(`#lotesLista-${g} [data-lt]`).length; w.querySelector('#lotesLista-' + g).insertAdjacentHTML('beforeend', servLoteLinha({ id: uid('lt'), nome: 'Semana ' + (n + 1), de: 1, ate: 1, pctPadrao: 0, dataPadrao: '' })); return; }
