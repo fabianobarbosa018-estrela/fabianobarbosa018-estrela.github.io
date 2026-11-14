@@ -3637,7 +3637,21 @@ function carregarScript(src) {
   libs[src] = new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { delete libs[src]; rej(new Error('Falha ao carregar ' + src)); }; document.head.appendChild(s); });
   return libs[src];
 }
+/* Imprimir: no computador abre o diálogo de impressão; no iPhone/iPad abre o PDF numa aba (o Safari só imprime pelo compartilhar) */
+function imprimirArquivo(blob) {
+  const url = URL.createObjectURL(blob);
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios) {
+    const f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } setTimeout(() => { f.remove(); URL.revokeObjectURL(url); }, 60000); };
+    f.src = url; document.body.appendChild(f);
+    return;
+  }
+  modalMsg('Imprimir', '<p>Toque no botão abaixo. Na tela do PDF, toque em <b>compartilhar</b> e depois em <b>Imprimir</b>.</p><p><a class="btn pri" href="' + url + '" target="_blank" rel="noopener">Abrir PDF para imprimir</a></p>');
+}
 async function salvarArquivo(nome, data) {
+  if (/-impressao\.pdf$/.test(nome)) return imprimirArquivo(data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' }));
   if (DL) {
     try { await DL.save({ filename: nome, data }); toast('Arquivo salvo.'); return; }
     catch (e) { if (e && e.code === 'declined') { toast('Download cancelado.'); return; } if (e && e.code === 'rate_limited') { toast('Aguarde um instante e tente de novo.'); return; } }
