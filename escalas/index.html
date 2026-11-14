@@ -1798,10 +1798,6 @@ function vServicos() {
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
   <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label></div>`;
   if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
-  const pend = servPendentes(mes);
-  h += `<div class="card mb"><div class="row"><h2 style="margin:0">Pendências de pagamento</h2><div class="sp"></div><span class="small muted">saldo até ${esc(servMesNome(mes))}</span></div>
-    ${pend.lista.length ? '<div class="tw mt"><table><thead><tr><th>Prestador</th><th>Total a receber</th><th>Já pago</th><th>Saldo a pagar</th></tr></thead><tbody>' + pend.lista.map(o => `<tr><td>${esc(_capNome(o.c.p.nome || ''))}</td><td>${servMoeda(o.c.liquido)}</td><td>${servMoeda(o.c.pago)}</td><td><b>${servMoeda(o.c.saldo)}</b></td></tr>`).join('') + '</tbody></table></div><p class="small muted mt">Total pendente: R$ ' + servMoeda(pend.valor) + '. Inclui o que ficou de meses anteriores e já desconta os pagamentos feitos.</p>' : '<p class="muted">Nenhum pagamento pendente. Tudo em dia.</p>'}
-  </div>`;
   if (!criado) return h + `<div class="card empty"><b>${servMesNome(mes)} ainda não tem planilha</b>${S.somenteLeitura ? 'Sem permissão para criar agora.' : 'Aguarde um instante.'}</div>`;
   const vis = servPrestadoresGrupo();
   if (!vis.length) return h + '<div class="card empty"><b>Nenhum prestador neste grupo</b>Escolha outro grupo acima.</div>';
