@@ -682,6 +682,20 @@ table.list tr:hover td{background:#f8fbfc}
 </style>
 </head>
 <body>
+<div id="manutencao" style="position:fixed;inset:0;z-index:2147483647;background:#0b2e3a;color:#fff;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:inherit">
+  <div><div style="font-size:22px;font-weight:800;margin-bottom:10px">Sistema em manutenção</div>
+  <div style="font-size:16px;opacity:.9">Estamos em manutenção até as 06h de hoje. Tente novamente depois.</div></div>
+</div>
+<script>
+(function () {
+  var ate = Date.UTC(2026, 10, 14, 9, 0, 0); // 06:00 de Recife (UTC-3) em 14/11/2026
+  if (Date.now() < ate) {
+    var m = document.getElementById('manutencao');
+    if (m) m.style.display = 'flex';
+    document.documentElement.style.overflow = 'hidden';
+  }
+})();
+</script>
 <div class="app" id="app">
   <aside class="side" id="side">
     <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Gestão operacional</small></div>
