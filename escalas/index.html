@@ -3624,10 +3624,11 @@ function vtCadastroHTML(m) {
   const ref = m.dias[m.dim - 1];
   const fs = vtOrdenados().filter(f => f.ativo || (f.vt && f.vt.hist && f.vt.hist.length));
   let h = `<div class="alert i"><span class="ic">i</span><div>O valor diário é <b>valor da passagem × passagens por dia</b>. Ao mudar um valor, escolha a partir de quando ele vale: os meses anteriores continuam com o valor antigo.</div></div>
-  <div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th class="r">Valor da passagem</th><th class="r">Passagens/dia</th><th class="r">Valor diário</th><th>Vale desde</th><th></th></tr></thead><tbody>`;
+  <div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th>Chave Pix</th><th class="r">Valor da passagem</th><th class="r">Passagens/dia</th><th class="r">Valor diário</th><th>Vale desde</th><th></th></tr></thead><tbody>`;
   fs.forEach(f => {
     const v = C.vtValorEm(f, ref), nao = f.vt && f.vt.nao;
-    h += `<tr><td><b>${esc(f.nome)}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td>
+    const px = vtPix(f.id);
+    h += `<tr><td><b>${esc(f.nome)}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>
     ${v && v.fixo ? `<td class="r" colspan="2">fixo por quinzena</td><td class="r"><b>${rs(v.q1)} + ${rs(v.q2)}</b></td>` : `<td class="r">${v ? rs(v.valor) : '—'}</td><td class="r">${v ? v.qtd : '—'}</td>`}${v && v.fixo ? '' : `<td class="r"><b>${v ? rs(v.total) : nao ? '<span class="badge b-off">não recebe</span>' : '<span class="badge b-err">não cadastrado</span>'}</b></td>`}
     <td>${v ? (v.desde <= '2000-12-31' ? 'sempre' : C.dataBR(v.desde)) : ''}</td><td class="r"><button class="btn sm edit-only" data-act="vtValor" data-id="${f.id}">${ic('edit')} Editar</button></td></tr>`;
   });
