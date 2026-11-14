@@ -193,7 +193,7 @@ table.list tr:hover td{background:#fafbfc}
 .empty{text-align:center;padding:36px 16px;color:var(--ink2)}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 .list-sm{margin:0;padding:0;list-style:none}
-.list-sm li{padding:7px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px;justify-content:space-between}
+.list-sm li{padding:7px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
 .list-sm li:last-child{border-bottom:0}
 .chip{display:inline-block;background:#f3f4f6;border-radius:6px;padding:1px 7px;margin:2px 3px 2px 0;font-size:12.5px}
 .chip.b{background:var(--off-bg);color:var(--off)}
@@ -211,7 +211,8 @@ table.list tr:hover td{background:#fafbfc}
   .side.open{left:0}
   .top{display:flex}
   .content{padding:16px 12px 70px}
-  .g2,.g3{grid-template-columns:1fr}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .btn{white-space:normal;max-width:100%;text-align:center}
   h1{font-size:19px}
   .esc td.nm{min-width:130px;max-width:150px}
   .esc td.nm .fu{display:none}
