@@ -3498,6 +3498,13 @@ function vtFaixa(per, dim) { return per === 'q1' ? [1, 15] : per === 'q2' ? [16,
 function vtTituloPer(m, per) { const [a, b] = vtFaixa(per, m.dim); return String(a).padStart(2, '0') + ' A ' + String(b).padStart(2, '0') + '/' + m.mes.slice(5, 7) + '/' + m.mes.slice(0, 4); }
 function vtValorPer(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[vtFaixa(per, m.dim)[1] - 1]); return v ? v.total : l.valorDia; }
 function vtValorTxt(m, l, per) { const v = C.vtValorEm(funcPorId(l.id), m.dias[vtFaixa(per, m.dim)[1] - 1]); if (v && v.fixo) return 'FIXO ' + (per === 'mes' ? brl(v.q1) + ' + ' + brl(v.q2) : brl(v[per])); const t = v ? v.total : l.valorDia; return t ? 'R$ ' + brl(t) : ''; }
+/* Chave Pix de quem recebe VT: o cadastro do funcionário; se não tiver, usa o da Serviços prestados com o mesmo nome */
+function vtPix(fid) {
+  const f = funcPorId(fid) || {}, norm = t => (t || '').trim().toLowerCase();
+  if (f.pix) return { pix: f.pix, titular: f.titular || '' };
+  const p = S.prestadores.find(x => norm(x.nome) === norm(f.nome) && x.pix);
+  return p ? { pix: p.pix, titular: p.titular || '' } : { pix: '', titular: '' };
+}
 function vtTot(l, per) { return per === 'mes' ? l.mes : l[per]; }
 function vtPago(l, per) { return per === 'mes' ? l.pago.q1 + l.pago.q2 : l.pago[per]; }
 const vtCelTxt = c => c.fixoQ ? brl(c.valor) + (c.tipo === 'trab' ? '' : ' ' + c.cod) : c.tipo === 'trab' ? (c.valor > 0 ? brl(c.valor) : c.fixoDia ? '•' : '—') : c.cod;
@@ -3599,10 +3606,11 @@ function vtResumoHTML(m) {
     <button class="btn sm edit-only" data-act="vtPagarTodos" data-q="${q}">Marcar todos como pagos</button></div>
     <div class="small muted mt">${f ? `Fechada em ${dtHora(f.em)} com total de <b>${rs(f.total)}</b>.${d && d.dif.length ? ' <span style="color:var(--warn)">A escala mudou depois do fechamento.</span>' : ' Confere com a escala atual.'}` : 'Ao fechar, os valores ficam guardados. Se a escala mudar depois, o sistema avisa a diferença.'}</div></div>`;
   }).join('')}</div></div>
-  <div class="tw"><table class="list vtres"><thead><tr><th>Funcionário</th><th>Setor</th><th class="r">Passagem</th><th class="r">Qtd/dia</th><th class="r">Valor diário</th><th class="r">Dias 1ª</th><th class="r">1ª quinzena</th><th class="r">Dias 2ª</th><th class="r">2ª quinzena</th><th class="r">Dias no mês</th><th class="r">Total do mês</th><th class="r">Pago</th><th class="r">Saldo</th></tr></thead><tbody>`;
+  <div class="tw"><table class="list vtres"><thead><tr><th>Funcionário</th><th>Setor</th><th>Chave Pix</th><th class="r">Passagem</th><th class="r">Qtd/dia</th><th class="r">Valor diário</th><th class="r">Dias 1ª</th><th class="r">1ª quinzena</th><th class="r">Dias 2ª</th><th class="r">2ª quinzena</th><th class="r">Dias no mês</th><th class="r">Total do mês</th><th class="r">Pago</th><th class="r">Saldo</th></tr></thead><tbody>`;
   m.linhas.forEach(l => {
     const s = l.saldo.mes;
-    h += `<tr><td><b>${esc(l.nome)}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td>${l.fixo ? `<td class="r" colspan="3">fixo: ${rs(l.fixo.q1)} (1ª) + ${rs(l.fixo.q2)} (2ª)</td>` : `<td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>`}
+    const px = vtPix(l.id);
+    h += `<tr><td><b>${esc(l.nome)}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>${l.fixo ? `<td class="r" colspan="3">fixo: ${rs(l.fixo.q1)} (1ª) + ${rs(l.fixo.q2)} (2ª)</td>` : `<td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>`}
     <td class="r">${l.q1.dias}</td><td class="r">${rs(l.q1.valor)}</td><td class="r">${l.q2.dias}</td><td class="r">${rs(l.q2.valor)}</td><td class="r">${l.mes.dias}</td><td class="r"><b>${rs(l.mes.valor)}</b></td><td class="r">${rs(l.pago.q1 + l.pago.q2)}</td><td class="r" style="color:${s > 0.004 ? 'var(--err)' : s < -0.004 ? 'var(--off)' : 'inherit'};font-weight:700">${rs(s)}</td></tr>`;
   });
   const sm = k => m.linhas.reduce((a, l) => a + k(l), 0);
