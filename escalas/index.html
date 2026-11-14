@@ -2762,6 +2762,12 @@ function vtProximo() {
 }
 function faixaDia(d) { return d.slice(0, 2) === '20' ? ' · dias 1 a 15' : d.slice(0, 2) === '05' ? ' · dias 16 a 30' : ''; }
 
+/* Diaristas com dia lançado em Serviços prestados (mês do dia) */
+function diaristasTrabalhando(dataISO) {
+  const mes = dataISO.slice(0, 7), dd = dataISO.slice(8, 10);
+  return servPrestadores().filter(p => grupoDe(p) === 'diaria' && ((S.servicos[servKey(mes, p.id)] || {}).dias || {})[dd] > 0)
+    .map(p => ({ id: 'prest:' + p.id, nome: _capNome(p.nome || ''), setorId: null, setor: 'Diarista' + (p.funcao ? ' · ' + p.funcao : ''), horario: '', diarista: true }));
+}
 function vPainel() {
   const hoje = UI.painelDia || C.hojeISO(), sem = C.inicioSemana(hoje), mes = hoje.slice(0, 7);
   const ativos = S.funcionarios.filter(f => f.ativo);
@@ -2786,6 +2792,9 @@ function vPainel() {
   const porNome = (a, b) => a.nome.localeCompare(b.nome);
   trab.sort((a, b) => cmpSetor(a.setorId, b.setorId) || porNome(a, b));
   folg.sort((a, b) => cmpSetor(a.setorId, b.setorId) || porNome(a, b));
+  // diaristas lançados nesse dia (Serviços prestados) também estão trabalhando
+  const diaristasDia = diaristasTrabalhando(hoje);
+  trab.push(...diaristasDia);
   // ---- ocorrências do dia ----
   const nomeId = id => (funcPorId(id) || {}).nome || '—';
   const trocas = e ? (e.ajustes || []).filter(a => a.data === hoje) : [];
@@ -2810,7 +2819,7 @@ function vPainel() {
   const pagTxt = r => r.estado === 'ok' ? `${C.dataBR(r.data)} · R$ ${servMoeda(r.valor)}${r.atraso ? ' · em atraso' : ''}` : r.estado === 'nc' ? 'Não calculado' : 'Nada em aberto';
   // ---- listas com "Ver todos" ----
   const LIM = 5;
-  const trabLista = mais.trab ? trab : trab.slice(0, LIM);
+  const trabLista = mais.trab ? trab : [...trab.filter(p => !p.diarista).slice(0, LIM), ...trab.filter(p => p.diarista)];
   const folgLista = mais.folg ? folg : folg.slice(0, 6);
   const ocLista = mais.oc ? ocorr : ocorr.slice(0, 3);
   const ico = {
@@ -2836,16 +2845,16 @@ function vPainel() {
 
   <div class="pmx-kpis">
     <div class="pmx-kpi"><span class="pmx-kico" style="color:#0f6b73">${ico.users}</span><div><div class="pmx-kl">Funcionários ativos</div><div class="pmx-kn">${ativos.length}</div><div class="pmx-ks">Equipe cadastrada${inatTxt()}</div></div></div>
-    <div class="pmx-kpi"><span class="pmx-kico" style="color:#1f9d55">${ico.check}</span><div><div class="pmx-kl">Trabalhando hoje</div><div class="pmx-kn">${e ? trab.length : '—'}</div><div class="pmx-ks">${e ? 'Presentes na escala' : 'Sem escala nesta semana'}</div></div></div>
+    <div class="pmx-kpi"><span class="pmx-kico" style="color:#1f9d55">${ico.check}</span><div><div class="pmx-kl">Trabalhando hoje</div><div class="pmx-kn">${e || diaristasDia.length ? trab.length : '—'}</div><div class="pmx-ks">${e ? 'Presentes na escala' : 'Sem escala nesta semana'}</div></div></div>
     <div class="pmx-kpi"><span class="pmx-kico" style="color:#e08a1e">${ico.cal}</span><div><div class="pmx-kl">De folga hoje</div><div class="pmx-kn">${e ? folg.length : '—'}</div><div class="pmx-ks">${e ? 'Conforme a escala' : 'Sem escala nesta semana'}</div></div></div>
     <div class="pmx-kpi"><span class="pmx-kico" style="color:#d33c3c">${ico.med}</span><div><div class="pmx-kl">Afastados hoje</div><div class="pmx-kn">${afast.length + faltas.length}</div><div class="pmx-ks">${afast.length + faltas.length ? esc([...new Set(afast.concat(faltas).map(p => p.tipo))].join(', ')) : 'Nenhum'}</div></div></div>
   </div>
 
   <section class="pmx-sec">
-    <header class="pmx-hd pmx-hd-teal"><span class="pmx-hd-ic">${ico.work}</span><span class="pmx-hd-t">Quem está trabalhando hoje</span><span class="pmx-hd-n">${e ? trab.length : ''}</span></header>
-    ${e && trab.length ? `<div class="pmx-tab"><div class="pmx-tr pmx-th"><span>Nome</span><span>Setor</span><span>Horário</span></div>
+    <header class="pmx-hd pmx-hd-teal"><span class="pmx-hd-ic">${ico.work}</span><span class="pmx-hd-t">Quem está trabalhando hoje</span><span class="pmx-hd-n">${e || diaristasDia.length ? trab.length : ''}</span></header>
+    ${(e || diaristasDia.length) && trab.length ? `<div class="pmx-tab"><div class="pmx-tr pmx-th"><span>Nome</span><span>Setor</span><span>Horário</span></div>
       ${trabLista.map(p => `<div class="pmx-tr"><span class="pmx-nm"><i class="pmx-dot"></i>${nomeCurto(p)}</span><span>${esc(p.setor)}</span><span>${p.horario ? esc(p.horario) : '—'}</span></div>`).join('')}</div>
-      <div class="pmx-foot">${btnTodos('trab', trab.length)}</div>` : `<div class="pmx-vazio">${e ? 'Ninguém previsto para trabalhar neste dia.' : 'Esta semana ainda não tem escala gerada.'}</div>`}
+      <div class="pmx-foot">${btnTodos('trab', trab.length)}</div>` : `<div class="pmx-vazio">${e || diaristasDia.length ? 'Ninguém previsto para trabalhar neste dia.' : 'Esta semana ainda não tem escala gerada.'}</div>`}
   </section>
 
   <section class="pmx-sec pmx-folga">
@@ -4375,7 +4384,7 @@ document.addEventListener('click', async ev => {
       const p = S.prestadores.find(x => x.id === pid); if (!p) return;
       const at = S.servicos[servKey(mes, pid)] || {};
       const on = (at.dias || {})[dd] != null;
-      return servDia(mes, pid, dd, on ? 0 : p.valor).then(() => render()).catch(() => render());
+      return servDia(mes, pid, dd, on ? 0 : p.valor).then(() => { if (!on) toast(_capNome(p.nome || '').split(' ')[0] + ' também aparece como trabalhando em ' + dd + '/' + mes.slice(5, 7) + ' no Painel.'); render(); }).catch(() => render());
     }
     case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
     case 'servLotes': return servLotesEditar(UI.servMes);
