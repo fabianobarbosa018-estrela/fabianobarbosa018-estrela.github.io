@@ -2730,6 +2730,16 @@ function semanasDoMes(ym) {
 function vMensal() {
   const { sems } = semanasDoMes(UI.mes);
   UI.setoresSel = (UI.setoresSel || []).filter(id => setorPorId(id));
+  // Visualizar uma semana: mostra só a escala daquela semana
+  if (UI.visaoSemana) {
+    const sw = UI.visaoSemana;
+    UI.semana = sw;
+    const mw = folhaModelo(Object.assign(periodoFolha('semana'), { setorIds: UI.setoresSel }));
+    let hw = `<div class="row mb" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h1>Escala da semana</h1><p class="sub" style="margin:0">${esc(semanaLabel(sw))}</p></div><button class="btn" data-act="voltarMes">← Voltar ao mês</button></div>`;
+    if (!S.escalas[sw]) hw += '<div class="alert w mb"><span class="ic">!</span><div>Esta semana ainda não tem escala gerada.</div></div>';
+    if (!mw.grupos.length) return hw + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
+    return hw + folhaHTML(mw);
+  }
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
   let h = `<div class="row mb"><div><h1>Escala mensal</h1><p class="sub" style="margin:0">Folha de folga do mês, no mesmo formato da planilha do hotel</p><p class="small muted" style="margin:2px 0 0">Versão ${VERSAO_APP}</p></div></div>
@@ -2748,7 +2758,7 @@ function vMensal() {
     const e = S.escalas[s], ap = !!(e && e.status === 'aprovada');
     const sit = !e ? '<span class="badge b-off">Não gerada</span>' : ap ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Pendente</span>';
     const edit = !e || S.somenteLeitura ? '' : ap ? `<button class="btn sm pri" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar</button>` : `<a class="btn sm" href="#mensal" data-act="irSemana" data-sem="${s}">${ic('edit')} Editar</a>`;
-    return `<div class="sem-card ${ap ? 'ok' : ''}"><div class="sem-d">${semanaLabel(s)}</div>${sit}<div class="sem-acoes"><a class="btn sm" href="#mensal" data-act="irSemana" data-sem="${s}">Visualizar</a>${edit}</div></div>`;
+    return `<div class="sem-card ${ap ? 'ok' : ''}"><div class="sem-d">${semanaLabel(s)}</div>${sit}<div class="sem-acoes"><button class="btn sm" data-act="verSemana" data-sem="${s}">Visualizar</button>${edit}</div></div>`;
   }).join('')}</div></div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
@@ -4021,6 +4031,8 @@ document.addEventListener('click', async ev => {
     case 'alternarTema': return alternarTema();
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
+    case 'verSemana': UI.visaoSemana = el.dataset.sem; window.scrollTo(0, 0); return render();
+    case 'voltarMes': UI.visaoSemana = null; window.scrollTo(0, 0); return render();
     case 'alertaCat': { const c = el.dataset.cat; UI.alertaCat = UI.alertaCat === c ? null : c; render(); return; }
     case 'verHoje': {
       const hj = C.hojeISO(), c = contagemSemana(C.inicioSemana(hj), '')[C.diaSemana(hj)];
