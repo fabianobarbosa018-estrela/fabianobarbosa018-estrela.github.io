@@ -1551,7 +1551,12 @@ async function log(tipo, texto, semana) {
   else { S.auditoria.unshift(Object.assign({ id: uid('log') }, e)); Store.salvarLocal(); }
 }
 let rT = null;
-function agendarRender() { if (rT) return; rT = setTimeout(() => { rT = null; render(); }, 30); }
+function agendarRender() {
+  if (rT) return;
+  // enquanto a pessoa digita um valor na tabela de serviços, não redesenha a tela (senão o cursor e a rolagem voltam ao início)
+  if (Date.now() - (window.__svcT || 0) < 2500) { rT = setTimeout(() => { rT = null; agendarRender(); }, 1500); return; }
+  rT = setTimeout(() => { rT = null; render(); }, 30);
+}
 function atualizarStatus() {
   const el = document.getElementById('storeStatus');
   let h;
@@ -4123,7 +4128,7 @@ document.addEventListener('click', async ev => {
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
-  if (t.dataset && t.dataset.svc === 'dia') { servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, t.value).catch(() => { }); return; }
+  if (t.dataset && t.dataset.svc === 'dia') { window.__svcT = Date.now(); servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, t.value).catch(() => { }); return; }
   if (t.id === 'inServMes' && t.value) { UI.servMes = t.value; render(); return; }
   if (t.id === 'selPer') { UI.servPer = t.value; render(); return; }
   if (t.id === 'selPainelSetor') { UI.painelSetor = t.value; UI.painelDia = undefined; render(); return; }
@@ -4144,6 +4149,7 @@ document.addEventListener('change', ev => {
   else if (t.dataset.act === 'mudarGrupo') mudarGrupo(t.dataset.id, +t.value);
 });
 document.addEventListener('input', ev => {
+  if (ev.target.dataset && ev.target.dataset.svc === 'dia') window.__svcT = Date.now();
   if (ev.target.id === 'busca') { UI.busca = ev.target.value; const l = document.getElementById('listaFunc'); if (l) l.innerHTML = listaFuncHTML(); }
 });
 // toque longo no nome (celular) abre ações
