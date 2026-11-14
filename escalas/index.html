@@ -1774,8 +1774,7 @@ function vServicos() {
     <select id="selGrupo" style="flex:1;min-width:220px">${Object.keys(servGrupoNome).map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
-  <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label>
-  <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkAmbos" ${UI.servAmbos ? 'checked' : ''}> Imprimir e exportar os dois grupos (diaristas e mensais, um arquivo para cada)</label></div>`;
+  <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label></div>`;
   if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
   const pend = servPendentes(mes);
   h += `<div class="card mb"><div class="row"><h2 style="margin:0">Pendências de pagamento</h2><div class="sp"></div><span class="small muted">saldo até ${esc(servMesNome(mes))}</span></div>
@@ -1820,7 +1819,8 @@ function vServicos() {
   h += `<div class="card mb"><div class="svc-wrap"><table class="svc">${thead}<tbody>${corpo}</tbody></table></div>
     <p class="small muted mt" style="margin-bottom:0">Valores em R$. Lance os dias direto na tabela: toque num dia vazio de diarista e a diária cadastrada entra sozinha. Só a diária soma os dias; nas outras modalidades eles ficam como registro. Os dias fora do lote escolhido aparecem apagados. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p></div>`;
   if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
-  h += `<div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
+  h += `<div class="row mt" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="small muted">Todos os serviços ao imprimir:</span><select id="selFormato" style="max-width:320px"><option value="unico" ${UI.servFormato !== 'separado' ? 'selected' : ''}>Um PDF com diaristas e serviços juntos</option><option value="separado" ${UI.servFormato === 'separado' ? 'selected' : ''}>Dois PDFs separados (diaristas e serviços)</option></select></div>
+  <div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
   <div class="row mt"><button class="btn" data-act="servFechPdf">${ic('pdf')} Fechamento (PDF)</button><button class="btn pri" data-act="servFechPrint">Imprimir fechamento</button></div>
   <p class="small muted mt">Baixar, Excel e Imprimir saem só do lote e do grupo escolhidos acima.</p>`;
   return h;
@@ -2156,7 +2156,7 @@ async function servPDFAmbos(paraImprimir) {
   await salvarArquivo('servicos-prestados-' + ms[0].mes + '-diaristas-e-mensais' + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
 }
 async function servPDF(paraImprimir) {
-  if (UI.servAmbos) return servPDFAmbos(paraImprimir);
+  if (UI.servGrupo === 'todos') return UI.servFormato === 'separado' ? servPorGrupos(servPDF, paraImprimir) : servPDFAmbos(paraImprimir);
   if (!await servPDFLibs()) return;
   const m = servModelo(UI.servMes);
   if (!m.ativos.length) return toast('Nada para exportar.');
@@ -2209,7 +2209,7 @@ async function servFechamento(paraImprimir) {
   await salvarArquivo('fechamento-' + mes + '-' + servSlug(lote.nome) + '-' + grupo + (paraImprimir ? '-impressao' : '') + '.pdf', doc.output('blob'));
 }
 async function servXls(unico) {
-  if (UI.servAmbos && !unico) return servPorGrupos(servXls);
+  if (UI.servGrupo === 'todos' && UI.servFormato === 'separado' && !unico) return servPorGrupos(servXls);
   try { await carregarScript('libs/exceljs.min.js'); } catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de Excel.</p>'); }
   const m = servModelo(UI.servMes);
   if (!m.ativos.length) return toast('Nada para exportar.');
@@ -4134,7 +4134,7 @@ document.addEventListener('change', ev => {
   if (t.id === 'selPainelSetor') { UI.painelSetor = t.value; UI.painelDia = undefined; render(); return; }
   if (t.id === 'selGrupo') { UI.servGrupo = t.value; render(); return; }
   if (t.id === 'chkSoValor') { UI.servSoValor = t.checked; return; }
-  if (t.id === 'chkAmbos') { UI.servAmbos = t.checked; return; }
+  if (t.id === 'selFormato') { UI.servFormato = t.value; return; }
   if (t.id === 'chkFechAnt') { UI.servFechAnt = t.checked; return; }
   if (t.id === 'inSemana' && t.value) { UI.semana = C.inicioSemana(t.value); render(); }
   else if (t.id === 'inMes' && t.value) { UI.mes = t.value; render(); }
