@@ -568,6 +568,17 @@ table.list tr:hover td{background:#f8fbfc}
 .sem-card:not(.ok){border-left:4px solid var(--acc)}
 .sem-d{font-weight:700;font-size:14px}
 .sem-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+/* Escala de uma semana: cabe na tela do celular, sem rolagem lateral */
+.sem-folha table.folha{width:100%;min-width:0;table-layout:fixed}
+.sem-folha table.folha .fnm{min-width:0;white-space:normal}
+.sem-folha table.folha th,.sem-folha table.folha td{font-size:11px;padding:2px 1px;overflow:hidden;word-break:break-word}
+.sem-folha table.folha th.fnm,.sem-folha table.folha td.fnm{width:104px;font-size:10px;text-align:left;padding-left:3px;word-break:normal;overflow-wrap:break-word}
+.sem-folha table.folha th.ft1{font-size:16px}
+.sem-folha table.folha th.ft2{font-size:12px}
+.sem-folha .folha-wrap{overflow:visible}
+.sem-folha .fimp{min-width:0;width:100%;box-sizing:border-box}
+.sem-folha .fimp-t{font-size:24px}
+.sem-folha .fimp p{font-size:13px}
 </style>
 </head>
 <body>
@@ -2738,7 +2749,7 @@ function vMensal() {
     let hw = `<div class="row mb" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h1>Escala da semana</h1><p class="sub" style="margin:0">${esc(semanaLabel(sw))}</p></div><button class="btn" data-act="voltarMes">← Voltar ao mês</button></div>`;
     if (!S.escalas[sw]) hw += '<div class="alert w mb"><span class="ic">!</span><div>Esta semana ainda não tem escala gerada.</div></div>';
     if (!mw.grupos.length) return hw + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
-    return hw + folhaHTML(mw);
+    return hw + '<div class="sem-folha">' + folhaHTML(mw) + '</div>';
   }
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
