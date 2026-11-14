@@ -579,6 +579,8 @@ table.list tr:hover td{background:#f8fbfc}
 .sem-folha .fimp{min-width:0;width:100%;box-sizing:border-box}
 .sem-folha .fimp-t{font-size:24px}
 .sem-folha .fimp p{font-size:13px}
+.sem-folha td.ed{cursor:pointer}
+.sem-folha td.ed:active{opacity:.6}
 </style>
 </head>
 <body>
@@ -2749,7 +2751,8 @@ function vMensal() {
     let hw = `<div class="row mb" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h1>Escala da semana</h1><p class="sub" style="margin:0">${esc(semanaLabel(sw))}</p></div><button class="btn" data-act="voltarMes">← Voltar ao mês</button></div>`;
     if (!S.escalas[sw]) hw += '<div class="alert w mb"><span class="ic">!</span><div>Esta semana ainda não tem escala gerada.</div></div>';
     if (!mw.grupos.length) return hw + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
-    return hw + '<div class="sem-folha">' + folhaHTML(mw) + '</div>';
+    if (!S.somenteLeitura && mw.grupos.length) hw += '<p class="small muted mb">Toque num dia de um funcionário para trocar entre <b>Trabalha</b> e <b>Folga</b>.</p>';
+    return hw + '<div class="sem-folha">' + folhaHTML(mw, true) + '</div>';
   }
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
@@ -2820,7 +2823,7 @@ function segmentos(cel) {
   return r;
 }
 const COR_FERIADO = '#DDEBF7', COR_FERIAS = '#FF0000', COR_TITULO = '#C00000';
-function folhaHTML(m) {
+function folhaHTML(m, editavel) {
   const n = m.cols.length;
   const thDia = (d, i, txt) => `<th class="${m.feriados[i] ? 'fer' : ''}" ${m.feriados[i] ? `title="Feriado: ${esc(m.feriados[i].nome)}"` : ''}>${txt}</th>`;
   let h = `<div class="folha-wrap"><table class="folha"><thead>
@@ -2834,7 +2837,11 @@ function folhaHTML(m) {
       h += `<tr><td class="fnm" style="background:${g.cor}" title="${esc(g.nome)}">${esc(l.nome.toUpperCase())}</td>`;
       segmentos(l.cel).forEach(sg => {
         if (sg.tipo === 'V') h += `<td colspan="${sg.n}" class="fv">FÉRIAS</td>`;
-        else h += `<td class="${sg.tipo === '-' ? 'nd' : ''}" style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : sg.tipo === 'R' ? '<span class="fr">F</span>' : ''}</td>`;
+        else {
+          const dd = m.cols[sg.i], ed = !!editavel && !S.somenteLeitura && ['T', 'F', 'R', 'X'].includes(sg.tipo);
+          const dat = ed ? ` data-act="escDia" data-sem="${C.inicioSemana(dd)}" data-fid="${l.id}" data-d="${dd}" title="Toque para trocar entre Trabalha e Folga"` : '';
+          h += `<td class="${sg.tipo === '-' ? 'nd' : ''}${ed ? ' ed' : ''}"${dat} style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : sg.tipo === 'R' ? '<span class="fr">F</span>' : ''}</td>`;
+        }
       });
       h += '</tr>';
     });
@@ -3285,6 +3292,54 @@ async function abrirEdicaoAprovada(sem) {
     textos.forEach(t => log('escala', t, sem));
     fecharModal(w);
     toast('Ajustes salvos. A escala continua aprovada.');
+  };
+}
+/* Toque num dia da visão da semana: troca Trabalha/Folga daquela pessoa, com as mesmas regras e histórico da edição de escala */
+async function escEditarDia(sem, fid, d) {
+  const e = S.escalas[sem];
+  if (!e || !e.atribuicoes || !e.atribuicoes[fid]) return;
+  if (S.somenteLeitura) { toast('Somente o administrador pode alterar a escala.'); return; }
+  const f = funcPorId(fid), orig = e.atribuicoes, nome = (f || orig[fid]).nome;
+  const dias = C.diasDaSemana(sem);
+  if (!dias.includes(d)) return;
+  const stAtual = C.statusDia(orig[fid], d, f, true);
+  if (stAtual === 'V' || stAtual === '-') return toast('Este dia não pode ser alterado aqui.');
+  const eFolga = stAtual === 'F';
+  const w = abrirModal(`<div class="mh">${esc(nome)} · ${C.DIAS[C.diaSemana(d)]}, ${C.dataBR(d)}</div><div class="mbd">
+    <p>Hoje na escala: <b>${eFolga ? 'Folga' : 'Trabalha'}</b></p>
+    <div class="fld"><label class="f">Neste dia</label><select id="edTipo" style="width:100%"><option value="T" ${eFolga ? '' : 'selected'}>Trabalha</option><option value="F" ${eFolga ? 'selected' : ''}>Folga</option></select></div>
+    <p class="small muted">Se a mudança quebrar alguma regra, ela não é salva (em escala aprovada, é salva como excepcional e fica no histórico).</p>
+    </div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Revisar e salvar</button></div>`);
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const novaFolga = w.querySelector('#edTipo').value === 'F';
+    if (novaFolga === eFolga) { fecharModal(w); return; }
+    const wd = C.diaSemana(d);
+    const curFolgas = dias.filter(x => C.statusDia(orig[fid], x, f, true) === 'F').map(x => C.diaSemana(x));
+    const novos = novaFolga ? [...new Set(curFolgas.concat([wd]))] : curFolgas.filter(x => x !== wd);
+    const draft = clone(orig); draft[fid] = Object.assign({}, orig[fid], { dias: novos.sort((a, b) => a - b) });
+    const antes = eFolga ? 'Folga' : 'Trabalha', depois = novaFolga ? 'Folga' : 'Trabalha';
+    const txt = `Ajuste: ${nome} · ${C.dataBR(d)} · ${antes} → ${depois}`;
+    if (e.status !== 'aprovada') {
+      const ok = await salvarAlteracao(sem, draft, txt);
+      if (ok) { fecharModal(w); render(); }
+      return;
+    }
+    const v = C.validarEscala({ semana: sem, modo: e.modo, atribuicoes: draft }, S.funcionarios, S.setores, historicoArr());
+    const aviso = v.erros.length ? `<div class="alert w"><span class="ic">!</span><div><b>Esta alteração quebra regras da escala.</b> Ela será salva como excepcional.<br>${v.erros.map(x => esc(x.msg)).join('<br>')}</div></div>` : '';
+    const ok = await confirmar('Confirmar ajuste na escala aprovada?', `<p>A escala continua <b>aprovada</b>. Confira o que será registrado:</p>${aviso}<ul class="list-sm"><li>${esc(nome)} · ${C.dataBR(d)}: <b>${antes}</b> → <b>${depois}</b></li></ul>`, 'Confirmar e salvar');
+    if (!ok) return;
+    const agora = agoraISO(), exc = v.erros.length > 0;
+    const doc = Object.assign({}, e, {
+      modo: e.modo || 'manual',
+      atribuicoes: draft,
+      ajustes: (e.ajustes || []).concat([{ ts: agora, funcId: fid, nome, data: d, antes, depois, excepcional: exc }]).slice(-500),
+      alteracoes: (e.alteracoes || []).concat([{ ts: agora, texto: txt + (exc ? ' (excepcional)' : '') }]).slice(-200)
+    });
+    try { await Store.set('escalas', sem, doc); } catch (x) { render(); return; }
+    log('escala', txt + (exc ? ' (excepcional)' : ''), sem);
+    fecharModal(w);
+    toast('Ajuste salvo. A escala continua aprovada.');
   };
 }
 /* Aprova de uma vez todas as semanas em rascunho do mês. Se alguma tiver erro de regra, nenhuma é aprovada. */
@@ -4042,6 +4097,7 @@ document.addEventListener('click', async ev => {
     case 'alternarTema': return alternarTema();
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
+    case 'escDia': return escEditarDia(el.dataset.sem, el.dataset.fid, el.dataset.d);
     case 'verSemana': UI.visaoSemana = el.dataset.sem; window.scrollTo(0, 0); return render();
     case 'voltarMes': UI.visaoSemana = null; window.scrollTo(0, 0); return render();
     case 'alertaCat': { const c = el.dataset.cat; UI.alertaCat = UI.alertaCat === c ? null : c; render(); return; }
