@@ -683,6 +683,22 @@ table.list tr:hover td{background:#f8fbfc}
 .svc-cal>button{padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--card);color:inherit;font-weight:600}
 .svc-cal>button.on{background:#0f6b73;color:#fff;border-color:#0f6b73}
 .svc-cal>span{padding:4px 0}
+/* Ctrl+P / Imprimir da página: sem menu nem botões, conteúdo ajustado à largura da folha */
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  html{zoom:.72}
+  html,body{background:#fff!important;color:#000!important;font-size:9.5pt!important}
+  .side,.shade,.btn,button,.tabs,.nav,.side-atu,#storeStatus,#modals,.mbg,.toast,#manutencao,.no-print,.alert.w,input[type=search],input[type=date],input[type=month]{display:none!important}
+  .app{display:block!important;min-height:0!important}
+  .main{display:block!important;width:100%!important;min-width:0!important}
+  .content{padding:0!important;max-width:none!important;width:100%!important;zoom:1}
+  *{box-shadow:none!important;text-shadow:none!important;overflow:visible!important;max-height:none!important;transition:none!important;animation:none!important}
+  table{width:100%!important;table-layout:auto!important;font-size:8.5pt!important}
+  th,td{padding:2px 4px!important;white-space:normal!important}
+  input,select,textarea{border:none!important;background:transparent!important;padding:0!important}
+  tr,.card,.kpi,.pmx-card,.pmx-kpi{break-inside:avoid;page-break-inside:avoid}
+  a{color:#000!important;text-decoration:none!important}
+}
 </style>
 </head>
 <body>
