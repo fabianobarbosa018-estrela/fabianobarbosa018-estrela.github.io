@@ -3826,7 +3826,8 @@ async function vtPDF(per, imprimir) {
     [{ content: 'VALOR', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtTot(l, per).valor ? brl(vtTot(l, per).valor) : '-', i, { fontStyle: 'bold' }))),
     [{ content: 'DIAS', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(String(vtTot(l, per).dias), i))),
     [{ content: 'PAGO', styles: { fillColor: verde } }].concat(L.map((l, i) => hc(vtPago(l, per) ? brl(vtPago(l, per)) : '', i))),
-    [{ content: 'SALDO', styles: { fillColor: verde } }].concat(L.map((l, i) => { const s = vtTot(l, per).valor - vtPago(l, per); return hc(Math.abs(s) > 0.004 ? brl(s) : '-', i, { textColor: s > 0.004 ? [192, 0, 0] : preto, fontStyle: 'bold' }); }))
+    [{ content: 'SALDO', styles: { fillColor: verde } }].concat(L.map((l, i) => { const s = vtTot(l, per).valor - vtPago(l, per); return hc(Math.abs(s) > 0.004 ? brl(s) : '-', i, { textColor: s > 0.004 ? [192, 0, 0] : preto, fontStyle: 'bold' }); })),
+    [{ content: 'CHAVE PIX', styles: { fillColor: verde } }].concat(L.map((l, i) => { const px = vtPix(l.id); return hc(px.pix ? px.pix + (px.titular ? '\n' + px.titular : '') : '-', i, { fontSize: 6, fontStyle: 'normal' }); }))
   ];
   const dataW = 15, colW = (W - 12 - dataW) / n;
   const colStyles = { 0: { cellWidth: dataW } }; for (let i = 1; i <= n; i++) colStyles[i] = { cellWidth: colW };
