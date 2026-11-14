@@ -3849,7 +3849,7 @@ async function vtPDF(per, imprimir) {
   doc.setFontSize(7); doc.setTextColor(90);
   doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AT atestado · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, H - 4));
   const blob = doc.output('blob'), nome = vtNomeArq(per, 'pdf');
-  if (imprimir) { try { const u = URL.createObjectURL(blob), win = window.open(u, '_blank'); if (win) { setTimeout(() => URL.revokeObjectURL(u), 60000); return; } } catch (e) { } }
+  // imprimir também entrega o arquivo (anexo), sem abrir uma aba com endereço temporário
   await salvarArquivo(imprimir ? nome.replace('.pdf', '-impressao.pdf') : nome, blob);
 }
 async function vtExcel() {
