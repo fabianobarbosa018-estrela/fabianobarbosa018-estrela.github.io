@@ -3650,8 +3650,27 @@ function imprimirArquivo(blob) {
   }
   modalMsg('Imprimir', '<p>Toque no botão abaixo. Na tela do PDF, toque em <b>compartilhar</b> e depois em <b>Imprimir</b>.</p><p><a class="btn pri" href="' + url + '" target="_blank" rel="noopener">Abrir PDF para imprimir</a></p>');
 }
+/* Mostra o PDF antes de imprimir ou salvar. Resolve 'imprimir', 'salvar' ou null (fechado). */
+function visualizarPDF(nome, blob) {
+  return new Promise(res => {
+    const url = URL.createObjectURL(blob);
+    const w = abrirModal('<div class="mh">Conferir antes de imprimir</div><div class="mbd"><iframe src="' + url + '" title="' + esc(nome) + '" style="width:100%;height:62vh;min-height:320px;border:1px solid var(--linha,#ccc);border-radius:8px;background:#fff"></iframe><p class="muted" style="font-size:12px;margin:8px 0 0">No celular, se o PDF não aparecer aqui, use "Abrir em tela cheia".</p></div><div class="mf"><button class="btn" data-a="fechar">Fechar</button><a class="btn" href="' + url + '" target="_blank" rel="noopener">Abrir em tela cheia</a><button class="btn" data-a="salvar">Salvar / compartilhar</button><button class="btn pri" data-a="imprimir">Imprimir</button></div>', true);
+    let feito = false;
+    const fim = acao => { if (feito) return; feito = true; setTimeout(() => URL.revokeObjectURL(url), 120000); res(acao); };
+    w.querySelectorAll('.mf [data-a]').forEach(b => b.onclick = () => { const a = b.dataset.a; fecharModal(w); fim(a === 'fechar' ? null : a); });
+    w.querySelector('.mf a').onclick = () => { /* link abre o PDF; o modal continua aberto */ };
+    const obs = new MutationObserver(() => { if (!document.body.contains(w)) { obs.disconnect(); fim(null); } });
+    obs.observe(document.getElementById('modals'), { childList: true });
+  });
+}
 async function salvarArquivo(nome, data) {
-  if (/-impressao\.pdf$/.test(nome)) return imprimirArquivo(data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' }));
+  if (/\.pdf$/i.test(nome) && !data._visto) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
+    const acao = await visualizarPDF(nome, blob);
+    if (acao === 'imprimir') return imprimirArquivo(blob);
+    if (acao !== 'salvar') return;
+    data = blob; data._visto = true;
+  }
   if (DL) {
     try { await DL.save({ filename: nome, data }); toast('Arquivo salvo.'); return; }
     catch (e) { if (e && e.code === 'declined') { toast('Download cancelado.'); return; } if (e && e.code === 'rate_limited') { toast('Aguarde um instante e tente de novo.'); return; } }
