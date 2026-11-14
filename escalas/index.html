@@ -677,6 +677,7 @@ table.list tr:hover td{background:#f8fbfc}
 .pmx-pd b{color:#0b2e3a;white-space:nowrap}
 .pmx-pd-t{border-bottom:0;font-size:15px;padding-top:8px}
 .pmx-atr{color:#b42318;font-size:11px;margin-left:4px}
+.pmx-fi-ok{grid-column:1/-1;background:linear-gradient(160deg,#e6f6ef,#d4f0e1);border-color:#9fdcb4}
 </style>
 </head>
 <body>
@@ -2616,6 +2617,15 @@ function servSaldoPorData(mesF) {
   const itens = Object.keys(datas).sort().map(d => ({ data: d, valor: datas[d].valor, qtd: datas[d].pids.size, atraso: d < hoje }));
   return { itens, semData, total: r2(itens.reduce((t, x) => t + x.valor, 0)) };
 }
+/* Já pago em serviços prestados num mês (soma dos lotes marcados como pagos). */
+function servJaPagoMes(mesF) {
+  let total = 0, qtd = 0;
+  S.prestadores.forEach(p => servCalc(mesF, p.id).pagos.forEach(q => {
+    if (!q.pago) return;
+    total = r2(total + (q.valorPago != null ? q.valorPago : q.valor)); qtd++;
+  }));
+  return { total, qtd };
+}
 function servProximo(filtro) {
   const hoje = C.hojeISO(), datas = {};
   let semData = 0;
@@ -2736,6 +2746,7 @@ function vPainel() {
   const sp20 = servProximo(d => d.slice(8, 10) === '20'), sp05 = servProximo(d => d.slice(8, 10) === '05'), spT = servProximo();
   const mesAtual = hoje.slice(0, 7);
   const saldo = servSaldoPorData(mesAtual);
+  const jaPago = servJaPagoMes(mesAtual);
   const pendTxt = (saldo.semData ? '<div class="pmx-fi-s">' + saldo.semData + ' lote(s) sem data de pagamento</div>' : '') +
     (saldo.itens.length ? saldo.itens.map(x => `<div class="pmx-pd"><span>${C.dataBR(x.data)}${x.atraso ? ' <b class="pmx-atr">em atraso</b>' : ''}</span><b>R$ ${servMoeda(x.valor)}</b></div>`).join('') + `<div class="pmx-pd pmx-pd-t"><span>Total em aberto</span><b>R$ ${servMoeda(saldo.total)}</b></div>` : '<div class="pmx-fi-s">Nada em aberto</div>');
   const pagTxt = r => r.estado === 'ok' ? `${C.dataBR(r.data)} · R$ ${servMoeda(r.valor)}${r.atraso ? ' · em atraso' : ''}` : r.estado === 'nc' ? 'Não calculado' : 'Nada em aberto';
@@ -2814,6 +2825,7 @@ function vPainel() {
   <div class="pmx-fin">
     <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 20</div><div class="pmx-fi-s">Serviços prestados (dias 1 a 15)</div><div class="pmx-fi-v">${pagTxt(sp20)}</div></a>
     <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 05</div><div class="pmx-fi-s">Serviços prestados (dias 16 ao fim do mês)</div><div class="pmx-fi-v">${pagTxt(sp05)}</div></a>
+    <a class="pmx-fi pmx-fi-ok" href="#servicos"><div class="pmx-fi-l">Já pago no mês</div><div class="pmx-fi-s">${MESES[+mesAtual.slice(5, 7) - 1].toLowerCase()} de ${mesAtual.slice(0, 4)} · ${jaPago.qtd} lote(s) pago(s)</div><div class="pmx-fi-v pmx-fi-big">R$ ${servMoeda(jaPago.total)}</div></a>
     <a class="pmx-fi pmx-fi-p" href="#servicos"><div class="pmx-fi-l">Pendências do mês</div><div class="pmx-fi-s">${MESES[+mesAtual.slice(5, 7) - 1].toLowerCase()} de ${mesAtual.slice(0, 4)}</div><div class="pmx-fi-v">${pendTxt}</div></a>
   </div>
 
