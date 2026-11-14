@@ -679,6 +679,10 @@ table.list tr:hover td{background:#f8fbfc}
 .pmx-pd-t{border-bottom:0;font-size:15px;padding-top:8px}
 .pmx-atr{color:#b42318;font-size:11px;margin-left:4px}
 .pmx-fi-ok{grid-column:1/-1;background:linear-gradient(160deg,#e6f6ef,#d4f0e1);border-color:#9fdcb4}
+.svc-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:10px}
+.svc-cal>button{padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--card);color:inherit;font-weight:600}
+.svc-cal>button.on{background:#0f6b73;color:#fff;border-color:#0f6b73}
+.svc-cal>span{padding:4px 0}
 </style>
 </head>
 <body>
@@ -1906,6 +1910,27 @@ function servPerSel(lotes) {
   return lotes.some(x => x.id === v) ? v : (lotes[0] ? lotes[0].id : 'mes');
 }
 const servGrupoNome = { diaria: 'Diaristas', outros: 'Mensais, combinados e extras', todos: 'TODOS OS SERVIÇOS' };
+/* Pesquisa de prestador: calendário do mês para lançar os dias trabalhados (diarista) */
+function servPainelDias(mes, vis) {
+  const busca = (UI.servBusca || '').trim();
+  if (!busca) return '';
+  if (!vis.length) return '<div class="card empty mb"><b>Nenhum prestador com esse nome</b>Confira a grafia ou limpe a pesquisa.</div>';
+  if (vis.length > 1) return `<div class="small muted mb">${vis.length} prestadores encontrados. Digite o nome completo para lançar os dias.</div>`;
+  const p = vis[0], nome = _capNome(p.nome || '');
+  const mod = p.modalidade || 'diaria';
+  if (mod !== 'diaria') return `<div class="card mb"><b>${esc(nome)}</b> · ${esc(SERV_MOD[mod] || mod)}<div class="small muted mt">O lançamento por dia é só para diaristas. Para os outros, use a planilha e os ajustes.</div></div>`;
+  const at = S.servicos[servKey(mes, p.id)] || {}, dias = at.dias || {};
+  const ult = servDiasDoMes(mes), pad = n => String(n).padStart(2, '0');
+  const wd0 = C.diaSemana(mes + '-01');
+  const cabec = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(x => `<span class="small muted" style="text-align:center">${x}</span>`).join('');
+  let cel = ''; for (let i = 0; i < wd0; i++) cel += '<span></span>';
+  for (let d = 1; d <= ult; d++) { const on = dias[pad(d)] != null; cel += `<button class="${on ? 'on' : ''}" data-act="servDiaTog" data-pid="${esc(p.id)}" data-dd="${pad(d)}">${d}</button>`; }
+  const n = Object.keys(dias).length, tot = r2(Object.values(dias).reduce((t, v) => t + (+v || 0), 0));
+  return `<div class="card mb">
+    <div class="row"><div><b style="font-size:16px">${esc(nome)}</b><div class="small muted">${esc(p.funcao || '—')} · diária R$ ${servMoeda(p.valor || 0)}</div></div><div class="sp"></div><div style="text-align:right"><b>${n}</b> dia(s)<div class="small muted">R$ ${servMoeda(tot)}</div></div></div>
+    <p class="small muted mt" style="margin-bottom:0">Toque no dia que ${esc(nome.split(' ')[0])} trabalhou. Toque de novo para tirar.</p>
+    <div class="svc-cal">${cabec}${cel}</div></div>`;
+}
 function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
@@ -1923,6 +1948,7 @@ function vServicos() {
     <button class="btn" data-act="servLotes">Lotes do mês</button>
     <button class="btn" data-act="prestLista">Prestadores</button>
   </div>
+  <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
     <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(x.nome)}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
     <select id="selGrupo" style="flex:1;min-width:220px">${Object.keys(servGrupoNome).map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
@@ -1931,9 +1957,12 @@ function vServicos() {
   <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label></div>`;
   if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
   if (!criado) return h + `<div class="card empty"><b>${servMesNome(mes)} ainda não tem planilha</b>${S.somenteLeitura ? 'Sem permissão para criar agora.' : 'Aguarde um instante.'}</div>`;
-  const vis = servPrestadoresGrupo();
-  if (!vis.length) return h + '<div class="card empty"><b>Nenhum prestador neste grupo</b>Escolha outro grupo acima.</div>';
+  const busca = (UI.servBusca || '').trim();
+  const norm = t => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const vis = busca ? ativos.filter(p => norm(p.nome).includes(norm(busca))) : servPrestadoresGrupo();
+  if (!vis.length) return h + (busca ? servPainelDias(mes, vis) : '<div class="card empty"><b>Nenhum prestador neste grupo</b>Escolha outro grupo acima.</div>');
 
+  h += servPainelDias(mes, vis);
   const calcs = vis.map(p => servCalc(mes, p.id));
   const aPagar = lote ? r2(calcs.reduce((a, c) => a + c.pagos[idx].valor, 0)) : r2(calcs.reduce((a, c) => a + c.liquido, 0));
   const jaPago = lote ? r2(calcs.reduce((a, c) => a + (c.pagos[idx].pago ? (c.pagos[idx].valorPago ?? c.pagos[idx].valor) : 0), 0)) : r2(calcs.reduce((a, c) => a + c.pago, 0));
@@ -4293,6 +4322,14 @@ document.addEventListener('click', async ev => {
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
     case 'servPerChip': UI.servPer = el.dataset.id; return render();
+    case 'servDiaTog': {
+      if (S.somenteLeitura) return toast('Sem permissão para alterar agora.');
+      const mes = UI.servMes, pid = el.dataset.pid, dd = el.dataset.dd;
+      const p = S.prestadores.find(x => x.id === pid); if (!p) return;
+      const at = S.servicos[servKey(mes, pid)] || {};
+      const on = (at.dias || {})[dd] != null;
+      return servDia(mes, pid, dd, on ? 0 : p.valor).then(() => render()).catch(() => render());
+    }
     case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
     case 'servLotes': return servLotesEditar(UI.servMes);
     case 'loteAdd': { const w = el.closest('.mbg'), g = el.dataset.sec, n = w.querySelectorAll(`#lotesLista-${g} [data-lt]`).length; w.querySelector('#lotesLista-' + g).insertAdjacentHTML('beforeend', servLoteLinha({ id: uid('lt'), nome: 'Semana ' + (n + 1), de: 1, ate: 1, pctPadrao: 0, dataPadrao: '' })); return; }
@@ -4456,6 +4493,17 @@ document.addEventListener('click', async ev => {
     case 'backup': return baixarBackup();
     case 'salvarCfg': { const n = document.getElementById('cfgNome').value.trim(), t = document.getElementById('cfgTitulo').value.trim(), imp = document.getElementById('cfgImp').value.trim(); try { await Store.set('config', 'geral', Object.assign({}, S.config, { nomeHotel: n, tituloFolha: t || 'ESCALA DE FOLGA', textoImportante: imp, feriados: feriadosLista() })); log('sistema', 'Configurações alteradas'); toast('Configurações salvas.'); } catch (e) { } return; }
   }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if (!t || t.id !== 'inServBusca') return;
+  UI.servBusca = t.value;
+  clearTimeout(window.__busT);
+  window.__busT = setTimeout(() => {
+    render();
+    const e = document.getElementById('inServBusca');
+    if (e) { e.focus(); const n = e.value.length; try { e.setSelectionRange(n, n); } catch (x) { } }
+  }, 500);
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
