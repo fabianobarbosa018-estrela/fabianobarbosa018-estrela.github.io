@@ -561,6 +561,13 @@ table.list tr:hover td{background:#f8fbfc}
 .svc-pix{font-size:12px;color:var(--ink2);word-break:break-all}
 .svc-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 @media (max-width:820px){.svc-cards{grid-template-columns:1fr}.svc-chip{min-width:0;flex:1 1 140px}}
+/* Escala mensal: semanas em cartões */
+.sem-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.sem-card{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--card);display:flex;flex-direction:column;gap:8px}
+.sem-card.ok{border-left:4px solid var(--ok)}
+.sem-card:not(.ok){border-left:4px solid var(--acc)}
+.sem-d{font-weight:700;font-size:14px}
+.sem-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
 </style>
 </head>
 <body>
@@ -2731,12 +2738,18 @@ function vMensal() {
   </div>
   <div class="small muted mt">Marque os setores que quer ver e baixar (pode marcar mais de um):</div>
   <div class="row mt" style="gap:6px">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
-  <div class="row mt">${sems.map(s => `<a href="#mensal" data-act="irSemana" data-sem="${s}" class="btn sm">${semanaLabel(s)} ${S.escalas[s] ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-off">—</span>'}</a>`).join('')}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status === 'aprovada') ? `<div class="row mt"><span class="small muted">Editar escala aprovada:</span>${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status === 'aprovada').map(s => `<button class="btn pri sm" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar ${semanaLabel(s)}</button>`).join('')}</div>` : ''}
   ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><button class="btn ok" data-act="aprovarMes" data-mes="${UI.mes}">${ic('check')} Aprovar escala do mês (${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length} semana(s) em rascunho)</button></div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
+  // Semanas da escala: cartão por semana, com visualizar e editar
+  h += `<div class="card mb sem-sec"><div class="row" style="justify-content:space-between;align-items:center"><b>Semanas da escala</b><span class="small muted">${sems.length} semanas no mês</span></div>
+  <div class="sem-grid mt">${sems.map(s => {
+    const e = S.escalas[s], ap = !!(e && e.status === 'aprovada');
+    const sit = !e ? '<span class="badge b-off">Não gerada</span>' : ap ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Pendente</span>';
+    const edit = !e || S.somenteLeitura ? '' : ap ? `<button class="btn sm pri" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar</button>` : `<a class="btn sm" href="#mensal" data-act="irSemana" data-sem="${s}">${ic('edit')} Editar</a>`;
+    return `<div class="sem-card ${ap ? 'ok' : ''}"><div class="sem-d">${semanaLabel(s)}</div>${sit}<div class="sem-acoes"><a class="btn sm" href="#mensal" data-act="irSemana" data-sem="${s}">Visualizar</a>${edit}</div></div>`;
+  }).join('')}</div></div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
   return h + folhaHTML(m);
