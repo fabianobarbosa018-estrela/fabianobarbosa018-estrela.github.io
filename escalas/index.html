@@ -4395,6 +4395,7 @@ document.addEventListener('click', async ev => {
       const p = S.prestadores.find(x => x.id === pid); if (!p) return;
       const at = S.servicos[servKey(mes, pid)] || {};
       const on = (at.dias || {})[dd] != null;
+      if (!on && !(r2(p.valor) > 0)) return toast('Cadastre o valor da diária de ' + (p.nome || 'este prestador') + ' antes de marcar os dias.');
       return servDia(mes, pid, dd, on ? 0 : p.valor).then(() => { if (!on) toast(_capNome(p.nome || '').split(' ')[0] + ' também aparece como trabalhando em ' + dd + '/' + mes.slice(5, 7) + ' no Painel.'); render(); }).catch(() => render());
     }
     case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
