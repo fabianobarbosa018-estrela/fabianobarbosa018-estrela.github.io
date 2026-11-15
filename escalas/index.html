@@ -1894,6 +1894,7 @@ function servCalc(mes, pid) {
     p, l, modal, diasTotal, valorMes, lotes, g: gg, dsc, adi,
     extras: r2((l.extras || []).reduce((a, x) => a + (+x.valor || 0), 0)),
     bruto, desc: r2(dsc.reduce((a, v) => a + v, 0)), adiant: r2(adi.reduce((a, v) => a + v, 0)), descSobra: sobra,
+    descItens: (l.descontos || []).map(x => ({ desc: x.desc || 'Desconto', valor: r2(+x.valor || 0), lote: lotes[ixItem(x)] ? lotes[ixItem(x)].nome : '' })),
     ant, liquido, pagos, pago, saldo: r2(liquido - pago)
   };
   _servMemo[mk] = r;
@@ -2025,6 +2026,7 @@ function vServicos() {
     const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
     return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}</div></div><span class="svc-badge">${estado}</span></div>
       <div class="svc-grid"><div><span>Dias trabalhados</span><b>${nDias}</b></div><div><span>A receber</span><b>R$ ${servMoeda(q.valor)}</b></div><div><span>Já pago</span><b>R$ ${servMoeda(q.pago)}</b></div><div><span>Saldo</span><b class="${q.saldo > 0.004 ? 'neg' : ''}">R$ ${servMoeda(q.saldo)}</b></div></div>
+      ${(c.descItens || []).length ? `<div class="small" style="margin:6px 0;color:#C00000"><b>Descontos</b> · abatidos ${lote ? 'deste lote' : 'no mês'}: R$ ${servMoeda(lote ? c.dsc[idx] : c.desc)}${c.descItens.map(d => `<div>• ${esc(d.desc)}: R$ ${servMoeda(d.valor)} <span class="muted">(${esc(d.lote)})</span></div>`).join('')}${c.descSobra > 0 ? `<div class="muted">Não coube no saldo: R$ ${servMoeda(c.descSobra)}</div>` : ''}</div>` : ''}
       ${pix}<div class="svc-acoes"><button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>${acao}</div></div>`;
   }).join('')}</div>`;
   h += `<p class="small muted mt" style="margin-bottom:0">Lance os dias pela pesquisa acima. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p>`;
