@@ -1961,15 +1961,18 @@ function servTextoDiaristas(mes) {
   const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
   const vis = servPrestadores().filter(p => (p.modalidade || 'diaria') === 'diaria');
   const linhas = ['SERVIÇOS PRESTADOS', ''];
+  let total = 0;
   vis.forEach(p => {
     const c = servCalc(mes, p.id);
     const valor = lote ? c.pagos[idx].valor : c.liquido;
     if (!(valor > 0.004)) return; // copia só quem tem valor neste período
+    total = r2(total + valor);
     const f = (p.funcao || '').trim();
     const pix = (p.pix || '') + (p.titular ? ' · ' + p.titular : '');
     linhas.push(`${SERV_EMOJI[f] || '👤'} ${_capNome(p.nome || '')}`, `R$ ${servMoeda(valor)}`, `Pix: ${pix}`.trimEnd(), `Serviço: ${f || '—'}`, '');
   });
-  return linhas.join('\n').trimEnd();
+  linhas.push(`TOTAL: R$ ${servMoeda(total)}`);
+  return linhas.join('\n');
 }
 async function servCopiarTexto(txt) {
   try { await navigator.clipboard.writeText(txt); return true; } catch (e) {
