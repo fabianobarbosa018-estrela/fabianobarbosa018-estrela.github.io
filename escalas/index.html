@@ -1964,8 +1964,9 @@ function servTextoDiaristas(mes) {
   let total = 0;
   vis.forEach(p => {
     const c = servCalc(mes, p.id);
-    const valor = lote ? c.pagos[idx].valor : c.liquido;
-    if (!(valor > 0.004)) return; // copia só quem tem valor neste período
+    // Só copia quem ainda tem valor a pagar: lote já marcado como pago sai da lista
+    const valor = lote ? (c.pagos[idx].pago ? 0 : c.pagos[idx].valor) : r2(c.liquido - c.pago);
+    if (!(valor > 0.004)) return;
     total = r2(total + valor);
     const f = (p.funcao || '').trim();
     const pix = (p.pix || '') + (p.titular ? ' · ' + p.titular : '');
