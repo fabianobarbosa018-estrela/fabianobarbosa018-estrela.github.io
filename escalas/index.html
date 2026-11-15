@@ -1965,7 +1965,7 @@ function servTextoDiaristas(mes) {
   vis.forEach(p => {
     const c = servCalc(mes, p.id);
     // Só copia quem ainda tem valor a pagar: lote já marcado como pago sai da lista
-    const valor = lote ? (c.pagos[idx].pago ? 0 : c.pagos[idx].valor) : r2(c.liquido - c.pago);
+    const valor = lote ? (c.pagos[idx].pago ? r2(c.pagos[idx].valor - (c.pagos[idx].valorPago ?? c.pagos[idx].valor)) : c.pagos[idx].valor) : r2(c.liquido - c.pago);
     if (!(valor > 0.004)) return;
     total = r2(total + valor);
     const f = (p.funcao || '').trim();
@@ -2051,7 +2051,7 @@ function vServicos() {
   h += `<div class="svc-cards">${calcs.map(c => {
     const q = pagLinha(c), nm = _capNome(c.p.nome || ''), nDias = Object.keys(c.l.dias || {}).length;
     const pix = c.p.pix ? `<div class="svc-pix">PIX ${esc(c.p.pix)}${c.p.titular ? ' · ' + esc(c.p.titular) : ''}</div>` : '';
-    const acao = lote && q.valor > 0 ? (q.pagoOk ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
+    const acao = lote && q.valor > 0 ? (q.pagoOk ? (q.saldo > 0.004 ? `<button class="btn sm pri" data-act="servPagarDif" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Pagar diferença R$ ${servMoeda(q.saldo)}</button>` : '') + `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` :`<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
     const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
     const abre = c.modal === 'diaria' ? ` data-act="servAbrirDia" data-pid="${c.p.id}" style="cursor:pointer" title="Abrir para lançar os dias"` : '';
     return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}</div></div><span class="svc-badge">${estado}</span></div>
@@ -2147,6 +2147,22 @@ async function servAjSalvar(el) {
   render();
 }
 /* Marca ou desmarca como pago um lote de um prestador, com confirmação */
+/* Paga só a diferença de um lote já pago (diárias lançadas depois do pagamento) */
+async function servPagarDiferenca(mes, pid, loteId) {
+  const c = servCalc(mes, pid), x = c.pagos.find(y => y.id === loteId);
+  if (!x || !x.pago) return;
+  const dif = r2(x.valor - (x.valorPago != null ? x.valorPago : x.valor));
+  if (!(dif > 0.004)) return;
+  const nome = _capNome((c.p || {}).nome || '');
+  const ok = await modalMsg('Pagar diferença',
+    `<p>Pagar a diferença de <b>R$ ${servMoeda(dif)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${esc(x.nome)} (dias ${x.de} a ${x.ate}) · ${servMesNome(mes)}</p>`,
+    [{ t: 'Cancelar', v: false }, { t: 'Confirmar pagamento', c: 'pri', v: true }]);
+  if (!ok) return;
+  const novo = Object.assign({}, servPagosDoc(c.l));
+  novo[loteId] = Object.assign({}, novo[loteId], { pago: true, valorPago: x.valor });
+  try { await servSalvar(mes, pid, { pagos: novo }); log('servicos', 'Pago (diferença): ' + nome + ' · ' + mes + ' · ' + x.nome + ' · R$ ' + servMoeda(dif)); } catch (e) { }
+  render();
+}
 async function servPagar(mes, pid, loteId) {
   const c = servCalc(mes, pid), x = c.pagos.find(y => y.id === loteId);
   if (!x) return;
@@ -4436,6 +4452,7 @@ document.addEventListener('click', async ev => {
       return servDia(mes, pid, dd, on ? 0 : p.valor).then(() => { if (!on) toast(_capNome(p.nome || '').split(' ')[0] + ' também aparece como trabalhando em ' + dd + '/' + mes.slice(5, 7) + ' no Painel.'); render(); }).catch(() => render());
     }
     case 'servPagarGrupo': return servPagarGrupo(UI.servMes, el.dataset.lote);
+    case 'servPagarDif': return servPagarDiferenca(UI.servMes, el.dataset.pid, el.dataset.lote);
     case 'servLotes': return servLotesEditar(UI.servMes);
     case 'loteAdd': { const w = el.closest('.mbg'), g = el.dataset.sec, n = w.querySelectorAll(`#lotesLista-${g} [data-lt]`).length; w.querySelector('#lotesLista-' + g).insertAdjacentHTML('beforeend', servLoteLinha({ id: uid('lt'), nome: 'Semana ' + (n + 1), de: 1, ate: 1, pctPadrao: 0, dataPadrao: '' })); return; }
     case 'loteDel': return el.closest('[data-lt]').remove();
