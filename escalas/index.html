@@ -1866,17 +1866,23 @@ function servCalc(mes, pid) {
   const pg = servPagosDoc(l);
   const ixDia = dia => lotes.findIndex(x => dia >= x.de && dia <= x.ate);
   const ixData = d => { if (!d) return n - 1; const i = ixDia(+d.slice(8, 10)); return i >= 0 ? i : n - 1; };
+  // Lote escolhido na edição (campo "lote" do lançamento). Sem lote válido, vale a data.
+  const ixItem = x => { const i = x && x.lote ? lotes.findIndex(y => y.id === x.lote) : -1; return i >= 0 ? i : ixData(x && x.data); };
   const pctDe = x => (pg[x.id] && pg[x.id].pct != null ? +pg[x.id].pct : (+x.pctPadrao || 0));
   const g = lotes.map(() => 0);
   if (tem) {
     if (modal === 'diaria') Object.entries(l.dias || {}).forEach(([dd, v]) => { const i = ixDia(+dd); if (i >= 0) g[i] += +v || 0; });
     else if (modal === 'mensal' || modal === 'combinado') lotes.forEach((x, i) => { g[i] += valorMes * pctDe(x) / 100; });
-    (l.extras || []).forEach(x => { g[ixData(x.data)] += +x.valor || 0; });
+    (l.extras || []).forEach(x => { g[ixItem(x)] += +x.valor || 0; });
   }
-  const soma = arr => { const q = lotes.map(() => 0); (arr || []).forEach(x => { q[ixData(x.data)] += +x.valor || 0; }); return q.map(r2); };
-  const dsc = soma(l.descontos), adi = soma(l.adiant), gg = g.map(r2);
+  const soma = arr => { const q = lotes.map(() => 0); (arr || []).forEach(x => { q[ixItem(x)] += +x.valor || 0; }); return q.map(r2); };
+  const demanda = soma(l.descontos), adi = soma(l.adiant), gg = g.map(r2);
   const ant = servSaldoAnt(mes, pid);
-  const valores = lotes.map((x, i) => r2(gg[i] + (i === 0 ? ant : 0) - dsc[i] - adi[i]));
+  // Descontos abatem o saldo do lote escolhido. Se o saldo não cobre, o excedente passa ao lote seguinte. Nenhum lote fica negativo.
+  const disp = lotes.map((x, i) => r2(gg[i] + (i === 0 ? ant : 0) - adi[i]));
+  const dsc = []; let sobra = 0;
+  lotes.forEach((x, i) => { const pede = r2(demanda[i] + sobra); const ap = r2(Math.min(pede, Math.max(disp[i], 0))); dsc.push(ap); sobra = r2(pede - ap); });
+  const valores = lotes.map((x, i) => r2(disp[i] - dsc[i]));
   const pagos = lotes.map((x, i) => {
     const o = pg[x.id] || {};
     return { id: x.id, nome: x.nome, de: x.de, ate: x.ate, pct: pctDe(x), valor: valores[i], data: o.data || x.dataPadrao || '', pago: !!o.pago, valorPago: o.valorPago != null ? r2(o.valorPago) : undefined };
@@ -1887,7 +1893,7 @@ function servCalc(mes, pid) {
   const r = {
     p, l, modal, diasTotal, valorMes, lotes, g: gg, dsc, adi,
     extras: r2((l.extras || []).reduce((a, x) => a + (+x.valor || 0), 0)),
-    bruto, desc: r2(dsc.reduce((a, v) => a + v, 0)), adiant: r2(adi.reduce((a, v) => a + v, 0)),
+    bruto, desc: r2(dsc.reduce((a, v) => a + v, 0)), adiant: r2(adi.reduce((a, v) => a + v, 0)), descSobra: sobra,
     ant, liquido, pagos, pago, saldo: r2(liquido - pago)
   };
   _servMemo[mk] = r;
@@ -2049,17 +2055,21 @@ function servLinhasResumo(lotes) {
 }
 
 /* ----- Ajustes do mês de um prestador ----- */
+let _ajLotes = []; // lotes do grupo do prestador aberto na edição (para o campo Lote)
 function servAjLinha(k, x) {
   x = x || {};
   const del = '<button class="btn sm" data-act="ajDel" title="Remover">✕</button>';
   const val = `<input data-f="valor" type="number" step="0.01" min="0" placeholder="Valor" value="${x.valor ?? ''}">`;
-  if (k === 'descontos') return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Descrição" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${val}${del}</div>`;
-  if (k === 'adiant') return `<div class="ajrow" data-k="${k}"><input data-f="data" type="date" value="${x.data || ''}">${val}${del}</div>`;
-  return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Serviço" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${val}${del}</div>`;
+  const opts = `<option value="">Automático (pela data)</option>` + _ajLotes.map(y => `<option value="${esc(y.id)}" ${x.lote === y.id ? 'selected' : ''}>${esc(y.nome)} · dias ${y.de} a ${y.ate}</option>`).join('');
+  const lote = `<label class="small">Lote <select data-f="lote">${opts}</select></label>`;
+  if (k === 'descontos') return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Descrição" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${lote}${val}${del}</div>`;
+  if (k === 'adiant') return `<div class="ajrow" data-k="${k}"><input data-f="data" type="date" value="${x.data || ''}">${lote}${val}${del}</div>`;
+  return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Serviço" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${lote}${val}${del}</div>`;
 }
 function servAjustes(mes, pid) {
   servNovaCache();
   const c = servCalc(mes, pid), p = c.p, l = c.l;
+  _ajLotes = c.lotes;
   const pct = c.modal === 'mensal' || c.modal === 'combinado';
   const bloco = (k, titulo, btn) => `<div class="mt"><b>${titulo}</b><div id="ajC_${k}">${(l[k] || []).map(x => servAjLinha(k, x)).join('')}</div><button class="btn sm mt" data-act="ajAdd" data-k="${k}">+ ${btn}</button></div>`;
   const valorBloco = pct
@@ -2074,7 +2084,8 @@ function servAjustes(mes, pid) {
       ${bloco('extras', 'Serviços extras', 'Adicionar serviço extra')}
       ${bloco('adiant', 'Adiantamentos', 'Adicionar adiantamento')}
       ${bloco('descontos', 'Descontos', 'Adicionar desconto')}
-      <div class="mt"><b>Lotes de pagamento</b><div class="small muted">Data e % desta pessoa em cada lote.${pct ? ' A soma dos % deve dar 100.' : ''}</div>${lotesBloco}</div>
+      <div class="mt"><b>Lotes de pagamento</b><div class="small muted">Data e % desta pessoa em cada lote. Cada desconto mostra o lote ao qual está vinculado.</div>${lotesBloco}</div>
+      ${c.descSobra > 0 ? `<div class="alert w mt"><span class="ic">i</span><div>Descontos de R$ ${servMoeda(c.descSobra)} não couberam no saldo dos lotes e ficaram pendentes. Ajuste o lote ou o valor.</div></div>` : ''}
     </div>
     <div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="ajSalvar" data-pid="${pid}" data-mes="${mes}">Salvar</button></div>`, true);
 }
@@ -2093,9 +2104,9 @@ async function servAjSalvar(el) {
     pagos[x.id] = Object.assign({}, o, { data: d ? d.value : (o.data || ''), pct: pc ? r2(pc.value) : o.pct });
   });
   const patch = {
-    extras: lerLinhas('extras').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', valor: o.valor })),
-    adiant: lerLinhas('adiant').map(o => ({ data: o.data || '', valor: o.valor })),
-    descontos: lerLinhas('descontos').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', valor: o.valor })),
+    extras: lerLinhas('extras').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', lote: o.lote || '', valor: o.valor })),
+    adiant: lerLinhas('adiant').map(o => ({ data: o.data || '', lote: o.lote || '', valor: o.valor })),
+    descontos: lerLinhas('descontos').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', lote: o.lote || '', valor: o.valor })),
     pagos
   };
   const vi = w.querySelector('#ajValor'); if (vi) patch.valor = r2(vi.value);
