@@ -1964,6 +1964,7 @@ function servTextoDiaristas(mes) {
   vis.forEach(p => {
     const c = servCalc(mes, p.id);
     const valor = lote ? c.pagos[idx].valor : c.liquido;
+    if (!(valor > 0.004)) return; // copia só quem tem valor neste período
     const f = (p.funcao || '').trim();
     const pix = (p.pix || '') + (p.titular ? ' · ' + p.titular : '');
     linhas.push(`${SERV_EMOJI[f] || '👤'} ${_capNome(p.nome || '')}`, `R$ ${servMoeda(valor)}`, `Pix: ${pix}`.trimEnd(), `Serviço: ${f || '—'}`, '');
