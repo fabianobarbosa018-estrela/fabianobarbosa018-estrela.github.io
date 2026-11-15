@@ -1954,6 +1954,30 @@ function servPainelDias(mes, vis) {
     <p class="small muted mt" style="margin-bottom:0">Toque no dia que ${esc(nome.split(' ')[0])} trabalhou. Toque de novo para tirar.</p>
     <div class="svc-cal">${cabec}${cel}</div></div>`;
 }
+/* Texto para copiar e colar (diaristas), no lote escolhido */
+const SERV_EMOJI = { 'Cavalo': '🐴', 'Aquático': '🛶', 'Bar': '🍹', 'Copeira': '☕', 'Copa': '🍽️', 'Cozinha': '🍳' };
+function servTextoDiaristas(mes) {
+  const lotes = servLotesMes(mes, 'diaria'), sel = servPerSel(lotes);
+  const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
+  const vis = servPrestadores().filter(p => (p.modalidade || 'diaria') === 'diaria');
+  const linhas = ['SERVIÇOS PRESTADOS', ''];
+  vis.forEach(p => {
+    const c = servCalc(mes, p.id);
+    const valor = lote ? c.pagos[idx].valor : c.liquido;
+    const f = (p.funcao || '').trim();
+    const pix = (p.pix || '') + (p.titular ? ' · ' + p.titular : '');
+    linhas.push(`${SERV_EMOJI[f] || '👤'} ${_capNome(p.nome || '')}`, `R$ ${servMoeda(valor)}`, `Pix: ${pix}`.trimEnd(), `Serviço: ${f || '—'}`, '');
+  });
+  return linhas.join('\n').trimEnd();
+}
+async function servCopiarTexto(txt) {
+  try { await navigator.clipboard.writeText(txt); return true; } catch (e) {
+    const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e2) { }
+    ta.remove(); return ok;
+  }
+}
 function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
@@ -2033,7 +2057,7 @@ function vServicos() {
   h += `<p class="small muted mt" style="margin-bottom:0">Lance os dias pela pesquisa acima. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p>`;
   if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
   h += `<div class="row mt" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="small muted">Todos os serviços ao imprimir:</span><select id="selFormato" style="max-width:320px"><option value="unico" ${UI.servFormato !== 'separado' ? 'selected' : ''}>Um PDF com diaristas e serviços juntos</option><option value="separado" ${UI.servFormato === 'separado' ? 'selected' : ''}>Dois PDFs separados (diaristas e serviços)</option></select></div>
-  <div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button></div>
+  <div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button>${grupo === 'diaria' ? '<button class="btn pri" data-act="servCopiar">Copiar texto (WhatsApp)</button>' : ''}</div>
   <div class="row mt"><button class="btn" data-act="servFechPdf">${ic('pdf')} Fechamento (PDF)</button><button class="btn pri" data-act="servFechPrint">Imprimir fechamento</button></div>
   <p class="small muted mt">Baixar, Excel e Imprimir saem só do lote e do grupo escolhidos acima.</p>`;
   return h;
@@ -4392,6 +4416,7 @@ document.addEventListener('click', async ev => {
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
     case 'servPerChip': UI.servPer = el.dataset.id; return render();
+    case 'servCopiar': return servCopiarTexto(servTextoDiaristas(UI.servMes)).then(ok => toast(ok ? 'Texto copiado. Cole onde quiser.' : 'Não consegui copiar automaticamente.'));
     case 'servAbrirDia': {
       const p = S.prestadores.find(x => x.id === el.dataset.pid); if (!p) return;
       UI.servBusca = p.nome; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
