@@ -1508,7 +1508,7 @@ const C = window.Core;
 const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de folga não é fixa nem permanente, ela poderá sofrer alterações a qualquer momento ( no dia anterior a folga ) o horário também poderá ser alterado ( no mesmo dia ) de acordo com a necessidade da Fazenda.\nQualquer duvida, podem procurar a gerencia!';
 const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
 const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
-const S = { setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
+const S = { orcamentos: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
 const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', setoresSel: [], filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
 let DB = null, DL = null;
 const LS_KEY = 'escalas_hotel_v1';
@@ -1567,11 +1567,11 @@ const Store = {
     DB.collection('config').onSnapshot(s => { const g = s.docs.find(d => d.id === 'geral'); if (g) S.config = Object.assign({}, CONFIG_PADRAO, g.data()); marcar('config', s); }, erro('config'));
   },
   carregarLocal() {
-    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { orcamentos: d.orcamentos || [], setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
   },
   salvarLocal() {
     if (S.modo === 'nuvem') return Nuvem.guardarCopia();
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ orcamentos: S.orcamentos, setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
   },
   enfileirar(chave, fn) {
     const ant = this.filas[chave] || Promise.resolve();
@@ -1658,7 +1658,7 @@ const Nuvem = {
   },
   async carregarTudo() {
     const r = await this.rpc('esc_ler', { p_desde: null });
-    Object.assign(S, { setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    Object.assign(S, { orcamentos: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true; S.sincAt = new Date();
     this.guardarCopia(); render(); atualizarStatus();
@@ -1682,9 +1682,9 @@ const Nuvem = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
   },
-  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), setores: S.setores, funcionarios: S.funcionarios, prestadores: S.prestadores, servicos: S.servicos, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
+  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), orcamentos: S.orcamentos, setores: S.setores, funcionarios: S.funcionarios, prestadores: S.prestadores, servicos: S.servicos, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
   lerCopia() {
-    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { setores: d.setores || [], funcionarios: d.funcionarios || [], prestadores: d.prestadores || [], servicos: d.servicos || {}, vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
+    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { orcamentos: d.orcamentos || [], setores: d.setores || [], funcionarios: d.funcionarios || [], prestadores: d.prestadores || [], servicos: d.servicos || {}, vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
   },
   async falhaGravacao(e) {
     if (e && e.code === 'SESSAO_INVALIDA') { this.sair(true); throw e; }
@@ -1769,6 +1769,7 @@ const ICON = {
   setores: '<path d="M3 21V8l9-5 9 5v13M9 21v-7h6v7"/>',
   historico: '<path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 3"/>',
   exportar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+  orcamentos: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h6"/>',
   backup: '<path d="M4 7c0-2 4-3 8-3s8 1 8 3-4 3-8 3-8-1-8-3zM4 7v10c0 2 4 3 8 3s8-1 8-3V7M4 12c0 2 4 3 8 3s8-1 8-3"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
@@ -1785,7 +1786,7 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['orcamentos', 'Orçamentos'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -2674,7 +2675,7 @@ function catAlerta(m) {
    ===================================================================== */
 function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
-  const GRUPOS_MENU = [['Gestão', ['painel', 'mensal', 'funcionarios', 'setores']], ['Financeiro e controle', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup']]];
+  const GRUPOS_MENU = [['Gestão', ['painel', 'mensal', 'funcionarios', 'setores', 'orcamentos']], ['Financeiro e controle', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup']]];
   document.getElementById('nav').innerHTML = GRUPOS_MENU.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '">' + ic(k) + (r ? r[1] : k) + '</a>'; }).join('')).join('');
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
   atualizarStatus();
@@ -2683,7 +2684,7 @@ function render() {
   document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
   if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
   const sy = window.scrollY;
-  const fn = { painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { orcamentos: window.vOrcamentos, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -4417,6 +4418,7 @@ document.getElementById('shade').onclick = () => { document.getElementById('side
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
+  if (act && act.startsWith('orc') && window.orcAcao) return window.orcAcao(el, ev);
   const sem = UI.semana;
   switch (act) {
     case 'servAnt': UI.servMes = servMesVizinho(UI.servMes || C.hojeISO().slice(0, 7), -1); return render();
@@ -4672,5 +4674,6 @@ document.addEventListener('touchstart', ev => {
 irRota();
 Store.init();
 </script>
+<script src="orcamentos.js"></script>
 </body>
 </html>
