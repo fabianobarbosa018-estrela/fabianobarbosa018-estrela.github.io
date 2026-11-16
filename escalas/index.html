@@ -1679,6 +1679,7 @@ const Nuvem = {
   },
   async carregarTudo() {
     await this.carregarPapel();
+    if (S.papel === 'restrito' && !['diaria', 'mensal', 'servicos'].includes(UI.rota)) { UI.rota = 'mensal'; history.replaceState(null, '', '#mensal'); }
     const r = await this.rpc('esc_ler', { p_desde: null });
     Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
@@ -1736,10 +1737,11 @@ const Nuvem = {
 };
 function vLogin() {
   const pend = S.loginPrimeiro;
-  return `<div style="max-width:380px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1><p class="sub" style="text-align:center">Sistema de escalas de folga</p>
+  const soFunc = (location.hash || '') === '#funcionario';
+  return `<div style="max-width:380px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1><p class="sub" style="text-align:center">${soFunc ? 'Acesso da funcionária: entre com o seu e-mail. No primeiro acesso, crie a sua senha.' : 'Sistema de escalas de folga'}</p>
   ${S.erroConexao ? '<div class="alert e"><span class="ic">!</span><div>Sem conexão com a internet.</div></div>' : ''}
   <form id="fLogin">
-  ${pend ? `<div class="alert i"><span class="ic">i</span><div>Primeiro acesso para <b>${esc(pend)}</b>. Crie a sua senha.</div></div>` : `<div class="fld"><label class="f">E-mail (só para funcionários)</label><input type="email" id="loginEmail" autocomplete="username" style="width:100%" placeholder="Deixe em branco se for o administrador"></div>`}
+  ${pend ? `<div class="alert i"><span class="ic">i</span><div>Primeiro acesso para <b>${esc(pend)}</b>. Crie a sua senha.</div></div>` : soFunc ? `<div class="fld"><label class="f">Seu e-mail</label><input type="email" id="loginEmail" autocomplete="username" style="width:100%" placeholder="seu@email.com"></div>` : ''}
   <div class="fld"><label class="f">${pend ? 'Crie sua senha (mínimo 6 caracteres)' : 'Senha'}</label><input type="password" id="loginSenha" autocomplete="${pend ? 'new-password' : 'current-password'}" style="width:100%" autofocus></div>
   ${pend ? '<div class="fld"><label class="f">Repita a senha</label><input type="password" id="loginSenha2" autocomplete="new-password" style="width:100%"></div>' : ''}
   <div id="loginErro" class="small" style="color:var(--err);min-height:18px"></div>
@@ -1764,6 +1766,7 @@ document.addEventListener('submit', async ev => {
     S.loginPrimeiro = null; return;
   }
   const emailDigitado = ((document.getElementById('loginEmail') || {}).value || '').trim().toLowerCase();
+  if ((location.hash || '') === '#funcionario' && !emailDigitado) return voltar('Digite o seu e-mail.');
   const err = await Nuvem.entrar(senha, emailDigitado || null);
   if (err && typeof err === 'object') { S.loginPrimeiro = emailDigitado; render(); return; }
   if (err) voltar(err);
