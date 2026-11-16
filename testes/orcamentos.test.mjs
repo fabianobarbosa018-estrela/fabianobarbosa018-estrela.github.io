@@ -219,13 +219,13 @@ t('validação de contrato: nome, início e valor do orçamento', () => {
   assert.ok(C.validarContrato({ ...orc, contratadoNome: 'X' }).some(e => /valor/.test(e)));
 });
 
-t('cláusulas: trazem valor, prazo, serviço e foro', () => {
+t('cláusulas: trazem valor, prazo e serviço, sem cláusula de foro', () => {
   const c = { ...C.contratoAvulso30('CTR-2026-0001', '2026-11-16'), contratadoNome: 'Maria', servico: 'Manutenção de ventiladores', valor: 250.5, foro: 'Recife', diasAviso: 5 };
   const texto = C.clausulasContrato(c, 'Hotel Fazenda Oasis', '52.756.106/0001-13').map(x => x.texto).join(' ');
   assert.ok(texto.includes('R$ 250,50'));
   assert.ok(texto.includes('30 (trinta) dias, de 16/11/2026 a 16/12/2026'));
   assert.ok(texto.includes('Manutenção de ventiladores'));
-  assert.ok(texto.includes('comarca de Recife'));
+  assert.ok(!texto.includes('comarca'), 'não deve haver cláusula de foro');
   assert.ok(texto.includes('aviso prévio por escrito de 5 dias'));
 });
 

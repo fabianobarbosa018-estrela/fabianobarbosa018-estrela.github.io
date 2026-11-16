@@ -289,7 +289,7 @@
       contratadoNome: forn ? String(forn).trim() : '', contratadoDoc: '',
       servico: orc.servico || '', descricao: orc.descricao || '', local: orc.local || '',
       valor: t.final, formaPagamento: '', inicio: hoje, prazo: orc.prazo || '', dias: null, fim: '',
-      diasAviso: 5, foro: '', observacoes: ''
+      diasAviso: 5, observacoes: ''
     };
   }
 
@@ -299,7 +299,7 @@
       tipoRegistro: 'contrato', tipoContrato: 'servico30', numero: numero, status: 'rascunho',
       orcamentoId: '', orcamentoNumero: '', contratadoNome: '', contratadoDoc: '',
       servico: '', descricao: '', local: '', valor: 0, formaPagamento: '', prazo: '',
-      inicio: inicio, dias: 30, fim: addDias(inicio, 30), diasAviso: 5, foro: '', observacoes: ''
+      inicio: inicio, dias: 30, fim: addDias(inicio, 30), diasAviso: 5, observacoes: ''
     };
   }
 
@@ -337,8 +337,7 @@
       { titulo: 'Das obrigações da CONTRATANTE', texto: 'Efetuar o pagamento nas condições acordadas e permitir o acesso da CONTRATADA ao local da prestação do serviço.' },
       { titulo: 'Da rescisão', texto: 'Qualquer das partes poderá rescindir este contrato mediante aviso prévio por escrito de ' + (num(c.diasAviso) || 0) + ' dias, pagando-se os serviços já executados.' },
       { titulo: 'Da natureza da prestação (sem vínculo trabalhista)', texto: 'A CONTRATADA presta o serviço com autonomia, por conta própria, sem subordinação, sem horário fixo imposto pela CONTRATANTE e sem exclusividade. Não há vínculo empregatício, trabalhista ou previdenciário entre as partes. A CONTRATADA responde integralmente pelos seus encargos fiscais, previdenciários e tributários, e não tem direito a férias, 13º salário, FGTS ou demais verbas trabalhistas. A CONTRATADA não será considerada funcionária da CONTRATANTE para nenhum efeito.' },
-      { titulo: 'Da ciência e concordância', texto: 'A CONTRATADA declara ter lido, compreendido e concordado com todas as cláusulas deste contrato, inclusive as cláusulas sobre a natureza da prestação e a rescisão, e que recebeu cópia deste instrumento antes da assinatura.' },
-      { titulo: 'Do foro', texto: 'Fica eleito o foro da comarca de ' + (c.foro || '__________') + ' para dirimir quaisquer dúvidas decorrentes deste contrato.' }
+      { titulo: 'Da ciência e concordância', texto: 'A CONTRATADA declara ter lido, compreendido e concordado com todas as cláusulas deste contrato, inclusive as cláusulas sobre a natureza da prestação e a rescisão, e que recebeu cópia deste instrumento antes da assinatura.' }
     ];
     if (avulso) {
       itens.splice(itens.length - 1, 0, { titulo: 'Da multa por não comparecimento', texto: 'Se a CONTRATADA não comparecer para a prestação do serviço, sem justo motivo comprovado, ou desistir da prestação após o início do prazo, pagará à CONTRATANTE multa de 100% (cem por cento) do valor total deste contrato, sem prejuízo da indenização por perdas e danos excedentes.' });
@@ -839,7 +838,7 @@
         '<div class="fld"><label class="f">Data de início</label><input type="date" data-ctr-campo="inicio" value="' + eh(c.inicio) + '"></div></div>' +
         '<div class="fld"><label class="f">Descrição</label><textarea rows="3" data-ctr-campo="descricao">' + eh(c.descricao) + '</textarea></div></div>' +
       '<div class="card mb"><h3 style="margin-top:0">Valor e pagamento</h3><div class="grid" style="' + grade + '">' + campo('Valor total (R$)', 'valor', ehOrc ? String(OrcCalc.num(c.valor)).replace('.', ',') : (c.valor || '')) + campo('Forma de pagamento', 'formaPagamento', c.formaPagamento) + '</div></div>' +
-      '<div class="card mb"><h3 style="margin-top:0">Condições</h3><div class="grid" style="' + grade + '">' + campo('Aviso prévio para rescisão (dias)', 'diasAviso', c.diasAviso) + campo('Foro (comarca)', 'foro', c.foro) +
+      '<div class="card mb"><h3 style="margin-top:0">Condições</h3><div class="grid" style="' + grade + '">' + campo('Aviso prévio para rescisão (dias)', 'diasAviso', c.diasAviso) +
         '<div class="fld"><label class="f">Situação</label><select data-ctr-campo="status">' + statusOpts + '</select></div></div>' +
         '<div class="fld"><label class="f">Observações</label><textarea rows="2" data-ctr-campo="observacoes">' + eh(c.observacoes) + '</textarea></div></div>' +
       '</div>';
