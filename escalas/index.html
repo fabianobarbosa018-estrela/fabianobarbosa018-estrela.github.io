@@ -1738,20 +1738,38 @@ const Nuvem = {
 function vLogin() {
   const pend = S.loginPrimeiro;
   const soFunc = (location.hash || '') === '#funcionario';
+  const criar = soFunc && !pend && S.loginCriar;
   return `<div style="max-width:380px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1><p class="sub" style="text-align:center">${soFunc ? 'Acesso da funcionária: entre com o seu e-mail. No primeiro acesso, crie a sua senha.' : 'Sistema de escalas de folga'}</p>
   ${S.erroConexao ? '<div class="alert e"><span class="ic">!</span><div>Sem conexão com a internet.</div></div>' : ''}
   <form id="fLogin">
   ${pend ? `<div class="alert i"><span class="ic">i</span><div>Primeiro acesso para <b>${esc(pend)}</b>. Crie a sua senha.</div></div>` : soFunc ? `<div class="fld"><label class="f">Seu e-mail</label><input type="email" id="loginEmail" autocomplete="username" style="width:100%" placeholder="seu@email.com"></div>` : ''}
-  <div class="fld"><label class="f">${pend ? 'Crie sua senha (mínimo 6 caracteres)' : 'Senha'}</label><input type="password" id="loginSenha" autocomplete="${pend ? 'new-password' : 'current-password'}" style="width:100%" autofocus></div>
-  ${pend ? '<div class="fld"><label class="f">Repita a senha</label><input type="password" id="loginSenha2" autocomplete="new-password" style="width:100%"></div>' : ''}
+  <div class="fld"><label class="f">${pend || criar ? 'Crie sua senha (mínimo 6 caracteres)' : 'Senha'}</label><input type="password" id="loginSenha" autocomplete="${pend || criar ? 'new-password' : 'current-password'}" style="width:100%" autofocus></div>
+  ${pend || criar ? '<div class="fld"><label class="f">Repita a senha</label><input type="password" id="loginSenha2" autocomplete="new-password" style="width:100%"></div>' : ''}
   <div id="loginErro" class="small" style="color:var(--err);min-height:18px"></div>
-  <button class="btn pri" style="width:100%" type="submit">${pend ? 'Criar senha e entrar' : 'Entrar'}</button></form></div>`;
+  <button class="btn pri" style="width:100%" type="submit">${criar ? 'Criar acesso' : pend ? 'Criar senha e entrar' : 'Entrar'}</button></form>
+  ${soFunc && !pend && !criar ? '<p class="small" style="text-align:center;margin:14px 0 0"><button type="button" class="btn sm" data-act="loginCriar">Primeiro acesso? Criar minha senha</button></p>' : ''}
+  ${criar ? '<p class="small" style="text-align:center;margin:14px 0 0"><button type="button" class="btn sm" data-act="loginVoltar">Já tenho senha</button></p>' : ''}</div>`;
 }
 document.addEventListener('submit', async ev => {
   if (ev.target.id !== 'fLogin') return;
   ev.preventDefault();
-  const b = ev.target.querySelector('button');
-  const voltar = (msg) => { const e = document.getElementById('loginErro'); if (e) e.textContent = msg; b.disabled = false; b.textContent = S.loginPrimeiro ? 'Criar senha e entrar' : 'Entrar'; };
+  const b = ev.target.querySelector('button'); b.dataset.label = b.textContent;
+  const voltar = (msg) => { const e = document.getElementById('loginErro'); if (e) e.textContent = msg; b.disabled = false; b.textContent = b.dataset.label; };
+  if ((location.hash || '') === '#funcionario' && S.loginCriar && !S.loginPrimeiro) {
+    const em = ((document.getElementById('loginEmail') || {}).value || '').trim().toLowerCase();
+    const senhaC = document.getElementById('loginSenha').value;
+    const repeteC = document.getElementById('loginSenha2').value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return voltar('Digite um e-mail válido.');
+    if (senhaC.length < 6) return voltar('A senha precisa ter pelo menos 6 caracteres.');
+    if (senhaC !== repeteC) return voltar('As senhas não são iguais.');
+    b.disabled = true; b.textContent = 'Criando acesso…';
+    try { await Nuvem.rpc('esc_definir_senha', { p_email: em, p_senha: senhaC }, true); }
+    catch (e) { return voltar(e.code === 'SEM_CONVITE' ? 'Seu e-mail ainda não foi convidado. Peça ao gerente do hotel.' : 'Não foi possível criar a senha. Tente de novo.'); }
+    const errC = await Nuvem.entrar(senhaC, em);
+    if (errC && typeof errC === 'object') return voltar('Não foi possível entrar. Tente de novo.');
+    if (errC) return voltar(errC);
+    S.loginCriar = false; return;
+  }
   const senha = document.getElementById('loginSenha').value;
   b.disabled = true; b.textContent = 'Entrando…';
   if (S.loginPrimeiro) {
@@ -4576,6 +4594,8 @@ document.addEventListener('click', async ev => {
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'alternarTema': return alternarTema();
+    case 'loginCriar': S.loginCriar = true; render(); return;
+    case 'loginVoltar': S.loginCriar = false; render(); return;
     case 'acConvidar': {
       const em = (document.getElementById('acEmail').value || '').trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast('Informe um e-mail válido.'); return; }
