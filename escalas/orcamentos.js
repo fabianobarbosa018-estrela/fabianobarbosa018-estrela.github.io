@@ -942,7 +942,7 @@
     var assin = S.config && S.config.assinatura;
     if (assin) {
       if (y - 36 < 22) { doc.addPage(); y = 40; }
-      try { doc.addImage(assin, 'PNG', M + 2, y - 33, 60, 30); } catch (e) { }
+      try { doc.addImage(assin, /^data:image\/jpe?g/.test(assin) ? 'JPEG' : 'PNG', M + 2, y - 33, 60, 30); } catch (e) { }
     }
     linha(M, 'CONTRATANTE', nomeHotel() + ' · Fabiano, gerente operacional'); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
     y += 22;

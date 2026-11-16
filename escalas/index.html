@@ -4537,11 +4537,13 @@ document.addEventListener('change', async (ev) => {
   if (f.size > 4 * 1024 * 1024) { toast('Imagem muito grande. Use uma foto de até 4 MB.'); return; }
   const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
   const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-  const w = Math.min(600, img.width), h = Math.round(img.height * w / img.width);
+  // JPEG pequeno sobre fundo branco (sem transparência), para o PDF e para a gravação
+  const w = Math.min(500, img.width), h = Math.round(img.height * w / img.width);
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-  cv.getContext('2d').drawImage(img, 0, 0, w, h);
-  const png = cv.toDataURL('image/png');
-  try { await Store.set('config', 'geral', Object.assign({}, S.config, { assinatura: png })); toast('Assinatura salva. Ela aparece nos próximos contratos.'); } catch (e) { }
+  const ctx2 = cv.getContext('2d'); ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0, 0, w, h); ctx2.drawImage(img, 0, 0, w, h);
+  const jpg = cv.toDataURL('image/jpeg', 0.85);
+  try { await Store.set('config', 'geral', Object.assign({}, S.config, { assinatura: jpg })); toast('Assinatura salva. Ela aparece nos próximos contratos.'); }
+  catch (e) { toast('Não foi possível salvar a assinatura. Tente de novo.'); }
 });
 document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
