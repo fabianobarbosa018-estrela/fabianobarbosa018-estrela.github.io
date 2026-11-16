@@ -938,7 +938,13 @@
     y += 6; limite(70);
     doc.text('E, por estarem assim justos e contratados, assinam este instrumento em duas vias de igual teor.', M, y); y += 16;
     var linha = function (x, nome, sub) { doc.line(x, y, x + 78, y); doc.setFontSize(9); doc.text(nome, x, y + 5); if (sub) doc.text(sub, x, y + 9); };
-    linha(M, 'CONTRATANTE', nomeHotel()); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
+    // assinatura do gerente (guardada nas configurações do sistema, não no repositório)
+    var assin = S.config && S.config.assinatura;
+    if (assin) {
+      if (y - 36 < 22) { doc.addPage(); y = 40; }
+      try { doc.addImage(assin, 'PNG', M + 2, y - 33, 60, 30); } catch (e) { }
+    }
+    linha(M, 'CONTRATANTE', nomeHotel() + ' · Fabiano, gerente operacional'); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
     y += 22;
     linha(M, 'Testemunha 1', 'Nome e CPF'); linha(W - M - 78, 'Testemunha 2', 'Nome e CPF');
     aplicarMarcaDagua(doc, logo);

@@ -3445,6 +3445,9 @@ function vBackup() {
     <div class="fld"><label class="f">Nome da empresa (topo do sistema e WhatsApp)</label><input type="text" id="cfgNome" value="${esc(S.config.nomeHotel || '')}" maxlength="100"></div>
     <div class="fld"><label class="f">Título da folha</label><input type="text" id="cfgTitulo" value="${esc(S.config.tituloFolha || 'ESCALA DE FOLGA')}" maxlength="60"></div>
     <div class="fld"><label class="f">Texto do quadro IMPORTANTE (cada linha vira um parágrafo)</label><textarea id="cfgImp" style="min-height:130px">${esc(S.config.textoImportante || '')}</textarea></div>
+    <div class="fld"><label class="f">Assinatura do gerente (aparece no bloco do contratante dos contratos)</label>
+      ${S.config.assinatura ? `<div class="row" style="align-items:center;gap:10px;margin-bottom:6px"><img src="${S.config.assinatura}" alt="Assinatura" style="max-height:70px;background:#fff;border-radius:6px;padding:6px"><button class="btn sm danger" data-act="removerAssinatura">Remover assinatura</button></div>` : '<p class="small muted" style="margin:0 0 6px">Nenhuma assinatura cadastrada.</p>'}
+      <input type="file" id="cfgAss" accept="image/png,image/jpeg"></div>
     <button class="btn pri" data-act="salvarCfg">Salvar</button>
   </div>
   <div class="card"><h2>Feriados</h2>
@@ -4457,6 +4460,19 @@ document.getElementById('btnMin').onclick = () => {
 };
 window.addEventListener('resize', () => { if (window.innerWidth <= 900) document.getElementById('side').classList.remove('min'); else aplicarMenuMin(); });
 aplicarMenuMin();
+document.addEventListener('change', async (ev) => {
+  if (!ev.target || ev.target.id !== 'cfgAss') return;
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  if (f.size > 4 * 1024 * 1024) { toast('Imagem muito grande. Use uma foto de até 4 MB.'); return; }
+  const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+  const w = Math.min(600, img.width), h = Math.round(img.height * w / img.width);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(img, 0, 0, w, h);
+  const png = cv.toDataURL('image/png');
+  try { await Store.set('config', 'geral', Object.assign({}, S.config, { assinatura: png })); toast('Assinatura salva. Ela aparece nos próximos contratos.'); } catch (e) { }
+});
 document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
@@ -4508,6 +4524,7 @@ document.addEventListener('click', async ev => {
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'alternarTema': return alternarTema();
+    case 'removerAssinatura': { if (!await confirmar('Remover assinatura?', '<p>Os próximos contratos sairão sem assinatura do gerente.</p>', 'Remover', true)) return; try { await Store.set('config', 'geral', Object.assign({}, S.config, { assinatura: null })); toast('Assinatura removida.'); } catch (e) { } return; }
     case 'temaEscolher': try { localStorage.setItem('escalas-tema', el.dataset.t); } catch (e) { } aplicarTema(el.dataset.t); return render();
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
