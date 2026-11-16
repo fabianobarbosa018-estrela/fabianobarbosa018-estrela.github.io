@@ -227,7 +227,10 @@ def run():
         page.click('.mf [data-a="fechar"]')
         page.wait_for_timeout(300)
         # orçamentos não listam contratos
-        page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(200)
+        page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(300)
+        assert page.locator('tr').filter(has_text='João Pintor').count() == 1, 'contrato não aparece na aba Contratos'
+        page.reload(); page.wait_for_selector('button[data-act="orcNovo"]', timeout=20000); page.wait_for_timeout(500)
+        page.goto(BASE + '#orcamentos'); page.wait_for_selector('button[data-act="orcTela"][data-t="lista"]', timeout=20000); page.wait_for_timeout(500)
         page.click('button[data-act="orcTela"][data-t="lista"]'); page.wait_for_timeout(400)
         assert page.locator('tr').filter(has_text='João Pintor').count() == 0, 'contrato apareceu na lista de orçamentos'
 

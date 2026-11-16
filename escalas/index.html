@@ -1770,6 +1770,7 @@ const ICON = {
   historico: '<path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4M3 4v4h4M12 7v5l3 3"/>',
   exportar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
   orcamentos: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h6"/>',
+  contratos: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 9h6M9 13h6"/><path d="M14 19l2 2 4-4"/>',
   backup: '<path d="M4 7c0-2 4-3 8-3s8 1 8 3-4 3-8 3-8-1-8-3zM4 7v10c0 2 4 3 8 3s8-1 8-3V7M4 12c0 2 4 3 8 3s8-1 8-3"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
@@ -1786,7 +1787,7 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['orcamentos', 'Orçamentos'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['orcamentos', 'Orçamentos'], ['contratos', 'Contratos'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -2675,7 +2676,7 @@ function catAlerta(m) {
    ===================================================================== */
 function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
-  const GRUPOS_MENU = [['Gestão', ['painel', 'mensal', 'funcionarios', 'setores', 'orcamentos']], ['Financeiro e controle', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup']]];
+  const GRUPOS_MENU = [['Gestão', ['painel', 'mensal', 'funcionarios', 'setores', 'orcamentos', 'contratos']], ['Financeiro e controle', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup']]];
   document.getElementById('nav').innerHTML = GRUPOS_MENU.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '">' + ic(k) + (r ? r[1] : k) + '</a>'; }).join('')).join('');
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
   atualizarStatus();
@@ -2684,7 +2685,7 @@ function render() {
   document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
   if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
   const sy = window.scrollY;
-  const fn = { orcamentos: window.vOrcamentos, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }

@@ -191,8 +191,9 @@ def run():
         # 11. abas de catálogo e contratos carregam
         ir(page, 'catalogo')
         check(page.locator('button[data-act="orcCatSalvar"]').count() >= 0 and page.locator('body').inner_text().count('Catálogo') > 0, 'aba catálogo abre')
-        ir(page, 'contratos')
-        check(page.locator('body').inner_text().count('Contrato') > 0, 'aba contratos abre')
+        page.click('a[href="#contratos"]'); page.wait_for_timeout(400)
+        check('Contratos' in page.locator('#topTitle').inner_text(), 'aba Contratos própria no menu abre')
+        check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'contratos: botão + Contrato de 30 dias')
         check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'botão contrato de 30 dias presente')
 
         # 12. celular

@@ -331,7 +331,9 @@
       { titulo: 'Cláusula 4ª — Das obrigações da CONTRATADA', texto: 'Executar o serviço com qualidade e dentro do prazo, observar as normas de segurança e as regras internas do hotel e responder pelos danos causados por seus funcionários ou por ela na execução do serviço.' },
       { titulo: 'Cláusula 5ª — Das obrigações da CONTRATANTE', texto: 'Efetuar o pagamento nas condições acordadas e permitir o acesso da CONTRATADA ao local da prestação do serviço.' },
       { titulo: 'Cláusula 6ª — Da rescisão', texto: 'Qualquer das partes poderá rescindir este contrato mediante aviso prévio por escrito de ' + (num(c.diasAviso) || 0) + ' dias, pagando-se os serviços já executados.' },
-      { titulo: 'Cláusula 7ª — Do foro', texto: 'Fica eleito o foro da comarca de ' + (c.foro || '__________') + ' para dirimir quaisquer dúvidas decorrentes deste contrato.' }
+      { titulo: 'Cláusula 7ª — Da natureza da prestação (sem vínculo trabalhista)', texto: 'A CONTRATADA presta o serviço com autonomia, por conta própria, sem subordinação, sem horário fixo imposto pela CONTRATANTE e sem exclusividade. Não há vínculo empregatício, trabalhista ou previdenciário entre as partes. A CONTRATADA responde integralmente pelos seus encargos fiscais, previdenciários e tributários, e não tem direito a férias, 13º salário, FGTS ou demais verbas trabalhistas. A CONTRATADA não será considerada funcionária da CONTRATANTE para nenhum efeito.' },
+      { titulo: 'Cláusula 8ª — Da ciência e concordância', texto: 'A CONTRATADA declara ter lido, compreendido e concordado com todas as cláusulas deste contrato, inclusive as cláusulas sobre a natureza da prestação e a rescisão, e que recebeu cópia deste instrumento antes da assinatura.' },
+      { titulo: 'Cláusula 9ª — Do foro', texto: 'Fica eleito o foro da comarca de ' + (c.foro || '__________') + ' para dirimir quaisquer dúvidas decorrentes deste contrato.' }
     ];
   }
 
@@ -351,6 +353,7 @@
 
   /* ---------------- Estado da tela ---------------- */
   var ORC = {
+    ctrTela: 'lista',    // lista | form (módulo Contratos)
     tela: 'painel',      // painel | lista | aprovados | form | detalhe
     id: null,            // orçamento aberto
     rasc: null,          // rascunho do formulário (fonte da verdade enquanto edita)
@@ -457,7 +460,7 @@
     return '<div class="row mb" style="justify-content:space-between;align-items:flex-start"><div><h2 style="margin:0">' + eh(titulo) + '</h2></div><div class="row">' + (acoes || '') + '</div></div>';
   }
   function nav() {
-    var abas = [['painel', 'Painel'], ['lista', 'Histórico e pesquisa'], ['aprovados', 'Serviços aprovados'], ['catalogo', 'Catálogo de preços'], ['contratos', 'Contratos']];
+    var abas = [['painel', 'Painel'], ['lista', 'Histórico e pesquisa'], ['aprovados', 'Serviços aprovados'], ['catalogo', 'Catálogo de preços']];
     return '<div class="tabs">' + abas.map(function (a) {
       return '<button class="' + (ORC.tela === a[0] ? 'on' : '') + '" data-act="orcTela" data-t="' + a[0] + '">' + a[1] + '</button>';
     }).join('') + '</div>';
@@ -469,8 +472,6 @@
     if (ORC.tela === 'lista') return telaLista();
     if (ORC.tela === 'aprovados') return telaAprovados();
     if (ORC.tela === 'catalogo') return telaCatalogo();
-    if (ORC.tela === 'contratos') return telaContratos();
-    if (ORC.tela === 'contratoForm') return telaContratoForm();
     return telaPainel();
   }
 
@@ -800,8 +801,8 @@
         '<td><span class="badge ' + classeStatusContrato(c.status) + '">' + eh(rotuloStatusContrato(c.status)) + '</span></td>' +
         '<td style="text-align:right"><button class="btn sm" data-act="orcCtrVer" data-id="' + eh(c.id) + '">Abrir</button></td></tr>';
     }).join('');
-    return cabecalho('Contratos', S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrNovo30">+ Contrato de 30 dias</button>') + nav() +
-      '<div class="card mb small muted">Contratos feitos a partir de um orçamento aprovado (botão “Gerar contrato” no orçamento) ou avulsos de 30 dias: basta informar o nome do prestador e a data de início. Revise as cláusulas com seu advogado antes de usar.</div>' +
+    return cabecalho('Contratos', S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrNovo30">+ Contrato de 30 dias</button>') +
+      '<div class="card mb small muted">Revise as cláusulas com seu advogado antes de usar.</div>' +
       '<div class="card">' + (lst.length ? '<div class="tw" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;color:var(--ink2);font-size:13px"><th>Nº</th><th>Contratada</th><th>Vigência</th><th style="text-align:right">Valor</th><th>Situação</th><th></th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="muted">Nenhum contrato ainda.</p>') + '</div>';
   }
 
@@ -849,7 +850,7 @@
     var c = contratos().find(function (x) { return x.id === id; });
     if (!c) return;
     ORC.ctr = copiaProfunda(c);
-    ORC.tela = 'contratoForm';
+    ORC.ctrTela = 'form'; UI.rota = 'contratos';
     render(); window.scrollTo(0, 0);
   }
 
@@ -864,7 +865,7 @@
     } else {
       ORC.ctr = OrcCalc.contratoAvulso30(numero, hojeISO());
     }
-    ORC.tela = 'contratoForm';
+    ORC.ctrTela = 'form'; UI.rota = 'contratos';
     render(); window.scrollTo(0, 0);
   }
 
@@ -885,7 +886,7 @@
     try {
       await Store.set('orcamentos', c.id, d);
       toast('Contrato salvo');
-      ORC.ctr = null; ORC.tela = 'contratos'; render(); window.scrollTo(0, 0);
+      ORC.ctr = null; ORC.ctrTela = 'lista'; UI.rota = 'contratos'; render(); window.scrollTo(0, 0);
     } catch (e) { /* aviso já mostrado pelo sistema */ }
   }
 
@@ -893,7 +894,7 @@
     if (!exigeEscrita()) return;
     var c = contratos().find(function (x) { return x.id === id; });
     if (!c || !window.confirm('Excluir o contrato ' + (c.numero || '') + '? Esta ação não pode ser desfeita.')) return;
-    try { await Store.del('orcamentos', id); toast('Contrato excluído'); ORC.ctr = null; ORC.tela = 'contratos'; render(); } catch (e) { /* aviso já mostrado */ }
+    try { await Store.del('orcamentos', id); toast('Contrato excluído'); ORC.ctr = null; ORC.ctrTela = 'lista'; render(); } catch (e) { /* aviso já mostrado */ }
   }
 
   async function gerarContratoPdf(c) {
@@ -958,7 +959,7 @@
       case 'orcCtrSalvar': return salvarContrato();
       case 'orcCtrPdf': lerCtrForm(); return gerarContratoPdf(prepararContrato(ORC.ctr));
       case 'orcCtrExcluir': return excluirContrato(id);
-      case 'orcCtrVoltar': ORC.ctr = null; ORC.tela = 'contratos'; render(); return;
+      case 'orcCtrVoltar': ORC.ctr = null; ORC.ctrTela = 'lista'; render(); return;
       case 'orcCatSalvar': return salvarPrecoCatalogo();
       case 'orcCatOcultar': return ocultarCatalogo(id);
       case 'orcCatBuscar': ORC.catFiltro = (document.getElementById('catBusca') || { value: '' }).value.trim(); render(); return;
@@ -1130,5 +1131,9 @@
   }
 
   root.gerarOrcamentoPdf = gerarPdf;
+  function vContratos() {
+    return ORC.ctrTela === 'form' ? telaContratoForm() : telaContratos();
+  }
   root.vOrcamentos = vOrcamentos;
+  root.vContratos = vContratos;
 })(typeof window !== 'undefined' ? window : globalThis);
