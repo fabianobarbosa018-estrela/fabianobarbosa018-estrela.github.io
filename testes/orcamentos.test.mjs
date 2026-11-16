@@ -186,5 +186,48 @@ t('registro de preços: item novo cria registro; mesmo preço não repete; preç
   assert.equal(novo[0].nome, 'Serviço inédito');
 });
 
+t('datas: soma de dias sem erro de fuso e virada de ano', () => {
+  assert.equal(C.addDias('2026-11-16', 30), '2026-12-16');
+  assert.equal(C.addDias('2026-12-31', 1), '2027-01-01');
+  assert.equal(C.formataData('2026-11-16'), '16/11/2026');
+});
+
+t('contrato de 30 dias: vigência e numeração sequencial', () => {
+  const c = C.contratoAvulso30('CTR-2026-0004', '2026-11-16');
+  assert.equal(c.tipoContrato, 'servico30');
+  assert.equal(c.fim, '2026-12-16');
+  assert.equal(c.dias, 30);
+  assert.equal(C.proximoNumeroContrato([{ numero: 'CTR-2026-0002' }, { numero: 'ORC-2026-0009' }], '2026'), 'CTR-2026-0003');
+  assert.equal(C.proximoNumeroContrato([], '2026'), 'CTR-2026-0001');
+});
+
+t('contrato de orçamento: valor final e prestador vêm do orçamento', () => {
+  const orc = { id: 'orc_1', numero: 'ORC-2026-0001', servico: 'Pintura externa', prazo: '10 dias úteis', tipo: 'pintura_externa',
+    descontoTipo: 'pct', desconto: 10, itens: [item({ nome: 'Tinta', qtd: 2, vu: 500, fornecedor: 'Pintor João' })] };
+  const c = C.contratoDeOrcamento(orc, 'CTR-2026-0001', '2026-11-16');
+  assert.equal(c.valor, 900);
+  assert.equal(c.contratadoNome, 'Pintor João');
+  assert.equal(c.orcamentoId, 'orc_1');
+  assert.equal(c.status, 'rascunho');
+});
+
+t('validação de contrato: nome, início e valor do orçamento', () => {
+  const av = C.contratoAvulso30('CTR-2026-0001', '2026-11-16');
+  assert.ok(C.validarContrato(av).some(e => /nome do prestador/.test(e)));
+  assert.equal(C.validarContrato({ ...av, contratadoNome: 'Maria Ventiladores' }).length, 0, 'contrato de 30 dias só precisa do nome');
+  const orc = C.contratoDeOrcamento({ itens: [] }, 'CTR-2026-0002', '2026-11-16');
+  assert.ok(C.validarContrato({ ...orc, contratadoNome: 'X' }).some(e => /valor/.test(e)));
+});
+
+t('cláusulas: trazem valor, prazo, serviço e foro', () => {
+  const c = { ...C.contratoAvulso30('CTR-2026-0001', '2026-11-16'), contratadoNome: 'Maria', servico: 'Manutenção de ventiladores', valor: 250.5, foro: 'Recife', diasAviso: 5 };
+  const texto = C.clausulasContrato(c, 'Hotel Fazenda Oasis', '52.756.106/0001-13').map(x => x.texto).join(' ');
+  assert.ok(texto.includes('R$ 250,50'));
+  assert.ok(texto.includes('30 (trinta) dias, de 16/11/2026 a 16/12/2026'));
+  assert.ok(texto.includes('Manutenção de ventiladores'));
+  assert.ok(texto.includes('comarca de Recife'));
+  assert.ok(texto.includes('aviso prévio por escrito de 5 dias'));
+});
+
 console.log(`orçamentos: ${ok} ok, ${falhas} falha(s)`);
 if (falhas) process.exit(1);

@@ -184,6 +184,53 @@ def run():
         assert page.locator('text=R$ 150,00').count() >= 1, 'catálogo não mostra o preço'
         assert page.locator('svg.orc-ico').count() >= 5, 'ícones do catálogo ausentes'
 
+        # --- contratos: a partir do orçamento aprovado e avulso de 30 dias
+        page.click('button[data-act="orcTela"][data-t="lista"]'); page.wait_for_timeout(400)
+        linhas = page.locator('tr').filter(has_text='Limpeza de quartos')
+        alvo = None
+        for i in range(linhas.count()):
+            if 'cópia' not in linhas.nth(i).inner_text():
+                alvo = linhas.nth(i); break
+        assert alvo is not None, 'orçamento aprovado não encontrado'
+        alvo.locator('button[data-act="orcVer"]').click()
+        page.wait_for_selector('button[data-act="orcGerarContrato"]', timeout=5000)
+        page.click('button[data-act="orcGerarContrato"]')
+        page.wait_for_selector('#ctrForm')
+        page.locator('[data-ctr-campo="contratadoNome"]').fill('João Pintor')
+        page.locator('[data-ctr-campo="contratadoDoc"]').fill('123.456.789-00')
+        page.click('button[data-act="orcCtrSalvar"]')
+        page.wait_for_selector('text=Contrato salvo', timeout=5000)
+        page.wait_for_timeout(600)
+        ctrs = [d for (c, i), d in store.items() if c == 'orcamentos' and d.get('tipoRegistro') == 'contrato']
+        assert len(ctrs) == 1, ctrs
+        assert ctrs[0]['contratadoNome'] == 'João Pintor' and abs(ctrs[0]['valor'] - 186.57) < 0.01, ctrs[0]
+        assert ctrs[0]['tipoContrato'] == 'orcamento' and ctrs[0]['numero'].startswith('CTR-')
+
+        # contrato de 30 dias: só o nome do prestador
+        page.click('button[data-act="orcCtrNovo30"]')
+        page.wait_for_selector('#ctrForm')
+        page.locator('[data-ctr-campo="contratadoNome"]').fill('Maria Ventiladores')
+        page.click('button[data-act="orcCtrSalvar"]')
+        page.wait_for_selector('text=Contrato salvo', timeout=5000)
+        page.wait_for_timeout(600)
+        ctrs = [d for (c, i), d in store.items() if c == 'orcamentos' and d.get('tipoRegistro') == 'contrato']
+        assert len(ctrs) == 2, len(ctrs)
+        c30 = [d for d in ctrs if d['tipoContrato'] == 'servico30'][0]
+        from datetime import date
+        assert (date.fromisoformat(c30['fim']) - date.fromisoformat(c30['inicio'])).days == 30, c30
+
+        # PDF do contrato abre na pré-visualização do sistema
+        page.locator('button[data-act="orcCtrVer"]').first.click()
+        page.wait_for_selector('#ctrForm')
+        page.click('button[data-act="orcCtrPdf"]')
+        page.wait_for_selector('.mf [data-a="salvar"]', timeout=20000)
+        page.click('.mf [data-a="fechar"]')
+        page.wait_for_timeout(300)
+        # orçamentos não listam contratos
+        page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(200)
+        page.click('button[data-act="orcTela"][data-t="lista"]'); page.wait_for_timeout(400)
+        assert page.locator('tr').filter(has_text='João Pintor').count() == 0, 'contrato apareceu na lista de orçamentos'
+
         # --- somente leitura não altera
         b.close()
     print('ERROS DE CONSOLE/PÁGINA:', erros if erros else 'nenhum')
