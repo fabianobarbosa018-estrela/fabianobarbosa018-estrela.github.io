@@ -193,7 +193,14 @@ def run():
         check(page.locator('button[data-act="orcCatSalvar"]').count() >= 0 and page.locator('body').inner_text().count('Catálogo') > 0, 'aba catálogo abre')
         page.click('a[href="#contratos"]'); page.wait_for_timeout(400)
         check('Contratos' in page.locator('#topTitle').inner_text(), 'aba Contratos própria no menu abre')
-        check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'contratos: botão + Contrato de 30 dias')
+        check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'contratos: botão de contrato de prestação')
+        page.click('button[data-act="orcCtrNovo30"]'); page.wait_for_selector('#ctrForm')
+        page.locator('[data-ctr-campo="contratadoNome"]').fill('Diarista Teste')
+        page.locator('[data-ctr-campo="dias"]').fill('1')
+        page.click('button[data-act="orcCtrSalvar"]'); page.wait_for_timeout(800)
+        from datetime import date
+        d1 = [d for (c, i), d in store.items() if c == 'orcamentos' and d.get('contratadoNome') == 'Diarista Teste']
+        check(len(d1) == 1 and (date.fromisoformat(d1[0]['fim']) - date.fromisoformat(d1[0]['inicio'])).days == 1, 'contrato de 1 dia: vigência de 1 dia')
         check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'botão contrato de 30 dias presente')
 
         # 12. celular

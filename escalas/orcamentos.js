@@ -249,7 +249,7 @@
   /* ---------------- Contratos ---------------- */
   // Contratos ficam na mesma coleção dos orçamentos, marcados com tipoRegistro = 'contrato'.
   var STATUS_CONTRATO = [['rascunho', 'Rascunho', 'b-draft'], ['aguardando', 'Aguardando assinatura', 'b-blue'], ['assinado', 'Assinado', 'b-ok'], ['encerrado', 'Encerrado', 'b-off']];
-  var TIPOS_CONTRATO = [['orcamento', 'Contrato de serviço (orçamento aprovado)'], ['servico30', 'Contrato de serviço prestado: 30 dias']];
+  var TIPOS_CONTRATO = [['orcamento', 'Contrato de serviço (orçamento aprovado)'], ['servico30', 'Contrato de serviço prestado (prazo em dias)']];
 
   function rotuloTipoContrato(t) { var x = TIPOS_CONTRATO.find(function (y) { return y[0] === t; }); return x ? x[1] : t; }
   function rotuloStatusContrato(s) { var x = STATUS_CONTRATO.find(function (y) { return y[0] === s; }); return x ? x[1] : s; }
@@ -315,11 +315,16 @@
   }
 
   // cláusulas do contrato (texto), usadas no PDF
+  function diasTxt(n) {
+    n = Math.max(1, Math.round(num(n) || 30));
+    return n === 1 ? '1 (um) dia' : n === 30 ? '30 (trinta) dias' : n + ' dias';
+  }
+
   function clausulasContrato(c, nomeHotel, cnpjHotel) {
     var inicio = formataData(c.inicio);
     var avulso = c.tipoContrato === 'servico30';
     var prazoTxt = avulso
-      ? 'pelo prazo de 30 (trinta) dias, de ' + inicio + ' a ' + formataData(c.fim)
+      ? 'pelo prazo de ' + diasTxt(c.dias) + ', de ' + inicio + ' a ' + formataData(c.fim)
       : 'com início em ' + inicio + (c.prazo ? ', prazo previsto de execução: ' + c.prazo : '');
     var objeto = c.tipoContrato === 'orcamento'
       ? 'Execução do serviço “' + (c.servico || '—') + '”' + (c.orcamentoNumero ? ', conforme o orçamento nº ' + c.orcamentoNumero : '') + '.' + (c.descricao ? ' Descrição: ' + c.descricao : '') + (c.local ? ' Local: ' + c.local + '.' : '')
@@ -801,7 +806,7 @@
         '<td><span class="badge ' + classeStatusContrato(c.status) + '">' + eh(rotuloStatusContrato(c.status)) + '</span></td>' +
         '<td style="text-align:right"><button class="btn sm" data-act="orcCtrVer" data-id="' + eh(c.id) + '">Abrir</button></td></tr>';
     }).join('');
-    return cabecalho('Contratos', S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrNovo30">+ Contrato de 30 dias</button>') +
+    return cabecalho('Contratos', S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrNovo30">+ Contrato de prestação de serviço</button>') +
       '<div class="card mb small muted">Revise as cláusulas com seu advogado antes de usar.</div>' +
       '<div class="card">' + (lst.length ? '<div class="tw" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;color:var(--ink2);font-size:13px"><th>Nº</th><th>Contratada</th><th>Vigência</th><th style="text-align:right">Valor</th><th>Situação</th><th></th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="muted">Nenhum contrato ainda.</p>') + '</div>';
   }
@@ -813,7 +818,7 @@
     var statusOpts = STATUS_CONTRATO.map(function (s) { return '<option value="' + s[0] + '"' + (c.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('');
     var campo = function (label, id, val) { return '<div class="fld"><label class="f">' + label + '</label><input type="text" data-ctr-campo="' + id + '" value="' + eh(val) + '"></div>'; };
     var grade = 'grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px';
-    var vigencia = ehOrc ? '' : '<p class="small muted" style="margin:6px 0 0">Vigência: 30 dias, de ' + dataBR(c.inicio) + ' até ' + dataBR(OrcCalc.addDias(c.inicio, 30)) + '.</p>';
+    var vigencia = ehOrc ? '' : '<p class="small muted" style="margin:6px 0 0">Vigência: ' + diasTxt(c.dias) + ', de ' + dataBR(c.inicio) + ' até ' + dataBR(OrcCalc.addDias(c.inicio, Math.max(1, Math.round(OrcCalc.num(c.dias) || 30)))) + '.</p>';
     var acoes = '<button class="btn" data-act="orcCtrVoltar">Voltar</button>' +
       (S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrSalvar">Salvar contrato</button>') +
       '<button class="btn" data-act="orcCtrPdf">Gerar PDF</button>' +
@@ -823,7 +828,7 @@
       '<div class="card mb"><div class="small muted">Tipo</div><b>' + eh(rotuloTipoContrato(c.tipoContrato)) + '</b>' + (ehOrc && c.orcamentoNumero ? ' · orçamento ' + eh(c.orcamentoNumero) : '') + vigencia + '</div>' +
       '<div class="card mb"><h3 style="margin-top:0">Contratada (prestador)</h3><div class="grid" style="' + grade + '">' + campo('Nome do prestador', 'contratadoNome', c.contratadoNome) + campo('CPF ou CNPJ', 'contratadoDoc', c.contratadoDoc) + '</div></div>' +
       '<div class="card mb"><h3 style="margin-top:0">Serviço</h3><div class="grid" style="' + grade + '">' + campo('Serviço', 'servico', c.servico) + campo('Local', 'local', c.local) +
-        (ehOrc ? campo('Prazo previsto de execução', 'prazo', c.prazo) : '') +
+        (ehOrc ? campo('Prazo previsto de execução', 'prazo', c.prazo) : campo('Duração (dias)', 'dias', c.dias || 30)) +
         '<div class="fld"><label class="f">Data de início</label><input type="date" data-ctr-campo="inicio" value="' + eh(c.inicio) + '"></div></div>' +
         '<div class="fld"><label class="f">Descrição</label><textarea rows="3" data-ctr-campo="descricao">' + eh(c.descricao) + '</textarea></div></div>' +
       '<div class="card mb"><h3 style="margin-top:0">Valor e pagamento</h3><div class="grid" style="' + grade + '">' + campo('Valor total (R$)', 'valor', ehOrc ? String(OrcCalc.num(c.valor)).replace('.', ',') : (c.valor || '')) + campo('Forma de pagamento', 'formaPagamento', c.formaPagamento) + '</div></div>' +
@@ -842,7 +847,10 @@
   function prepararContrato(c) {
     c.valor = OrcCalc.num(c.valor);
     c.diasAviso = OrcCalc.num(c.diasAviso) || 0;
-    if (c.tipoContrato === 'servico30') c.fim = OrcCalc.addDias(c.inicio, 30);
+    if (c.tipoContrato === 'servico30') {
+      c.dias = Math.max(1, Math.round(OrcCalc.num(c.dias) || 30));
+      c.fim = OrcCalc.addDias(c.inicio, c.dias);
+    }
     return c;
   }
 
@@ -905,7 +913,7 @@
     var logo = await carregarLogo();
     var y = cabecalhoPdf(doc, logo, W, M, 'CONTRATO', c.numero);
     var limite = function (h) { if (y + h > 280) { doc.addPage(); y = 22; } };
-    var titulo = c.tipoContrato === 'servico30' ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS (30 DIAS)' : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS';
+    var titulo = c.tipoContrato === 'servico30' ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS (' + diasTxt(c.dias).toUpperCase() + ')' : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS';
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text(titulo, W / 2, y, { align: 'center' }); y += 7;
     y += 4;
     var partes = [
