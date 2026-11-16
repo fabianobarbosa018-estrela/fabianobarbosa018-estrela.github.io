@@ -29,6 +29,19 @@
   ];
   var UNIDADES = ['unidade', 'diária', 'metro', 'm²', 'hora', 'litro', 'kg', 'pacote', 'caixa', 'serviço', 'quarto', 'dia'];
   var HOTEL_CNPJ = '52.756.106/0001-13';
+  // tipos de serviço, com ícone (SVG 24x24, traço)
+  var TIPOS = [
+    ['ar_condicionado', 'Ar condicionado', '<rect x="3" y="3.5" width="18" height="7" rx="2"/><path d="M7 14.5c1.4 1.9 0 3-.9 4.2M12 14.5c1.4 1.9 0 3-.9 4.2M17 14.5c1.4 1.9 0 3-.9 4.2"/>'],
+    ['pintura_quarto', 'Pintura de quarto', '<rect x="3" y="3" width="14" height="5" rx="1.5"/><path d="M17 5.5h2.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H12"/><path d="M12 10v3"/><rect x="10" y="13" width="4" height="8" rx="1"/>'],
+    ['pintura_externa', 'Pintura externa', '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 20v-5h5v5"/>'],
+    ['outro', 'Outro', '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/>']
+  ];
+  var tipoIcone = function (id, tamanho) {
+    var t = TIPOS.find(function (x) { return x[0] === id; }) || TIPOS[TIPOS.length - 1];
+    var px = tamanho || 20;
+    return '<svg class="orc-ico" viewBox="0 0 24 24" width="' + px + '" height="' + px + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;color:var(--pri);flex-shrink:0"><title>' + t[1] + '</title>' + t[2] + '</svg>';
+  };
+  var tipoRotulo = function (id) { var t = TIPOS.find(function (x) { return x[0] === id; }); return t ? t[1] : 'Outro'; };
 
   /* ---------------- Funções puras (testáveis sem interface) ---------------- */
 
@@ -87,6 +100,7 @@
   function validar(orc) {
     var erros = [];
     if (!orc.servico || !orc.servico.trim()) erros.push('Informe o nome do serviço.');
+    if (!TIPOS.some(function (t) { return t[0] === orc.tipo; })) erros.push('Escolha o tipo de serviço.');
     if (!orc.data) erros.push('Informe a data do orçamento.');
     if (!orc.responsavel || !orc.responsavel.trim()) erros.push('Informe o responsável pelo orçamento.');
     if (!orc.itens || !orc.itens.length) erros.push('Inclua pelo menos um item na composição de custos.');
@@ -112,6 +126,7 @@
         if (alvo.indexOf(texto) < 0) return false;
       }
       if (f.status && o.status !== f.status) return false;
+      if (f.tipo && o.tipo !== f.tipo) return false;
       if (f.de && (o.data || '') < f.de) return false;
       if (f.ate && (o.data || '') > f.ate) return false;
       var v = totais(o).final;
@@ -142,7 +157,7 @@
   function rotuloCategoria(c) { var x = CATEGORIAS.find(function (t) { return t[0] === c; }); return x ? x[1] : 'Material'; }
 
   var OrcCalc = {
-    STATUS: STATUS, STATUS_APROVADOS: STATUS_APROVADOS, CATEGORIAS: CATEGORIAS, UNIDADES: UNIDADES,
+    STATUS: STATUS, STATUS_APROVADOS: STATUS_APROVADOS, CATEGORIAS: CATEGORIAS, UNIDADES: UNIDADES, TIPOS: TIPOS, tipoIcone: tipoIcone, tipoRotulo: tipoRotulo,
     num: num, r2: r2, totalItem: totalItem, totais: totais, proximoNumero: proximoNumero,
     validar: validar, filtrar: filtrar, resumo: resumo, rotuloStatus: rotuloStatus, classeStatus: classeStatus, rotuloCategoria: rotuloCategoria
   };
@@ -170,11 +185,13 @@
   var eh = function (s) { return esc(s); };
   var rotuloStatus = OrcCalc.rotuloStatus, classeStatus = OrcCalc.classeStatus, rotuloCategoria = OrcCalc.rotuloCategoria;
   var STATUS = OrcCalc.STATUS, CATEGORIAS = OrcCalc.CATEGORIAS, UNIDADES = OrcCalc.UNIDADES, STATUS_APROVADOS = OrcCalc.STATUS_APROVADOS;
+  var iconeTipo = function (id, px) { return tipoIcone(id, px); };
+  var tipoRot = function (id) { return tipoRotulo(id); };
   var nomeHotel = function () { return (S.config && S.config.nomeHotel) || 'Hotel Fazenda Oasis'; };
 
   function novoItem() { return { id: uid('it'), nome: '', descricao: '', qtd: 1, unidade: 'unidade', vu: 0, categoria: 'material' }; }
   function novoRascunho() {
-    return { id: null, numero: null, servico: '', descricao: '', data: hojeISO(), local: '', responsavel: '', prazo: '', status: 'em_elaboracao',
+    return { id: null, numero: null, tipo: 'outro', servico: '', descricao: '', data: hojeISO(), local: '', responsavel: '', prazo: '', status: 'em_elaboracao',
       itens: [novoItem()], descontoTipo: 'valor', desconto: 0, observacoes: '' };
   }
   function copiaProfunda(o) { return JSON.parse(JSON.stringify(o)); }
@@ -289,7 +306,7 @@
       '<th>Nº</th><th>Serviço</th><th>Data</th><th>Situação</th><th style="text-align:right">Valor final</th><th></th></tr></thead><tbody>' +
       rows.map(function (o) {
         var t = OrcCalc.totais(o);
-        return '<tr style="border-top:1px solid var(--line)"><td>' + eh(o.numero || '—') + '</td><td><b>' + eh(o.servico || '(sem nome)') + '</b><div class="small muted">' + eh(o.local || '') + '</div></td>' +
+        return '<tr style="border-top:1px solid var(--line)"><td>' + eh(o.numero || '—') + '</td><td>' + iconeTipo(o.tipo) + '<b>' + eh(o.servico || '(sem nome)') + '</b><div class="small muted">' + eh(o.local || '') + '</div></td>' +
           '<td>' + dataBR(o.data) + '</td><td><span class="badge ' + classeStatus(o.status) + '">' + eh(rotuloStatus(o.status)) + '</span></td>' +
           '<td style="text-align:right">' + brl(t.final) + '</td><td style="text-align:right"><button class="btn sm" data-act="orcVer" data-id="' + eh(o.id) + '">Abrir</button></td></tr>';
       }).join('') + '</tbody></table></div>';
@@ -302,6 +319,7 @@
     return cabecalho('Histórico e pesquisa', '<button class="btn pri" data-act="orcNovo">+ Novo orçamento</button>') + nav() +
       '<div class="card mb"><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
       '<div class="fld"><label class="f">Serviço, número, local ou responsável</label><input type="text" id="fTexto" value="' + eh(f.texto || '') + '"></div>' +
+      '<div class="fld"><label class="f">Tipo de serviço</label><select id="fTipo"><option value="">Todos</option>' + TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (f.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select></div>' +
       '<div class="fld"><label class="f">Situação</label><select id="fStatus">' + opts + '</select></div>' +
       '<div class="fld"><label class="f">Data de</label><input type="date" id="fDe" value="' + eh(f.de || '') + '"></div>' +
       '<div class="fld"><label class="f">Data até</label><input type="date" id="fAte" value="' + eh(f.ate || '') + '"></div>' +
@@ -318,7 +336,7 @@
       var t = OrcCalc.totais(o);
       tot.mo += Math.round(t.maoObra * 100); tot.mat += Math.round(t.materiais * 100); tot.desp += Math.round(t.despesas * 100);
       tot.desc += Math.round(t.desconto * 100); tot.fin += Math.round(t.final * 100);
-      return '<tr style="border-top:1px solid var(--line)"><td>' + eh(o.numero) + '</td><td><b>' + eh(o.servico) + '</b><div class="small muted">' + eh(o.local || '') + ' · ' + dataBR(o.data) + '</div></td>' +
+      return '<tr style="border-top:1px solid var(--line)"><td>' + eh(o.numero) + '</td><td>' + iconeTipo(o.tipo) + '<b>' + eh(o.servico) + '</b><div class="small muted">' + eh(o.local || '') + ' · ' + dataBR(o.data) + '</div></td>' +
         '<td style="text-align:right">' + brl(t.maoObra) + '</td><td style="text-align:right">' + brl(t.materiais) + '</td><td style="text-align:right">' + brl(t.despesas) + '</td>' +
         '<td style="text-align:right">' + brl(t.desconto) + '</td><td style="text-align:right"><b>' + brl(t.final) + '</b></td>' +
         '<td style="text-align:right"><button class="btn sm" data-act="orcVer" data-id="' + eh(o.id) + '">Abrir</button></td></tr>';
@@ -339,6 +357,7 @@
   function telaForm() {
     var c = ORC.rasc;
     if (!c) return '<p class="muted">Abra um orçamento.</p>';
+    var tipoOpts = TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (c.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
     var statusOpts = STATUS.map(function (s) { return '<option value="' + s[0] + '"' + (c.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('');
     var unidOpts = function (sel) { return UNIDADES.map(function (u) { return '<option value="' + u + '"' + (sel === u ? ' selected' : '') + '>' + u + '</option>'; }).join(''); };
     var catOpts = function (sel) { return CATEGORIAS.map(function (x) { return '<option value="' + x[0] + '"' + (sel === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join(''); };
@@ -358,6 +377,7 @@
       '<div id="orcForm">' +
       '<div class="row mb"><span class="small muted" id="orcSalvo">' + (ORC.salvoEm ? 'Salvo automaticamente às ' + ORC.salvoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Salvamento automático ativado') + '</span></div>' +
       '<div class="card mb"><h3 style="margin-top:0">Identificação</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">' +
+      '<div class="fld"><label class="f">Tipo de serviço</label><select data-orc-campo="tipo">' + tipoOpts + '</select></div>' +
       '<div class="fld"><label class="f">Nome do serviço</label><input type="text" data-orc-campo="servico" value="' + eh(c.servico) + '"></div>' +
       '<div class="fld"><label class="f">Data do orçamento</label><input type="date" data-orc-campo="data" value="' + eh(c.data) + '"></div>' +
       '<div class="fld"><label class="f">Local de realização</label><input type="text" data-orc-campo="local" value="' + eh(c.local) + '"></div>' +
@@ -389,7 +409,7 @@
     var acoesEdicao = S.somenteLeitura ? '' : '<button class="btn" data-act="orcEditar" data-id="' + eh(o.id) + '">Editar</button><button class="btn" data-act="orcDuplicar" data-id="' + eh(o.id) + '">Duplicar</button><button class="btn danger" data-act="orcExcluir" data-id="' + eh(o.id) + '">Excluir</button>';
     return cabecalho('Orçamento ' + (o.numero || ''), '<button class="btn" data-act="orcVoltar">Voltar</button>' + acoesEdicao + '<button class="btn pri" data-act="orcPdf" data-id="' + eh(o.id) + '">Gerar PDF</button>') + nav() +
       '<div class="card mb"><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">' +
-      '<div><div class="small muted">Serviço</div><b>' + eh(o.servico) + '</b></div>' +
+      '<div><div class="small muted">Serviço</div><div class="row" style="gap:0">' + iconeTipo(o.tipo, 26) + '<b>' + eh(o.servico) + '</b></div><div class="small muted">' + eh(tipoRot(o.tipo)) + '</div></div>' +
       '<div><div class="small muted">Data</div>' + dataBR(o.data) + '</div>' +
       '<div><div class="small muted">Local</div>' + eh(o.local || '—') + '</div>' +
       '<div><div class="small muted">Responsável</div>' + eh(o.responsavel || '—') + '</div>' +
@@ -463,7 +483,7 @@
 
   function lerFiltros() {
     var g = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
-    ORC.filtros = { texto: g('fTexto'), status: g('fStatus'), de: g('fDe'), ate: g('fAte'), vmin: g('fVmin'), vmax: g('fVmax') };
+    ORC.filtros = { texto: g('fTexto'), tipo: g('fTipo'), status: g('fStatus'), de: g('fDe'), ate: g('fAte'), vmin: g('fVmin'), vmax: g('fVmax') };
   }
 
   root.orcAcao = function (el, ev) {
@@ -528,7 +548,7 @@
     doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(o.servico || '', 14, y);
     y += 6;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    var campos = [['Data', dataBR(o.data)], ['Local', o.local || '—'], ['Responsável', o.responsavel || '—'], ['Prazo previsto', o.prazo || '—']];
+    var campos = [['Tipo', tipoRot(o.tipo)], ['Data', dataBR(o.data)], ['Local', o.local || '—'], ['Responsável', o.responsavel || '—'], ['Prazo previsto', o.prazo || '—']];
     campos.forEach(function (c, i) {
       var x = 14 + (i % 2) * 95, yy = y + Math.floor(i / 2) * 6;
       doc.setFont('helvetica', 'bold'); doc.text(c[0] + ': ', x, yy + 5);

@@ -83,12 +83,22 @@ t('validação aponta campos obrigatórios e itens inválidos', () => {
 });
 
 t('validação aceita orçamento completo', () => {
-  const erros = C.validar({ servico: 'Limpeza', data: '2026-11-16', responsavel: 'Gerente', itens: [item({ nome: 'Quarto', qtd: 3, vu: 50, unidade: 'quarto' })], desconto: 0, descontoTipo: 'valor' });
+  const erros = C.validar({ tipo: 'pintura_externa', servico: 'Limpeza', data: '2026-11-16', responsavel: 'Gerente', itens: [item({ nome: 'Quarto', qtd: 3, vu: 50, unidade: 'quarto' })], desconto: 0, descontoTipo: 'valor' });
   assert.equal(erros.length, 0);
 });
 
-t('validação recusa desconto maior que o subtotal e % acima de 100', () => {
+t('validação exige tipo de serviço válido e filtro por tipo funciona', () => {
   const base = { servico: 'a', data: '2026-01-01', responsavel: 'b', itens: [item({ nome: 'i', qtd: 1, vu: 10, unidade: 'hora' })] };
+  assert.ok(C.validar({ ...base, tipo: 'nao_existe' }).some(e => /tipo de serviço/.test(e)));
+  assert.ok(C.validar({ ...base }).some(e => /tipo de serviço/.test(e)));
+  assert.equal(C.validar({ ...base, tipo: 'ar_condicionado' }).length, 0);
+  const lista = [{ id: 'x', tipo: 'ar_condicionado', servico: 'AC', data: '2026-11-01', itens: [] }, { id: 'y', tipo: 'pintura_quarto', servico: 'P', data: '2026-11-02', itens: [] }];
+  assert.deepEqual(Array.from(C.filtrar(lista, { tipo: 'pintura_quarto' }).map(o => o.id)), ['y']);
+  assert.equal(C.tipoRotulo('pintura_externa'), 'Pintura externa');
+});
+
+t('validação recusa desconto maior que o subtotal e % acima de 100', () => {
+  const base = { tipo: 'outro', servico: 'a', data: '2026-01-01', responsavel: 'b', itens: [item({ nome: 'i', qtd: 1, vu: 10, unidade: 'hora' })] };
   assert.ok(C.validar({ ...base, descontoTipo: 'valor', desconto: 11 }).some(e => /maior que o subtotal/.test(e)));
   assert.ok(C.validar({ ...base, descontoTipo: 'pct', desconto: 120 }).some(e => /100%/.test(e)));
 });

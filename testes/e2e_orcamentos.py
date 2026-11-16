@@ -42,6 +42,7 @@ def run():
         # --- novo orçamento
         page.click('button[data-act="orcNovo"]')
         page.wait_for_selector('#orcForm')
+        page.select_option('[data-orc-campo="tipo"]', 'pintura_quarto')
         page.fill('[data-orc-campo="servico"]', 'Limpeza de quartos – Ala Norte')
         page.fill('[data-orc-campo="responsavel"]', 'Fabiano (gerente operacional)')
         page.fill('[data-orc-campo="local"]', 'Ala Norte')
@@ -107,6 +108,7 @@ def run():
         page.click('button[data-act="orcTela"][data-t="lista"]')
         page.wait_for_timeout(300)
         assert page.locator('text=Limpeza de quartos').count() >= 1, 'não persistiu após atualizar'
+        assert page.locator('svg.orc-ico').count() >= 1, 'ícone do tipo de serviço não apareceu na lista'
 
         # --- detalhe, status, duplicar, PDF
         page.click('button[data-act="orcVer"]')
