@@ -329,17 +329,24 @@
     var objeto = c.tipoContrato === 'orcamento'
       ? 'Execução do serviço “' + (c.servico || '—') + '”' + (c.orcamentoNumero ? ', conforme o orçamento nº ' + c.orcamentoNumero : '') + '.' + (c.descricao ? ' Descrição: ' + c.descricao : '') + (c.local ? ' Local: ' + c.local + '.' : '')
       : (c.servico ? 'Prestação do serviço: ' + c.servico + '.' + (c.descricao ? ' ' + c.descricao : '') : 'Prestação de serviços pela CONTRATADA, conforme combinado entre as partes.');
-    return [
-      { titulo: 'Cláusula 1ª — Do objeto', texto: objeto },
-      { titulo: 'Cláusula 2ª — Do prazo', texto: 'O presente contrato vigorará ' + prazoTxt + '.' },
-      { titulo: 'Cláusula 3ª — Do valor e do pagamento', texto: 'Pelos serviços, a CONTRATANTE pagará à CONTRATADA o valor total de ' + fmtBRL(c.valor) + (c.formaPagamento ? ', na forma: ' + c.formaPagamento : ', na forma a ser combinada entre as partes') + '.' },
-      { titulo: 'Cláusula 4ª — Das obrigações da CONTRATADA', texto: 'Executar o serviço com qualidade e dentro do prazo, observar as normas de segurança e as regras internas do hotel e responder pelos danos causados por seus funcionários ou por ela na execução do serviço.' },
-      { titulo: 'Cláusula 5ª — Das obrigações da CONTRATANTE', texto: 'Efetuar o pagamento nas condições acordadas e permitir o acesso da CONTRATADA ao local da prestação do serviço.' },
-      { titulo: 'Cláusula 6ª — Da rescisão', texto: 'Qualquer das partes poderá rescindir este contrato mediante aviso prévio por escrito de ' + (num(c.diasAviso) || 0) + ' dias, pagando-se os serviços já executados.' },
-      { titulo: 'Cláusula 7ª — Da natureza da prestação (sem vínculo trabalhista)', texto: 'A CONTRATADA presta o serviço com autonomia, por conta própria, sem subordinação, sem horário fixo imposto pela CONTRATANTE e sem exclusividade. Não há vínculo empregatício, trabalhista ou previdenciário entre as partes. A CONTRATADA responde integralmente pelos seus encargos fiscais, previdenciários e tributários, e não tem direito a férias, 13º salário, FGTS ou demais verbas trabalhistas. A CONTRATADA não será considerada funcionária da CONTRATANTE para nenhum efeito.' },
-      { titulo: 'Cláusula 8ª — Da ciência e concordância', texto: 'A CONTRATADA declara ter lido, compreendido e concordado com todas as cláusulas deste contrato, inclusive as cláusulas sobre a natureza da prestação e a rescisão, e que recebeu cópia deste instrumento antes da assinatura.' },
-      { titulo: 'Cláusula 9ª — Do foro', texto: 'Fica eleito o foro da comarca de ' + (c.foro || '__________') + ' para dirimir quaisquer dúvidas decorrentes deste contrato.' }
+    var itens = [
+      { titulo: 'Do objeto', texto: objeto },
+      { titulo: 'Do prazo', texto: 'O presente contrato vigorará ' + prazoTxt + '.' },
+      { titulo: 'Do valor e do pagamento', texto: 'Pelos serviços, a CONTRATANTE pagará à CONTRATADA o valor total de ' + fmtBRL(c.valor) + (c.formaPagamento ? ', na forma: ' + c.formaPagamento : ', na forma a ser combinada entre as partes') + '.' },
+      { titulo: 'Das obrigações da CONTRATADA', texto: 'Executar o serviço com qualidade e dentro do prazo, observar as normas de segurança e as regras internas do hotel e responder pelos danos causados por seus funcionários ou por ela na execução do serviço.' },
+      { titulo: 'Das obrigações da CONTRATANTE', texto: 'Efetuar o pagamento nas condições acordadas e permitir o acesso da CONTRATADA ao local da prestação do serviço.' },
+      { titulo: 'Da rescisão', texto: 'Qualquer das partes poderá rescindir este contrato mediante aviso prévio por escrito de ' + (num(c.diasAviso) || 0) + ' dias, pagando-se os serviços já executados.' },
+      { titulo: 'Da natureza da prestação (sem vínculo trabalhista)', texto: 'A CONTRATADA presta o serviço com autonomia, por conta própria, sem subordinação, sem horário fixo imposto pela CONTRATANTE e sem exclusividade. Não há vínculo empregatício, trabalhista ou previdenciário entre as partes. A CONTRATADA responde integralmente pelos seus encargos fiscais, previdenciários e tributários, e não tem direito a férias, 13º salário, FGTS ou demais verbas trabalhistas. A CONTRATADA não será considerada funcionária da CONTRATANTE para nenhum efeito.' },
+      { titulo: 'Da ciência e concordância', texto: 'A CONTRATADA declara ter lido, compreendido e concordado com todas as cláusulas deste contrato, inclusive as cláusulas sobre a natureza da prestação e a rescisão, e que recebeu cópia deste instrumento antes da assinatura.' },
+      { titulo: 'Do foro', texto: 'Fica eleito o foro da comarca de ' + (c.foro || '__________') + ' para dirimir quaisquer dúvidas decorrentes deste contrato.' }
     ];
+    if (avulso) {
+      itens.splice(itens.length - 1, 0, { titulo: 'Da multa por não comparecimento', texto: 'Se a CONTRATADA não comparecer para a prestação do serviço, sem justo motivo comprovado, ou desistir da prestação após o início do prazo, pagará à CONTRATANTE multa de 100% (cem por cento) do valor total deste contrato, sem prejuízo da indenização por perdas e danos excedentes.' });
+    }
+    var ordinais = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', '7ª', '8ª', '9ª', '10ª', '11ª', '12ª'];
+    return itens.map(function (it, i) {
+      return { titulo: 'Cláusula ' + ordinais[i] + ' — ' + it.titulo, texto: it.texto };
+    });
   }
 
   var OrcCalc = {
