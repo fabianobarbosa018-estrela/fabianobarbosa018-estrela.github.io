@@ -1678,6 +1678,7 @@ const Nuvem = {
     S.auditoria.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
   },
   async carregarTudo() {
+    await this.carregarPapel();
     const r = await this.rpc('esc_ler', { p_desde: null });
     Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
@@ -1714,9 +1715,16 @@ const Nuvem = {
     try { await this.carregarTudo(); } catch (x) { S.offline = true; S.somenteLeitura = true; render(); atualizarStatus(); }
     throw e;
   },
-  async entrar(senha) {
-    try { const tok = await this.rpc('esc_entrar', { p_senha: senha }, true); localStorage.setItem(this.TOKEN, tok); await this.carregarTudo(); this.agendarSync(); return null; }
-    catch (e) { return e.code === 'SENHA_INCORRETA' ? 'Senha incorreta.' : e.code === 'BLOQUEADO' ? 'Muitas tentativas erradas. Aguarde 15 minutos.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Erro: ' + e.message; }
+  async entrar(senha, email) {
+    try {
+      const tok = email ? await this.rpc('esc_entrar_usuario', { p_email: email, p_senha: senha }, true) : await this.rpc('esc_entrar', { p_senha: senha }, true);
+      localStorage.setItem(this.TOKEN, tok); await this.carregarTudo(); this.agendarSync(); return null;
+    }
+    catch (e) { if (e.code === 'PRIMEIRO_ACESSO') return { primeiroAcesso: true }; return e.code === 'SENHA_INCORRETA' ? 'Senha incorreta.' : e.code === 'BLOQUEADO' ? 'Muitas tentativas erradas. Aguarde 15 minutos.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Erro: ' + e.message; }
+  },
+  async carregarPapel() {
+    try { const r = await this.rpc('esc_papel', {}); S.papel = (r && r.papel) || 'admin'; S.emailUsuario = (r && r.email) || ''; }
+    catch (e) { if (e.code === 'SESSAO_INVALIDA') throw e; S.papel = S.papel || 'admin'; }
   },
   async sair(expirou) {
     if (!expirou) { try { await this.rpc('esc_sair', {}); } catch (e) { } }
@@ -1727,18 +1735,38 @@ const Nuvem = {
   }
 };
 function vLogin() {
+  const pend = S.loginPrimeiro;
   return `<div style="max-width:380px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1><p class="sub" style="text-align:center">Sistema de escalas de folga</p>
   ${S.erroConexao ? '<div class="alert e"><span class="ic">!</span><div>Sem conexão com a internet.</div></div>' : ''}
-  <form id="fLogin"><div class="fld"><label class="f">Senha</label><input type="password" id="loginSenha" autocomplete="current-password" style="width:100%" autofocus></div>
+  <form id="fLogin">
+  ${pend ? `<div class="alert i"><span class="ic">i</span><div>Primeiro acesso para <b>${esc(pend)}</b>. Crie a sua senha.</div></div>` : `<div class="fld"><label class="f">E-mail (só para funcionários)</label><input type="email" id="loginEmail" autocomplete="username" style="width:100%" placeholder="Deixe em branco se for o administrador"></div>`}
+  <div class="fld"><label class="f">${pend ? 'Crie sua senha (mínimo 6 caracteres)' : 'Senha'}</label><input type="password" id="loginSenha" autocomplete="${pend ? 'new-password' : 'current-password'}" style="width:100%" autofocus></div>
+  ${pend ? '<div class="fld"><label class="f">Repita a senha</label><input type="password" id="loginSenha2" autocomplete="new-password" style="width:100%"></div>' : ''}
   <div id="loginErro" class="small" style="color:var(--err);min-height:18px"></div>
-  <button class="btn pri" style="width:100%" type="submit">Entrar</button></form></div>`;
+  <button class="btn pri" style="width:100%" type="submit">${pend ? 'Criar senha e entrar' : 'Entrar'}</button></form></div>`;
 }
 document.addEventListener('submit', async ev => {
   if (ev.target.id !== 'fLogin') return;
   ev.preventDefault();
-  const b = ev.target.querySelector('button'); b.disabled = true; b.textContent = 'Entrando…';
-  const err = await Nuvem.entrar(document.getElementById('loginSenha').value);
-  if (err) { const e = document.getElementById('loginErro'); if (e) e.textContent = err; b.disabled = false; b.textContent = 'Entrar'; }
+  const b = ev.target.querySelector('button');
+  const voltar = (msg) => { const e = document.getElementById('loginErro'); if (e) e.textContent = msg; b.disabled = false; b.textContent = S.loginPrimeiro ? 'Criar senha e entrar' : 'Entrar'; };
+  const senha = document.getElementById('loginSenha').value;
+  b.disabled = true; b.textContent = 'Entrando…';
+  if (S.loginPrimeiro) {
+    const repete = document.getElementById('loginSenha2').value;
+    if (senha.length < 6) return voltar('A senha precisa ter pelo menos 6 caracteres.');
+    if (senha !== repete) return voltar('As senhas não são iguais.');
+    try { await Nuvem.rpc('esc_definir_senha', { p_email: S.loginPrimeiro, p_senha: senha }, true); }
+    catch (e) { return voltar(e.code === 'SEM_CONVITE' ? 'Este e-mail não tem convite pendente. Peça ao gerente do hotel.' : 'Não foi possível criar a senha. Tente de novo.'); }
+    const err2 = await Nuvem.entrar(senha, S.loginPrimeiro);
+    if (err2 && typeof err2 === 'object') return voltar('Não foi possível entrar. Tente de novo.');
+    if (err2) return voltar(err2);
+    S.loginPrimeiro = null; return;
+  }
+  const emailDigitado = ((document.getElementById('loginEmail') || {}).value || '').trim().toLowerCase();
+  const err = await Nuvem.entrar(senha, emailDigitado || null);
+  if (err && typeof err === 'object') { S.loginPrimeiro = emailDigitado; render(); return; }
+  if (err) voltar(err);
 });
 async function log(tipo, texto, semana) {
   const e = { ts: agoraISO(), tipo, texto, semana: semana || null };
@@ -2700,7 +2728,10 @@ function catAlerta(m) {
 function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup', 'aparencia']]];
-  document.getElementById('nav').innerHTML = GRUPOS_MENU.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('');
+  const RESTRITO_OK = ['diaria', 'mensal', 'servicos'];
+  const grupos = S.papel === 'restrito' ? GRUPOS_MENU.map(([t, c]) => [t, c.filter(k => RESTRITO_OK.includes(k))]).filter(g => g[1].length) : GRUPOS_MENU;
+  const sairRestrito = S.papel === 'restrito' ? '<div class="nav-g">Conta</div><button class="btn sm" data-act="sairNuvem" style="margin:6px 12px">Sair deste aparelho</button>' : '';
+  document.getElementById('nav').innerHTML = grupos.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('') + sairRestrito;
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
   atualizarStatus();
   const v = document.getElementById('view');
@@ -2716,6 +2747,7 @@ function render() {
   if (S.modo === 'nuvem' && (S.offline || S.semRede)) topo += `<div class="alert w"><span class="ic">!</span><div><b>Sem internet.</b> ${S.offline ? 'Mostrando a última cópia salva neste aparelho' + (S.copiaEm ? ' (' + dtHora(S.copiaEm) + ')' : '') + ', só para consulta.' : 'As alterações não serão salvas até a conexão voltar.'} <a href="#" data-act="reconectar">Tentar de novo</a></div></div>`;
   else if (S.somenteLeitura) topo += '<div class="alert i"><span class="ic">i</span><div>Você está em modo somente leitura.</div></div>';
   v.innerHTML = topo + fn();
+  if (UI.rota === 'backup' && S.papel === 'admin') acCarregar();
   const foco = UI._foco; if (foco) { const el = document.getElementById(foco); if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { } } UI._foco = null; }
   window.scrollTo(0, sy);
 }
@@ -3440,6 +3472,10 @@ function vBackup() {
     <div class="fld"><label class="f">Nova senha (mínimo 6 caracteres)</label><input type="password" id="snNova" autocomplete="new-password"></div>
     <div class="row"><button class="btn pri" data-act="trocarSenha">Trocar senha</button><button class="btn danger" data-act="sairNuvem">Sair deste aparelho</button></div>
     <p class="small muted mt">Trocar a senha desconecta os outros aparelhos.</p></div>
+  ${S.modo === 'nuvem' && S.papel === 'admin' ? `<div class="card" id="acessoCard"><h2>Acesso de funcionários</h2>
+    <p class="small muted" style="margin:0 0 10px">Convide a pessoa pelo e-mail. Ela cria a própria senha na tela de entrada. Ela vê só Escala e Serviços prestados.</p>
+    <div class="row mb"><input type="email" id="acEmail" placeholder="e-mail da funcionária" style="flex:1;min-width:200px"><button class="btn pri" data-act="acConvidar">Convidar</button></div>
+    <div id="acLista"><p class="small muted">Carregando…</p></div></div>` : ''}
   <div class="card"><h2>Backups automáticos do servidor</h2><div id="bkAuto"><button class="btn sm" data-act="listarBk">Ver backups automáticos</button></div></div>` : ''}
   <div class="card edit-only"><h2>Folha de folga</h2>
     <div class="fld"><label class="f">Nome da empresa (topo do sistema e WhatsApp)</label><input type="text" id="cfgNome" value="${esc(S.config.nomeHotel || '')}" maxlength="100"></div>
@@ -4434,11 +4470,24 @@ async function vtExcel() {
    ===================================================================== */
 function irRota() {
   const h = (location.hash || '').replace('#', '');
-  UI.rota = ROTAS.some(r => r[0] === h) ? h : (h === 'escala' ? 'mensal' : 'painel'); // a tela semanal foi retirada: só a escala mensal
+  if (S.papel === 'restrito' && !['diaria', 'mensal', 'servicos'].includes(h === 'escala' ? 'mensal' : h)) { location.hash = '#mensal'; return; }
+  UI.rota = ROTAS.some(r => r[0] === h) ? h : (h === 'escala' ? 'mensal' : (S.papel === 'restrito' ? 'mensal' : 'painel')); // a tela semanal foi retirada: só a escala mensal
   document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on');
   render(); window.scrollTo(0, 0);
 }
 window.addEventListener('hashchange', irRota);
+async function acCarregar() {
+  const box = document.getElementById('acLista'); if (!box) return;
+  try {
+    const lista = await Nuvem.rpc('esc_listar_usuarios', {});
+    if (!lista.length) { box.innerHTML = '<p class="small muted">Nenhum funcionário convidado ainda.</p>'; return; }
+    box.innerHTML = '<ul class="list-sm">' + lista.map(u => {
+      const situ = !u.ativo ? 'acesso revogado' : !u.tem_senha ? 'aguardando primeiro acesso' : 'ativo' + (u.ultimo_acesso ? ' · último acesso ' + dtHora(u.ultimo_acesso) : '');
+      return '<li><span><b>' + esc(u.email) + '</b><div class="small muted">' + situ + '</div></span><span class="row" style="gap:6px">' +
+        (u.ativo ? '<button class="btn sm" data-act="acResetar" data-id="' + esc(u.email) + '">Nova senha</button><button class="btn sm danger" data-act="acRevogar" data-id="' + esc(u.email) + '">Revogar</button>' : '') + '</span></li>';
+    }).join('') + '</ul>';
+  } catch (e) { box.innerHTML = '<p class="small" style="color:var(--err)">Não foi possível carregar a lista.</p>'; }
+}
 function vAparencia() {
   const t = temaAtual();
   const op = (k, rot, desc) => '<button class="btn ' + (t === k ? 'pri' : '') + '" data-act="temaEscolher" data-t="' + k + '" style="width:100%;justify-content:flex-start;padding:14px 16px;margin-bottom:8px;text-align:left"><b>' + rot + '</b>&nbsp;<span class="small">' + desc + '</span></button>';
@@ -4524,6 +4573,25 @@ document.addEventListener('click', async ev => {
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'alternarTema': return alternarTema();
+    case 'acConvidar': {
+      const em = (document.getElementById('acEmail').value || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast('Informe um e-mail válido.'); return; }
+      try { await Nuvem.rpc('esc_convidar', { p_email: em }); document.getElementById('acEmail').value = ''; toast('Convite criado. Ela cria a senha na tela de entrada.'); acCarregar(); }
+      catch (e) { toast('Não foi possível convidar: ' + (e.code === 'EMAIL_INVALIDO' ? 'e-mail inválido.' : e.message)); }
+      return;
+    }
+    case 'acResetar': {
+      const em = el.dataset.id;
+      if (!await confirmar('Gerar nova senha?', '<p>A senha de <b>' + esc(em) + '</b> será apagada. Ela cria outra no próximo acesso e as sessões atuais são encerradas.</p>', 'Redefinir')) return;
+      try { await Nuvem.rpc('esc_resetar_senha_usuario', { p_email: em }); toast('Senha redefinida.'); acCarregar(); } catch (e) { toast('Não foi possível redefinir a senha.'); }
+      return;
+    }
+    case 'acRevogar': {
+      const em = el.dataset.id;
+      if (!await confirmar('Revogar acesso?', '<p><b>' + esc(em) + '</b> deixará de ter acesso ao sistema.</p>', 'Revogar', true)) return;
+      try { await Nuvem.rpc('esc_revogar_usuario', { p_email: em }); toast('Acesso revogado.'); acCarregar(); } catch (e) { toast('Não foi possível revogar o acesso.'); }
+      return;
+    }
     case 'removerAssinatura': { if (!await confirmar('Remover assinatura?', '<p>Os próximos contratos sairão sem assinatura do gerente.</p>', 'Remover', true)) return; try { await Store.set('config', 'geral', Object.assign({}, S.config, { assinatura: null })); toast('Assinatura removida.'); } catch (e) { } return; }
     case 'temaEscolher': try { localStorage.setItem('escalas-tema', el.dataset.t); } catch (e) { } aplicarTema(el.dataset.t); return render();
     case 'atualizarSistema': return atualizarSistema();
