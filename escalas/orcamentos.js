@@ -900,11 +900,13 @@
     var JsPDF;
     try { JsPDF = await carregarPdfLibs(); } catch (e) { toast('Não foi possível carregar o gerador de PDF. Verifique a conexão.'); return; }
     var doc = new JsPDF({ unit: 'mm', format: 'a4' });
-    var W = doc.internal.pageSize.getWidth(), M = 18, larg = W - 2 * M, y = 22;
+    var W = doc.internal.pageSize.getWidth(), M = 18, larg = W - 2 * M;
+    var logo = await carregarLogo();
+    var y = cabecalhoPdf(doc, logo, W, M, 'CONTRATO', c.numero);
     var limite = function (h) { if (y + h > 280) { doc.addPage(); y = 22; } };
     var titulo = c.tipoContrato === 'servico30' ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS (30 DIAS)' : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS';
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text(titulo, W / 2, y, { align: 'center' }); y += 7;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text('Nº ' + (c.numero || '—'), W / 2, y, { align: 'center' }); y += 12;
+    y += 4;
     var partes = [
       'CONTRATANTE: ' + nomeHotel() + ', CNPJ ' + HOTEL_CNPJ + ', neste ato representado por seu responsável legal.',
       'CONTRATADA: ' + (c.contratadoNome || '__________________________') + (c.contratadoDoc ? ', CPF/CNPJ ' + c.contratadoDoc : ', CPF/CNPJ ______________________') + '.'
@@ -924,6 +926,7 @@
     linha(M, 'CONTRATANTE', nomeHotel()); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
     y += 22;
     linha(M, 'Testemunha 1', 'Nome e CPF'); linha(W - M - 78, 'Testemunha 2', 'Nome e CPF');
+    aplicarMarcaDagua(doc, logo);
     var total = doc.internal.getNumberOfPages();
     for (var p = 1; p <= total; p++) {
       doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120);
@@ -985,6 +988,58 @@
     return window.jspdf.jsPDF;
   }
 
+  // logo da empresa (logo.png, ao lado do sistema): carregada uma vez
+  var LOGO_CACHE = null;
+  function carregarLogo() {
+    if (LOGO_CACHE) return Promise.resolve(LOGO_CACHE);
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var c = document.createElement('canvas');
+          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          c.getContext('2d').drawImage(img, 0, 0);
+          LOGO_CACHE = { dataUrl: c.toDataURL('image/png'), w: img.naturalWidth, h: img.naturalHeight };
+          resolve(LOGO_CACHE);
+        } catch (e) { resolve(null); }
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = 'logo.png';
+    });
+  }
+
+  // cabeçalho do PDF: logo, nome e CNPJ à esquerda; rótulo e número à direita. Retorna a altura usada.
+  function cabecalhoPdf(doc, logo, W, M, rotulo, numero) {
+    var y0 = 12, hL = 22, xT = M, cor = [15, 76, 92];
+    if (logo) { var wL = hL * logo.w / logo.h; doc.addImage(logo.dataUrl, 'PNG', M, y0, wL, hL); xT = M + wL + 6; }
+    doc.setTextColor(cor[0], cor[1], cor[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text(nomeHotel(), xT, y0 + 8);
+    doc.setTextColor(75, 85, 99); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text('CNPJ ' + HOTEL_CNPJ, xT, y0 + 14);
+    doc.setTextColor(cor[0], cor[1], cor[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text(rotulo, W - M, y0 + 8, { align: 'right' });
+    doc.setTextColor(17, 24, 39); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Nº ' + (numero || '—'), W - M, y0 + 14, { align: 'right' });
+    doc.setDrawColor(cor[0], cor[1], cor[2]); doc.setLineWidth(0.6);
+    doc.line(M, y0 + hL + 4, W - M, y0 + hL + 4);
+    doc.setTextColor(17, 24, 39);
+    return y0 + hL + 12;
+  }
+
+  // logo clarinha no centro de cada página (atrás do texto, com transparência)
+  function aplicarMarcaDagua(doc, logo) {
+    if (!logo) return;
+    var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    var w = 120, h = w * logo.h / logo.w, x = (W - w) / 2, y = (H - h) / 2;
+    var paginas = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= paginas; p++) {
+      doc.setPage(p);
+      try { doc.setGState(new doc.GState({ opacity: 0.08 })); } catch (e) { return; }
+      doc.addImage(logo.dataUrl, 'PNG', x, y, w, h);
+      doc.setGState(new doc.GState({ opacity: 1 }));
+    }
+  }
+
   async function gerarPdf(o, paraImprimir) {
     if (!o) return;
     var JsPDF;
@@ -994,17 +1049,10 @@
     var W = doc.internal.pageSize.getWidth();
     var cor = [15, 76, 92];
     var m = function (v) { return brl(v); };
-    // cabeçalho
-    doc.setFillColor(cor[0], cor[1], cor[2]); doc.rect(0, 0, W, 34, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
-    doc.text(nomeHotel(), 14, 16);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    doc.text('CNPJ ' + HOTEL_CNPJ, 14, 23);
-    doc.text('ORÇAMENTO', W - 14, 16, { align: 'right' });
-    doc.setFontSize(11); doc.text('Nº ' + (o.numero || '—'), W - 14, 23, { align: 'right' });
-    doc.setTextColor(17, 24, 39);
+    var logo = await carregarLogo();
+    // cabeçalho: logo, nome e CNPJ
+    var y = cabecalhoPdf(doc, logo, W, 14, 'ORÇAMENTO', o.numero);
     // identificação
-    var y = 44;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(o.servico || '', 14, y);
     y += 6;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
@@ -1015,7 +1063,7 @@
       var lw = doc.getTextWidth(c[0] + ': ');
       doc.setFont('helvetica', 'normal'); doc.text(String(c[1]), x + lw, yy + 5);
     });
-    y += 16;
+    y += 6 * Math.ceil(campos.length / 2) + 6;
     if (o.descricao) {
       doc.setFont('helvetica', 'bold'); doc.text('Descrição do serviço', 14, y); y += 5;
       doc.setFont('helvetica', 'normal');
@@ -1048,7 +1096,8 @@
     linha('Despesas adicionais', t.despesas);
     linha('Subtotal', t.subtotal);
     if (t.desconto > 0) linha('Desconto' + (o.descontoTipo === 'pct' ? ' (' + OrcCalc.num(o.desconto) + '%)' : ''), t.desconto, false, true);
-    doc.setDrawColor(cor[0], cor[1], cor[2]); doc.setLineWidth(0.5); doc.line(bx, y - 2, W - 14, y - 2);
+    y += 2;
+    doc.setDrawColor(cor[0], cor[1], cor[2]); doc.setLineWidth(0.5); doc.line(bx, y - 4, W - 14, y - 4);
     doc.setTextColor(cor[0], cor[1], cor[2]); linha('VALOR TOTAL', t.final, true); doc.setTextColor(17, 24, 39);
     // observações
     y += 4;
@@ -1064,6 +1113,7 @@
     doc.setDrawColor(150); doc.line(14, y, 90, y); doc.line(W - 90, y, W - 14, y);
     doc.setFontSize(9); doc.text('Responsável pelo orçamento', 14, y + 5); doc.text('Aprovação do proprietário', W - 90, y + 5);
     // rodapé em todas as páginas
+    aplicarMarcaDagua(doc, logo);
     var total = doc.internal.getNumberOfPages();
     for (var p = 1; p <= total; p++) {
       doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120);
