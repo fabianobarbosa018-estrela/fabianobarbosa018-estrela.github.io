@@ -717,8 +717,29 @@ table.list tr:hover td{background:#f8fbfc}
 })();
 </script>
 <div class="app" id="app">
+<style id="menu-v2">
+.brand{position:relative;padding:14px 16px 12px}
+.brand-logo{width:112px;margin:0 0 6px}
+.brand b{font-size:14px}
+.nav-g{margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px}
+.nav-g:first-child{border-top:0;margin-top:0;padding-top:4px}
+.nav a{padding:10px 12px;gap:12px;font-size:14.5px}
+.nav a svg{width:20px;height:20px;flex-shrink:0}
+.nav a .nav-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side .nav{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.side .brand,.side .side-atu,.side .side-foot{flex-shrink:0}
+.menu-min{position:absolute;right:10px;top:12px;width:28px;height:28px;border-radius:8px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:18px;line-height:1;cursor:pointer}
+.side.min{width:72px}
+.side.min .brand{padding:14px 0 12px;text-align:center}
+.side.min .brand-logo,.side.min .brand b,.side.min .brand small,.side.min .side-atu,.side.min #storeStatus{display:none}
+.side.min .menu-min{position:static;transform:rotate(180deg)}
+.side.min .nav-t{display:none}
+.side.min .nav a{justify-content:center;padding:12px 0}
+.side.min .nav-g{height:1px;font-size:0;padding:0;margin:8px 14px;border-top:1px solid rgba(255,255,255,.15)}
+@media (max-width:900px){.menu-min{display:none}}
+</style>
   <aside class="side" id="side">
-    <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Gestão operacional</small></div>
+    <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Gestão operacional</small><button class="menu-min" id="btnMin" aria-label="Recolher ou expandir menu" title="Recolher menu">‹</button></div>
     <nav class="nav" id="nav"></nav>
     <button class="atu side-atu" data-act="alternarTema" id="btnTema" style="margin-top:0"><span class="tema-t">Tema: automático</span></button>
     <button class="atu side-atu" data-act="atualizarSistema"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg><span class="atu-t">Atualizar sistema</span></button>
@@ -1771,6 +1792,8 @@ const ICON = {
   exportar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
   orcamentos: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h6"/>',
   contratos: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 9h6M9 13h6"/><path d="M14 19l2 2 4-4"/>',
+  diaria: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M9 14h6"/>',
+  aparencia: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
   backup: '<path d="M4 7c0-2 4-3 8-3s8 1 8 3-4 3-8 3-8-1-8-3zM4 7v10c0 2 4 3 8 3s8-1 8-3V7M4 12c0 2 4 3 8 3s8-1 8-3"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
@@ -1787,7 +1810,7 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['mensal', 'Escala mensal'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['orcamentos', 'Orçamentos'], ['contratos', 'Contratos'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -2676,8 +2699,8 @@ function catAlerta(m) {
    ===================================================================== */
 function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
-  const GRUPOS_MENU = [['Gestão', ['painel', 'mensal', 'funcionarios', 'setores', 'orcamentos', 'contratos']], ['Financeiro e controle', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup']]];
-  document.getElementById('nav').innerHTML = GRUPOS_MENU.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '">' + ic(k) + (r ? r[1] : k) + '</a>'; }).join('')).join('');
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup', 'aparencia']]];
+  document.getElementById('nav').innerHTML = GRUPOS_MENU.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('');
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
   atualizarStatus();
   const v = document.getElementById('view');
@@ -2685,7 +2708,7 @@ function render() {
   document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
   if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
   const sy = window.scrollY;
-  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -4413,6 +4436,27 @@ function irRota() {
   render(); window.scrollTo(0, 0);
 }
 window.addEventListener('hashchange', irRota);
+function vAparencia() {
+  const t = temaAtual();
+  const op = (k, rot, desc) => '<button class="btn ' + (t === k ? 'pri' : '') + '" data-act="temaEscolher" data-t="' + k + '" style="width:100%;justify-content:flex-start;padding:14px 16px;margin-bottom:8px;text-align:left"><b>' + rot + '</b>&nbsp;<span class="small">' + desc + '</span></button>';
+  return '<div class="row mb"><div><h1>Aparência e tema</h1><p class="sub" style="margin:0">Como o sistema aparece neste aparelho</p></div></div>' +
+    '<div class="card"><p class="sub" style="margin:0 0 12px">Escolha como o sistema aparece neste aparelho.</p>' +
+    op('auto', 'Automático', 'segue o tema do celular ou do computador') +
+    op('claro', 'Claro', 'fundo claro') +
+    op('escuro', 'Escuro', 'fundo escuro, para ambientes com pouca luz') + '</div>';
+}
+const MENU_MIN_KEY = 'escalas-menu-min';
+function aplicarMenuMin() {
+  const on = window.innerWidth > 900 && (() => { try { return localStorage.getItem(MENU_MIN_KEY) === '1'; } catch (e) { return false; } })();
+  document.getElementById('side').classList.toggle('min', on);
+}
+document.getElementById('btnMin').onclick = () => {
+  const on = !document.getElementById('side').classList.contains('min');
+  document.getElementById('side').classList.toggle('min', on);
+  try { localStorage.setItem(MENU_MIN_KEY, on ? '1' : '0'); } catch (e) { }
+};
+window.addEventListener('resize', () => { if (window.innerWidth <= 900) document.getElementById('side').classList.remove('min'); else aplicarMenuMin(); });
+aplicarMenuMin();
 document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
@@ -4464,6 +4508,7 @@ document.addEventListener('click', async ev => {
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'alternarTema': return alternarTema();
+    case 'temaEscolher': try { localStorage.setItem('escalas-tema', el.dataset.t); } catch (e) { } aplicarTema(el.dataset.t); return render();
     case 'atualizarSistema': return atualizarSistema();
     case 'irSemana': UI.semana = el.dataset.sem; if (UI.rota === 'escala') render(); return;
     case 'escDia': return escEditarDia(el.dataset.sem, el.dataset.fid, el.dataset.d);
