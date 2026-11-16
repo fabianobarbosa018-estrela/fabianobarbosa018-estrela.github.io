@@ -141,5 +141,50 @@ t('painel: contagens e valores (aprovado inclui em execução e concluído)', ()
   assert.equal(r.valorAprovado, 550);
 });
 
+t('busca do catálogo: "ar" acha ar-condicionado, sem acento e com hífen', () => {
+  assert.equal(C.normaliza('Ar-Condicionado  Split'), 'ar condicionado split');
+  const r = C.buscarCatalogo(C.BASE_CATALOGO, 'ar');
+  assert.ok(r.length >= 5);
+  assert.ok(r.every(e => C.normaliza(e.nome).includes('ar')));
+  const r2 = C.buscarCatalogo(C.BASE_CATALOGO, 'ar cond');
+  assert.ok(r2.some(e => e.id === 'base_ar_gas'));
+  assert.ok(C.buscarCatalogo(C.BASE_CATALOGO, 'ventilador').every(e => e.tipo === 'ventilador'));
+  assert.equal(C.buscarCatalogo(C.BASE_CATALOGO, '   ').length, 0);
+});
+
+t('catálogo mesclado: preço gravado vira o atual; item oculto some; itens criados entram', () => {
+  const gravados = [
+    { id: 'base_ar_gas', precos: [{ valor: 180, fornecedor: 'Rapaz do ar', data: '2026-11-10' }] },
+    { id: 'base_vent_motor', oculto: true },
+    { id: 'cat_manual', nome: 'Limpeza de caixa d água', tipo: 'outro', unidade: 'serviço', categoria: 'mao_obra', precos: [{ valor: 300, fornecedor: '', data: '2026-11-11' }] },
+  ];
+  const m = C.catalogoMesclado(C.BASE_CATALOGO, gravados);
+  const gas = m.find(e => e.id === 'base_ar_gas');
+  assert.equal(gas.precoAtual.valor, 180);
+  assert.equal(m.some(e => e.id === 'base_vent_motor'), false);
+  assert.equal(m.find(e => e.id === 'cat_manual').precoAtual.valor, 300);
+  assert.equal(m.find(e => e.id === 'base_ar_compra').precoAtual, null);
+});
+
+t('registro de preços: item novo cria registro; mesmo preço não repete; preço novo entra no topo', () => {
+  const cat = C.catalogoMesclado(C.BASE_CATALOGO, []);
+  const orc1 = { tipo: 'ar_condicionado', itens: [{ nome: 'Recarga de gás de ar-condicionado', unidade: 'serviço', categoria: 'mao_obra', vu: 150, fornecedor: 'Rapaz' }, { nome: 'Item sem preço', vu: 0 }] };
+  const r1 = C.precosDoOrcamento(cat, orc1, '2026-11-16');
+  assert.equal(r1.length, 1);
+  assert.equal(r1[0].id, 'base_ar_gas');
+  assert.equal(r1[0].precos[0].valor, 150);
+  const g1 = [r1[0]];
+  const cat2 = C.catalogoMesclado(C.BASE_CATALOGO, g1);
+  assert.equal(C.precosDoOrcamento(cat2, orc1, '2026-11-17').length, 0, 'mesmo preço e fornecedor: sem mudança');
+  const orc2 = { tipo: 'ar_condicionado', itens: [{ nome: 'recarga de gas de ar condicionado', vu: 165, fornecedor: 'Rapaz' }] };
+  const r2 = C.precosDoOrcamento(cat2, orc2, '2026-11-18');
+  assert.equal(r2.length, 1);
+  assert.deepEqual(Array.from(r2[0].precos.map(p => p.valor)), [165, 150]);
+  const novo = C.precosDoOrcamento(cat, { tipo: 'outro', itens: [{ nome: 'Serviço inédito', vu: 40, unidade: 'serviço', categoria: 'mao_obra' }] }, '2026-11-16');
+  assert.equal(novo.length, 1);
+  assert.ok(novo[0].id.startsWith('cat_'));
+  assert.equal(novo[0].nome, 'Serviço inédito');
+});
+
 console.log(`orçamentos: ${ok} ok, ${falhas} falha(s)`);
 if (falhas) process.exit(1);

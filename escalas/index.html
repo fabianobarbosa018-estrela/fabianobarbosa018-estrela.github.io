@@ -1508,7 +1508,7 @@ const C = window.Core;
 const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de folga não é fixa nem permanente, ela poderá sofrer alterações a qualquer momento ( no dia anterior a folga ) o horário também poderá ser alterado ( no mesmo dia ) de acordo com a necessidade da Fazenda.\nQualquer duvida, podem procurar a gerencia!';
 const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
 const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
-const S = { orcamentos: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
+const S = { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
 const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', setoresSel: [], filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
 let DB = null, DL = null;
 const LS_KEY = 'escalas_hotel_v1';
@@ -1567,11 +1567,11 @@ const Store = {
     DB.collection('config').onSnapshot(s => { const g = s.docs.find(d => d.id === 'geral'); if (g) S.config = Object.assign({}, CONFIG_PADRAO, g.data()); marcar('config', s); }, erro('config'));
   },
   carregarLocal() {
-    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { orcamentos: d.orcamentos || [], setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); Object.assign(S, { orcamentos: d.orcamentos || [], orcCatalogo: d.orcCatalogo || [], setores: d.setores || [], funcionarios: d.funcionarios || [], vt: d.vt || {}, escalas: {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); Object.entries(d.escalas || {}).forEach(([k, e]) => { if (C.diaSemana(k) === 0) S.escalas[k] = e; else S.escalasAntigas[k] = e; }); } } catch (e) { S.localFalhou = true; }
   },
   salvarLocal() {
     if (S.modo === 'nuvem') return Nuvem.guardarCopia();
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ orcamentos: S.orcamentos, setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ orcamentos: S.orcamentos, orcCatalogo: S.orcCatalogo, setores: S.setores, funcionarios: S.funcionarios, vt: S.vt, escalas: Object.assign({}, S.escalasAntigas, S.escalas), auditoria: S.auditoria.slice(0, 2000), config: S.config })); } catch (e) { S.localFalhou = true; }
   },
   enfileirar(chave, fn) {
     const ant = this.filas[chave] || Promise.resolve();
@@ -1658,7 +1658,7 @@ const Nuvem = {
   },
   async carregarTudo() {
     const r = await this.rpc('esc_ler', { p_desde: null });
-    Object.assign(S, { orcamentos: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true; S.sincAt = new Date();
     this.guardarCopia(); render(); atualizarStatus();
@@ -1682,9 +1682,9 @@ const Nuvem = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
   },
-  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), orcamentos: S.orcamentos, setores: S.setores, funcionarios: S.funcionarios, prestadores: S.prestadores, servicos: S.servicos, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
+  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), orcamentos: S.orcamentos, orcCatalogo: S.orcCatalogo, setores: S.setores, funcionarios: S.funcionarios, prestadores: S.prestadores, servicos: S.servicos, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
   lerCopia() {
-    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { orcamentos: d.orcamentos || [], setores: d.setores || [], funcionarios: d.funcionarios || [], prestadores: d.prestadores || [], servicos: d.servicos || {}, vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
+    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { orcamentos: d.orcamentos || [], orcCatalogo: d.orcCatalogo || [], setores: d.setores || [], funcionarios: d.funcionarios || [], prestadores: d.prestadores || [], servicos: d.servicos || {}, vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
   },
   async falhaGravacao(e) {
     if (e && e.code === 'SESSAO_INVALIDA') { this.sair(true); throw e; }

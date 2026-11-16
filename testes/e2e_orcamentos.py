@@ -141,6 +141,49 @@ def run():
         import shutil; shutil.copy(path, '/tmp/orc/orcamento.pdf')  # exemplo gerado pelo teste
         print('PDF salvo em /tmp/orc/orcamento.pdf')
 
+        # --- catálogo: sugestões ao digitar, preço aprendido e preenchimento automático
+        page.click('button[data-act="orcTela"][data-t="painel"]'); page.wait_for_timeout(300)
+        page.click('button[data-act="orcNovo"]')
+        page.wait_for_selector('#orcForm')
+        page.fill('[data-orc-campo="servico"]', 'Recarga de gás do split')
+        page.fill('[data-orc-campo="responsavel"]', 'Fabiano')
+        page.locator('[data-orc-item]').nth(0).locator('[data-orc-f="nome"]').fill('ar')
+        page.wait_for_selector('[data-act="orcSugEscolher"]', timeout=5000)
+        assert page.locator('[data-act="orcSugEscolher"]').count() >= 5, 'sugestões de "ar" não apareceram'
+        page.locator('[data-orc-item]').nth(0).locator('[data-orc-f="nome"]').fill('recarga de gás')
+        page.wait_for_selector('[data-act="orcSugEscolher"]', timeout=5000)
+        page.locator('[data-act="orcSugEscolher"]').filter(has_text='Recarga de gás').first.click()
+        page.wait_for_timeout(400)
+        it = page.locator('[data-orc-item]').nth(0)
+        assert it.locator('[data-orc-f="nome"]').input_value() == 'Recarga de gás de ar-condicionado'
+        it.locator('[data-orc-f="vu"]').fill('150')
+        it.locator('[data-orc-f="fornecedor"]').fill('Rapaz do ar')
+        page.wait_for_timeout(300)
+        page.click('button[data-act="orcSalvar"]')
+        page.wait_for_selector('text=Orçamento salvo', timeout=5000)
+        page.wait_for_timeout(800)
+        cats = [d for (c, i), d in store.items() if c == 'orcCatalogo']
+        assert any(d.get('precos') and d['precos'][0]['valor'] == 150 and d['precos'][0]['fornecedor'] == 'Rapaz do ar' for d in cats), 'preço não foi aprendido pelo catálogo'
+
+        # segundo orçamento: sugestão já mostra o último preço e preenche o item
+        page.click('button[data-act="orcTela"][data-t="painel"]'); page.wait_for_timeout(300)
+        page.click('button[data-act="orcNovo"]')
+        page.wait_for_selector('#orcForm')
+        page.locator('[data-orc-item]').nth(0).locator('[data-orc-f="nome"]').fill('gás')
+        page.wait_for_selector('[data-act="orcSugEscolher"]', timeout=5000)
+        assert page.locator('text=R$ 150,00').count() >= 1, 'sugestão não mostrou o último preço'
+        page.locator('[data-act="orcSugEscolher"]').filter(has_text='Recarga de gás').first.click()
+        page.wait_for_timeout(400)
+        it = page.locator('[data-orc-item]').nth(0)
+        assert it.locator('[data-orc-f="vu"]').input_value() in ('150', '150,00'), 'valor não preencheu'
+        assert it.locator('[data-orc-f="fornecedor"]').input_value() == 'Rapaz do ar', 'fornecedor não preencheu'
+
+        # catálogo: aba lista itens de ar-condicionado com o preço
+        page.click('button[data-act="orcCancelar"]'); page.wait_for_timeout(300)
+        page.click('button[data-act="orcTela"][data-t="catalogo"]'); page.wait_for_timeout(400)
+        assert page.locator('text=R$ 150,00').count() >= 1, 'catálogo não mostra o preço'
+        assert page.locator('svg.orc-ico').count() >= 5, 'ícones do catálogo ausentes'
+
         # --- somente leitura não altera
         b.close()
     print('ERROS DE CONSOLE/PÁGINA:', erros if erros else 'nenhum')

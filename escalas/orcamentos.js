@@ -34,6 +34,7 @@
     ['ar_condicionado', 'Ar condicionado', '<rect x="3" y="3.5" width="18" height="7" rx="2"/><path d="M7 14.5c1.4 1.9 0 3-.9 4.2M12 14.5c1.4 1.9 0 3-.9 4.2M17 14.5c1.4 1.9 0 3-.9 4.2"/>'],
     ['pintura_quarto', 'Pintura de quarto', '<rect x="3" y="3" width="14" height="5" rx="1.5"/><path d="M17 5.5h2.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H12"/><path d="M12 10v3"/><rect x="10" y="13" width="4" height="8" rx="1"/>'],
     ['pintura_externa', 'Pintura externa', '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 20v-5h5v5"/>'],
+    ['ventilador', 'Ventilador', '<circle cx="12" cy="12" r="1.8"/><path d="M12 10.2C12 6 9 4 7 5s-1 4.5 2 5.5"/><path d="M13.8 12c4.2 0 6 3 5 5s-4.5 1-5.5-2"/><path d="M12 13.8c0 4.2-3 6-5 5s-1-4.5 2-5.5"/><path d="M10.2 12c-4.2 0-6-3-5-5s4.5-1 5.5 2"/>'],
     ['outro', 'Outro', '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/>']
   ];
   var tipoIcone = function (id, tamanho) {
@@ -156,7 +157,97 @@
   function classeStatus(s) { var x = STATUS.find(function (t) { return t[0] === s; }); return x ? x[2] : 'b-off'; }
   function rotuloCategoria(c) { var x = CATEGORIAS.find(function (t) { return t[0] === c; }); return x ? x[1] : 'Material'; }
 
+  /* ---------------- Catálogo de itens e preços ---------------- */
+  // Serviços de manutenção e compras já cadastrados. Preços começam em branco:
+  // são preenchidos pelo catálogo ou pelos orçamentos salvos.
+  var BASE_CATALOGO = [
+    { id: 'base_ar_preventiva', nome: 'Manutenção preventiva de ar-condicionado (limpeza de filtros)', tipo: 'ar_condicionado', unidade: 'unidade', categoria: 'mao_obra' },
+    { id: 'base_ar_higienizacao', nome: 'Higienização de ar-condicionado split', tipo: 'ar_condicionado', unidade: 'unidade', categoria: 'mao_obra' },
+    { id: 'base_ar_corretiva', nome: 'Manutenção corretiva de ar-condicionado', tipo: 'ar_condicionado', unidade: 'serviço', categoria: 'mao_obra' },
+    { id: 'base_ar_gas', nome: 'Recarga de gás de ar-condicionado', tipo: 'ar_condicionado', unidade: 'serviço', categoria: 'mao_obra' },
+    { id: 'base_ar_instalacao', nome: 'Instalação de ar-condicionado split', tipo: 'ar_condicionado', unidade: 'unidade', categoria: 'mao_obra' },
+    { id: 'base_ar_compra', nome: 'Compra de ar-condicionado split', tipo: 'ar_condicionado', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_ar_capacitor', nome: 'Troca de capacitor de ar-condicionado', tipo: 'ar_condicionado', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_ar_placa', nome: 'Troca de placa eletrônica de ar-condicionado', tipo: 'ar_condicionado', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_ar_gas_compra', nome: 'Gás refrigerante (compra)', tipo: 'ar_condicionado', unidade: 'kg', categoria: 'material' },
+    { id: 'base_vent_manut_teto', nome: 'Manutenção de ventilador de teto', tipo: 'ventilador', unidade: 'unidade', categoria: 'mao_obra' },
+    { id: 'base_vent_manut_parede', nome: 'Manutenção de ventilador de parede', tipo: 'ventilador', unidade: 'unidade', categoria: 'mao_obra' },
+    { id: 'base_vent_motor', nome: 'Troca de motor de ventilador', tipo: 'ventilador', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_vent_capacitor', nome: 'Troca de capacitor de ventilador', tipo: 'ventilador', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_vent_compra_teto', nome: 'Compra de ventilador de teto', tipo: 'ventilador', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_vent_compra_parede', nome: 'Compra de ventilador de parede', tipo: 'ventilador', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_vent_compra_mesa', nome: 'Compra de ventilador de mesa', tipo: 'ventilador', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_pint_quarto_unid', nome: 'Pintura de quarto (mão de obra, por quarto)', tipo: 'pintura_quarto', unidade: 'quarto', categoria: 'mao_obra' },
+    { id: 'base_pint_quarto_m2', nome: 'Pintura de quarto (mão de obra, por m²)', tipo: 'pintura_quarto', unidade: 'm²', categoria: 'mao_obra' },
+    { id: 'base_pint_massa', nome: 'Massa corrida e lixamento (por m²)', tipo: 'pintura_quarto', unidade: 'm²', categoria: 'mao_obra' },
+    { id: 'base_pint_externa_m2', nome: 'Pintura externa da fachada (mão de obra, por m²)', tipo: 'pintura_externa', unidade: 'm²', categoria: 'mao_obra' },
+    { id: 'base_pint_tinta_int', nome: 'Tinta acrílica para interior (lata 18 L)', tipo: 'pintura_quarto', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_pint_tinta_ext', nome: 'Tinta para área externa (lata 18 L)', tipo: 'pintura_externa', unidade: 'unidade', categoria: 'material' },
+    { id: 'base_pint_acessorios', nome: 'Rolo, pincel e fita crepe (kit)', tipo: 'pintura_quarto', unidade: 'pacote', categoria: 'material' }
+  ];
+
+  // minúsculas, sem acento, hífen e espaços unificados ("ar" acha "ar-condicionado")
+  function normaliza(t) {
+    return String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // junta o catálogo base com o que foi gravado (preços, ajustes e itens criados); itens ocultos saem
+  function catalogoMesclado(base, gravados) {
+    var porId = {};
+    (gravados || []).forEach(function (g) { porId[g.id] = g; });
+    var out = [];
+    (base || []).forEach(function (b) {
+      var g = porId[b.id];
+      if (g && g.oculto) return;
+      var e = Object.assign({}, b, { precos: [] });
+      if (g) Object.keys(g).forEach(function (k) { if (g[k] !== undefined && k !== 'id') e[k] = g[k]; });
+      out.push(e);
+    });
+    (gravados || []).forEach(function (g) {
+      if (!g || g.oculto || (base || []).some(function (b) { return b.id === g.id; })) return;
+      out.push(Object.assign({ precos: [] }, g));
+    });
+    out.forEach(function (e) { e.precos = e.precos || []; e.precoAtual = e.precos[0] || null; });
+    return out;
+  }
+
+  function buscarCatalogo(itens, termo, limite) {
+    var q = normaliza(termo);
+    if (!q) return [];
+    return (itens || []).filter(function (i) { return normaliza(i.nome).indexOf(q) >= 0; }).sort(function (a, b) {
+      var pa = normaliza(a.nome).indexOf(q) === 0 ? 0 : 1, pb = normaliza(b.nome).indexOf(q) === 0 ? 0 : 1;
+      return pa - pb || a.nome.localeCompare(b.nome);
+    }).slice(0, limite || 8);
+  }
+
+  // registros de catálogo a gravar a partir dos itens do orçamento: guarda o preço quando é novo ou muda
+  function precosDoOrcamento(catalogo, orc, dataISO) {
+    var mudancas = {}, ordem = [], alterados = {};
+    (orc.itens || []).forEach(function (it) {
+      var v = num(it.vu);
+      if (!(v > 0) || !String(it.nome || '').trim()) return;
+      var chave = normaliza(it.nome);
+      var e = (catalogo || []).find(function (x) { return normaliza(x.nome) === chave; });
+      var id = e ? e.id : 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      var rec = mudancas[id] || {
+        id: id, nome: e ? e.nome : String(it.nome).trim(), tipo: e ? e.tipo : (orc.tipo || 'outro'),
+        unidade: e ? e.unidade : it.unidade, categoria: e ? e.categoria : it.categoria, descricao: e ? (e.descricao || '') : '',
+        precos: e ? (e.precos || []).slice() : []
+      };
+      if (!mudancas[id]) ordem.push(id);
+      var cabeca = rec.precos[0], forn = String(it.fornecedor || '').trim();
+      if (!cabeca || cabeca.valor !== v || String(cabeca.fornecedor || '') !== forn) {
+        rec.precos.unshift({ valor: v, fornecedor: forn, data: dataISO });
+        alterados[id] = true;
+      }
+      rec.precos = rec.precos.slice(0, 20);
+      mudancas[id] = rec;
+    });
+    return ordem.filter(function (k) { return alterados[k]; }).map(function (k) { return mudancas[k]; });
+  }
+
   var OrcCalc = {
+    BASE_CATALOGO: BASE_CATALOGO, normaliza: normaliza, catalogoMesclado: catalogoMesclado, buscarCatalogo: buscarCatalogo, precosDoOrcamento: precosDoOrcamento,
     STATUS: STATUS, STATUS_APROVADOS: STATUS_APROVADOS, CATEGORIAS: CATEGORIAS, UNIDADES: UNIDADES, TIPOS: TIPOS, tipoIcone: tipoIcone, tipoRotulo: tipoRotulo,
     num: num, r2: r2, totalItem: totalItem, totais: totais, proximoNumero: proximoNumero,
     validar: validar, filtrar: filtrar, resumo: resumo, rotuloStatus: rotuloStatus, classeStatus: classeStatus, rotuloCategoria: rotuloCategoria
@@ -173,7 +264,9 @@
     rasc: null,          // rascunho do formulário (fonte da verdade enquanto edita)
     filtros: {},
     salvoEm: null,
-    timer: null
+    timer: null,
+    sug: null,       // sugestões abertas: { item, termo }
+    catFiltro: ''
   };
   window.ORC_ESTADO = ORC;
 
@@ -187,9 +280,10 @@
   var STATUS = OrcCalc.STATUS, CATEGORIAS = OrcCalc.CATEGORIAS, UNIDADES = OrcCalc.UNIDADES, STATUS_APROVADOS = OrcCalc.STATUS_APROVADOS;
   var iconeTipo = function (id, px) { return tipoIcone(id, px); };
   var tipoRot = function (id) { return tipoRotulo(id); };
+  var catalogoAtual = function () { return OrcCalc.catalogoMesclado(OrcCalc.BASE_CATALOGO, S.orcCatalogo || []); };
   var nomeHotel = function () { return (S.config && S.config.nomeHotel) || 'Hotel Fazenda Oasis'; };
 
-  function novoItem() { return { id: uid('it'), nome: '', descricao: '', qtd: 1, unidade: 'unidade', vu: 0, categoria: 'material' }; }
+  function novoItem() { return { id: uid('it'), nome: '', descricao: '', fornecedor: '', qtd: 1, unidade: 'unidade', vu: 0, categoria: 'material' }; }
   function novoRascunho() {
     return { id: null, numero: null, tipo: 'outro', servico: '', descricao: '', data: hojeISO(), local: '', responsavel: '', prazo: '', status: 'em_elaboracao',
       itens: [novoItem()], descontoTipo: 'valor', desconto: 0, observacoes: '' };
@@ -269,7 +363,7 @@
     return '<div class="row mb" style="justify-content:space-between;align-items:flex-start"><div><h2 style="margin:0">' + eh(titulo) + '</h2></div><div class="row">' + (acoes || '') + '</div></div>';
   }
   function nav() {
-    var abas = [['painel', 'Painel'], ['lista', 'Histórico e pesquisa'], ['aprovados', 'Serviços aprovados']];
+    var abas = [['painel', 'Painel'], ['lista', 'Histórico e pesquisa'], ['aprovados', 'Serviços aprovados'], ['catalogo', 'Catálogo de preços']];
     return '<div class="tabs">' + abas.map(function (a) {
       return '<button class="' + (ORC.tela === a[0] ? 'on' : '') + '" data-act="orcTela" data-t="' + a[0] + '">' + a[1] + '</button>';
     }).join('') + '</div>';
@@ -280,6 +374,7 @@
     if (ORC.tela === 'detalhe') return telaDetalhe();
     if (ORC.tela === 'lista') return telaLista();
     if (ORC.tela === 'aprovados') return telaAprovados();
+    if (ORC.tela === 'catalogo') return telaCatalogo();
     return telaPainel();
   }
 
@@ -348,6 +443,113 @@
         '</tbody></table></div>' : '<p class="muted">Nenhum serviço aprovado ainda.</p>') + '</div>';
   }
 
+  function sugestoesHTML(itemId, termo) {
+    var res = OrcCalc.buscarCatalogo(catalogoAtual(), termo, 6);
+    if (!res.length) return '<p class="small muted" style="margin:6px 0">Nenhum item parecido no catálogo. Ele será criado ao salvar o orçamento.</p>';
+    return '<div class="small muted" style="margin:6px 0 4px">Sugestões do catálogo (toque para usar):</div><div class="row" style="gap:6px">' +
+      res.map(function (e) {
+        var pa = e.precoAtual;
+        return '<button type="button" class="btn sm" data-act="orcSugEscolher" data-item="' + eh(itemId) + '" data-cat="' + eh(e.id) + '">' + tipoIcone(e.tipo, 16) + eh(e.nome) +
+          (pa ? ' · ' + brl(pa.valor) + (pa.fornecedor ? ' (' + eh(pa.fornecedor) + ')' : '') : ' · sem preço') + '</button>';
+      }).join('') + '</div>';
+  }
+
+  function mostrarSugestoes(input) {
+    var card = input.closest('[data-orc-item]');
+    if (!card) return;
+    var id = card.dataset.orcItem, termo = input.value.trim();
+    ORC.sug = termo ? { item: id, termo: termo } : null;
+    var box = document.querySelector('[data-orc-sug="' + id + '"]');
+    if (box) box.innerHTML = termo ? sugestoesHTML(id, termo) : '';
+  }
+
+  function escolherSugestao(itemId, catId) {
+    lerForm();
+    var e = catalogoAtual().find(function (x) { return x.id === catId; });
+    var it = ORC.rasc.itens.find(function (x) { return x.id === itemId; });
+    if (!e || !it) return;
+    it.nome = e.nome;
+    it.unidade = e.unidade || it.unidade;
+    it.categoria = e.categoria || it.categoria;
+    it.descricao = e.descricao || it.descricao;
+    if (e.precoAtual) { it.vu = e.precoAtual.valor; it.fornecedor = e.precoAtual.fornecedor || ''; }
+    if (ORC.rasc.tipo === 'outro' && e.tipo) ORC.rasc.tipo = e.tipo;
+    ORC.sug = null;
+    render();
+  }
+
+  async function salvarRegistroCatalogo(rec) {
+    var d = Object.assign({}, rec);
+    delete d.id;
+    d.atualizadoEm = new Date().toISOString();
+    await Store.set('orcCatalogo', rec.id, d);
+  }
+
+  // ao salvar o orçamento, guarda no catálogo o preço de cada item (novo ou alterado)
+  async function atualizarCatalogoComOrcamento(orc) {
+    var regs = OrcCalc.precosDoOrcamento(catalogoAtual(), orc, orc.data || hojeISO());
+    for (var i = 0; i < regs.length; i++) {
+      try { await salvarRegistroCatalogo(regs[i]); } catch (e) { /* o orçamento já foi salvo */ }
+    }
+  }
+
+  async function salvarPrecoCatalogo() {
+    if (!exigeEscrita()) return;
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var nome = g('catNome').trim(), valor = OrcCalc.num(g('catValor')), fornec = g('catFornec').trim();
+    if (!nome) return toast('Informe o nome do item.');
+    if (!(valor > 0)) return toast('Informe o valor, maior que zero.');
+    var existente = catalogoAtual().find(function (x) { return OrcCalc.normaliza(x.nome) === OrcCalc.normaliza(nome); });
+    var id = existente ? existente.id : uid('cat');
+    var rec = {
+      id: id, nome: existente ? existente.nome : nome, tipo: g('catTipo'), unidade: g('catUnid'), categoria: g('catCat'),
+      descricao: g('catDesc').trim() || (existente ? (existente.descricao || '') : ''),
+      precos: [{ valor: valor, fornecedor: fornec, data: hojeISO() }].concat(existente ? existente.precos : []).slice(0, 20)
+    };
+    try { await salvarRegistroCatalogo(rec); toast('Preço registrado'); render(); } catch (e) { /* aviso já mostrado pelo sistema */ }
+  }
+
+  async function ocultarCatalogo(id) {
+    if (!exigeEscrita()) return;
+    var e = catalogoAtual().find(function (x) { return x.id === id; });
+    if (!e || !window.confirm('Ocultar "' + e.nome + '" do catálogo? Os orçamentos antigos não são alterados.')) return;
+    var d = Object.assign({}, e, { oculto: true });
+    delete d.precoAtual;
+    try { await Store.set('orcCatalogo', id, d); toast('Item ocultado'); render(); } catch (err) { /* aviso já mostrado */ }
+  }
+
+  function telaCatalogo() {
+    var f = ORC.catFiltro || '';
+    var itens = catalogoAtual().filter(function (e) { return !f || OrcCalc.buscarCatalogo([e], f, 1).length; });
+    var tipoOpts = TIPOS.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('');
+    var unidOpts = UNIDADES.map(function (u) { return '<option value="' + u + '">' + u + '</option>'; }).join('');
+    var catOpts = CATEGORIAS.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('');
+    var linhas = itens.map(function (e) {
+      var pa = e.precoAtual;
+      return '<tr style="border-top:1px solid var(--line)"><td>' + tipoIcone(e.tipo) + '<b>' + eh(e.nome) + '</b><div class="small muted">' + eh(tipoRot(e.tipo)) + ' · ' + eh(e.unidade || '') + '</div></td>' +
+        '<td style="text-align:right">' + (pa ? '<b>' + brl(pa.valor) + '</b>' : '<span class="muted">sem preço</span>') + '</td>' +
+        '<td>' + eh(pa && pa.fornecedor ? pa.fornecedor : '—') + '</td><td>' + (pa ? dataBR(pa.data) : '—') + '</td>' +
+        '<td class="small muted">' + e.precos.slice(0, 3).map(function (p) { return brl(p.valor) + (p.fornecedor ? ' (' + eh(p.fornecedor) + ')' : ''); }).join('<br>') + '</td>' +
+        '<td style="text-align:right">' + (S.somenteLeitura ? '' : '<button class="btn sm danger" data-act="orcCatOcultar" data-id="' + eh(e.id) + '">Ocultar</button>') + '</td></tr>';
+    }).join('');
+    var registro = S.somenteLeitura ? '' :
+      '<div class="card mb"><h3 style="margin-top:0">Registrar preço cobrado</h3>' +
+      '<p class="small muted" style="margin-top:0">Escreva o nome do item (ex.: “ar-condicionado”). Se já existir no catálogo, o preço é acrescentado ao histórico.</p>' +
+      '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">' +
+      '<div class="fld"><label class="f">Item</label><input type="text" id="catNome" autocomplete="off"></div>' +
+      '<div class="fld"><label class="f">Tipo de serviço</label><select id="catTipo">' + tipoOpts + '</select></div>' +
+      '<div class="fld"><label class="f">Unidade</label><select id="catUnid">' + unidOpts + '</select></div>' +
+      '<div class="fld"><label class="f">Categoria</label><select id="catCat">' + catOpts + '</select></div>' +
+      '<div class="fld"><label class="f">Valor cobrado (R$)</label><input type="text" inputmode="decimal" id="catValor"></div>' +
+      '<div class="fld"><label class="f">Fornecedor / prestador</label><input type="text" id="catFornec"></div>' +
+      '<div class="fld" style="grid-column:1/-1"><label class="f">Observação</label><input type="text" id="catDesc"></div></div>' +
+      '<div class="row"><button class="btn pri" data-act="orcCatSalvar">Salvar preço</button></div></div>';
+    return cabecalho('Catálogo de preços') + nav() + registro +
+      '<div class="card mb"><div class="row"><div class="fld" style="flex:1;min-width:220px;margin:0"><label class="f">Pesquisar item (ex.: “ar”, “ventilador”, “pintura”)</label><input type="search" id="catBusca" value="' + eh(f) + '"></div>' +
+      '<button class="btn pri" data-act="orcCatBuscar" style="align-self:flex-end">Pesquisar</button><button class="btn" data-act="orcCatLimpar" style="align-self:flex-end">Ver tudo</button><span class="sp"></span><span class="small muted" style="align-self:flex-end">' + itens.length + ' item(ns)</span></div></div>' +
+      '<div class="card">' + (itens.length ? '<div class="tw" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;color:var(--ink2);font-size:13px"><th>Item</th><th style="text-align:right">Último preço</th><th>Fornecedor</th><th>Data</th><th>Histórico (últimos)</th><th></th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="muted">Nenhum item encontrado.</p>') + '</div>';
+  }
+
   function blocoTotais(t, tipo) {
     var linha = function (l, v, neg, forte) { return '<div class="row" style="justify-content:space-between;padding:4px 0;' + (forte ? 'font-weight:800;font-size:16px;border-top:2px solid var(--line);margin-top:6px;padding-top:8px' : '') + '"><span>' + l + '</span><span>' + (neg ? '− ' : '') + brl(v) + '</span></div>'; };
     return linha('Mão de obra', t.maoObra) + linha('Materiais', t.materiais) + linha('Despesas adicionais', t.despesas) +
@@ -364,13 +566,15 @@
     var itens = c.itens.map(function (it) {
       return '<div class="orc-item card mb" data-orc-item="' + eh(it.id) + '" style="padding:12px">' +
         '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">' +
-        '<div class="fld"><label class="f">Item ou serviço</label><input type="text" data-orc-f="nome" value="' + eh(it.nome) + '"></div>' +
+        '<div class="fld"><label class="f">Item ou serviço (digite para buscar no catálogo)</label><input type="text" autocomplete="off" data-orc-f="nome" value="' + eh(it.nome) + '"></div>' +
         '<div class="fld"><label class="f">Categoria</label><select data-orc-f="categoria">' + catOpts(it.categoria) + '</select></div>' +
         '<div class="fld"><label class="f">Descrição</label><input type="text" data-orc-f="descricao" value="' + eh(it.descricao) + '"></div>' +
+        '<div class="fld"><label class="f">Fornecedor / prestador</label><input type="text" data-orc-f="fornecedor" value="' + eh(it.fornecedor || '') + '"></div>' +
         '<div class="fld"><label class="f">Quantidade</label><input type="text" inputmode="decimal" data-orc-f="qtd" value="' + eh(it.qtd) + '"></div>' +
         '<div class="fld"><label class="f">Unidade</label><select data-orc-f="unidade">' + unidOpts(it.unidade) + '</select></div>' +
         '<div class="fld"><label class="f">Valor unitário (R$)</label><input type="text" inputmode="decimal" data-orc-f="vu" value="' + eh(it.vu) + '"></div>' +
-        '</div><div class="row" style="justify-content:space-between"><span class="small muted">Total do item: <b data-orc-totalitem="' + eh(it.id) + '">' + brl(OrcCalc.totalItem(it)) + '</b></span>' +
+        '</div><div class="orc-sug" data-orc-sug="' + eh(it.id) + '">' + (ORC.sug && ORC.sug.item === it.id ? sugestoesHTML(it.id, ORC.sug.termo) : '') + '</div>' +
+        '<div class="row" style="justify-content:space-between"><span class="small muted">Total do item: <b data-orc-totalitem="' + eh(it.id) + '">' + brl(OrcCalc.totalItem(it)) + '</b></span>' +
         (c.itens.length > 1 ? '<button class="btn sm danger" data-act="orcItemDel" data-id="' + eh(it.id) + '">Remover item</button>' : '') + '</div></div>';
     }).join('');
     return cabecalho(c.id ? 'Editar orçamento ' + (c.numero || '') : 'Novo orçamento', '<button class="btn" data-act="orcCancelar">Voltar</button>' + (S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcSalvar">Salvar orçamento</button>')) +
@@ -446,7 +650,11 @@
     clearTimeout(ORC.timer);
     garantirId(c);
     ORC.id = c.id;
-    if (await gravar(c)) { ORC.tela = 'detalhe'; ORC.rasc = null; render(); window.scrollTo(0, 0); }
+    if (await gravar(c)) {
+      ORC.sug = null;
+      await atualizarCatalogoComOrcamento(c);
+      ORC.tela = 'detalhe'; ORC.rasc = null; render(); window.scrollTo(0, 0);
+    }
   }
 
   async function mudarStatus(id, status) {
@@ -501,12 +709,18 @@
       case 'orcDuplicar': return duplicar(id);
       case 'orcExcluir': return excluir(id);
       case 'orcPdf': return gerarPdf(porId(id));
+      case 'orcSugEscolher': return escolherSugestao(el.dataset.item, el.dataset.cat);
+      case 'orcCatSalvar': return salvarPrecoCatalogo();
+      case 'orcCatOcultar': return ocultarCatalogo(id);
+      case 'orcCatBuscar': ORC.catFiltro = (document.getElementById('catBusca') || { value: '' }).value.trim(); render(); return;
+      case 'orcCatLimpar': ORC.catFiltro = ''; render(); return;
       case 'orcBuscar': lerFiltros(); render(); return;
       case 'orcLimpar': ORC.filtros = {}; render(); return;
     }
   };
 
   document.addEventListener('input', function (ev) {
+    if (ev.target.matches && ev.target.matches('[data-orc-f="nome"]')) mostrarSugestoes(ev.target);
     var f = ev.target.closest && ev.target.closest('#orcForm');
     if (!f) return;
     lerForm(); atualizarTotaisNaTela(); agendarRascunho();
