@@ -834,6 +834,15 @@ table.list tr:hover td{background:#f8fbfc}
 .ats-dist li{align-items:flex-start}
 .ats-bts{justify-content:flex-end;gap:8px}
 .ats-bts .btn{min-height:44px}
+.ats-campos input,.ats-campos select,#atsMotivo{font-size:16px}
+.ats-campos input[type=text],.ats-campos input[type=number],#atsMotivo{width:100%;box-sizing:border-box}
+.ats-campos input[type=number]{border:1px solid #cfd6df;border-radius:9px;padding:8px 10px;background:#fff;min-height:38px}
+.ats-doc img,.ats-item img[data-act]{cursor:zoom-in}
+.ats-zoom{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:flex;flex-direction:column}
+.ats-zoom-area{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:flex-start;justify-content:flex-start}
+.ats-zoom-area img{display:block;margin:auto;max-width:none;transform-origin:center;background:#fff}
+.ats-zoom-bar{display:flex;gap:8px;justify-content:center;padding:10px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:#111}
+.ats-zoom-bar .btn{min-width:56px;min-height:44px;font-size:18px}
 .ats-item.off{opacity:.65}
 .ats-it-h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .ats-it-m{margin-top:6px}
@@ -2837,7 +2846,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '17/11 15:00';
+const VERSAO_APP = '17/11 15:30';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -5278,6 +5287,6 @@ Store.init();
 </script>
 <script src="orcamentos.js?v=1611c"></script>
 <script src="atestados_ler.js?v=1711b"></script>
-<script src="atestados.js?v=1711b"></script>
+<script src="atestados.js?v=1711c"></script>
 </body>
 </html>

@@ -115,7 +115,7 @@
     const dv = c => s.duvidas && s.duvidas.includes(c) ? ' ats-dv' : '';
     const v = s.verif || {}, bloqueio = s.bloqueio;
     let h = '<div class="ats-conf">';
-    if (L && L.previa) h += `<div class="card ats-doc"><img src="${L.previa}" alt="Atestado enviado"><div class="small muted">${L.tipo === 'pdf' ? 'PDF' : 'Foto'} · leitura ${Math.round(L.confianca || 0)}%</div></div>`;
+    if (L && L.previa) h += `<div class="card ats-doc"><img src="${L.previa}" alt="Atestado enviado" data-act="atsZoom" title="Toque para ampliar"><div class="small muted">${L.tipo === 'pdf' ? 'PDF' : 'Foto'} · leitura ${Math.round(L.confianca || 0)}% · <a href="#" data-act="atsZoom">🔍 ampliar a foto</a></div></div>`;
     h += '<div class="ats-campos">';
     if (s.loteIdx != null) h += `<div class="small muted">Documento ${s.loteIdx + 1} de ${s.lote.length}${s.lote[s.loteIdx].nome ? ' · ' + esc(s.lote[s.loteIdx].nome) : ''}</div>`;
     if (s.corrigindo) h += `<div class="alert i"><span class="ic">i</span><div>Corrigindo o atestado lançado. Ao salvar, o que foi lançado antes é desfeito e lançado de novo com os dados abaixo.</div></div>`;
@@ -131,8 +131,8 @@
         <div class="fld${dv('dias')}"><label class="f">Quantidade de dias</label><input type="number" id="atsDias" min="1" max="365" inputmode="numeric" value="${f.dias || ''}"></div>
         <div class="fld"><label class="f">Retorno previsto</label><input type="text" value="${ret ? br(ret) + ' (' + C.DIAS[C.diaSemana(ret)].toLowerCase() + ')' : '—'}" disabled></div>
       </div>
-      <div class="fld"><label class="f">CID <span class="small muted">(se estiver no documento; só o administrador vê)</span></label><input id="atsCid" value="${esc(f.cid || '')}" maxlength="12" autocapitalize="characters" placeholder="não informado"></div>
-      <div class="fld"><label class="f">Observação <span class="small muted">(opcional)</span></label><input id="atsObs" value="${esc(f.obs || '')}" maxlength="300"></div>
+      <div class="fld"><label class="f">CID <span class="small muted">(se estiver no documento; só o administrador vê)</span></label><input type="text" id="atsCid" value="${esc(f.cid || '')}" maxlength="12" autocapitalize="characters" placeholder="não informado"></div>
+      <div class="fld"><label class="f">Observação <span class="small muted">(opcional)</span></label><input type="text" id="atsObs" value="${esc(f.obs || '')}" maxlength="300"></div>
     </div>`;
     // o que será lançado
     h += '<div class="card"><h3 style="margin:0 0 8px">O que será lançado</h3>';
@@ -215,7 +215,7 @@
     h += L.map((it, i) => {
       const f = it.form, fn = f.func_id ? (funcPorId(f.func_id) || {}).nome : '', mot = motivoItem(it);
       return `<div class="card mb ats-item${it.status === 'removido' ? ' off' : ''}"><div class="ats-it-h" style="gap:10px">
-        ${it.L.previa ? `<img src="${it.L.previa}" alt="" style="width:56px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:0 0 auto">` : ''}
+        ${it.L.previa ? `<img src="${it.L.previa}" alt="" data-act="atsZoom" data-i="${i}" style="width:56px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:0 0 auto">` : ''}
         <div style="flex:1;min-width:0"><b>${fn ? esc(fn) : '<span class="muted">Funcionário não identificado</span>'}</b>
           <div class="small muted">${f.inicio ? br(f.inicio) : '—'}${f.inicio && f.dias ? ' a ' + br(fimDe(f.inicio, +f.dias)) + ' · ' + f.dias + ' dia(s) · volta ' + br(C.addDias(f.inicio, +f.dias)) : ''}</div>
           ${mot ? `<div class="small" style="margin-top:3px;color:${it.status === 'erro' || it.bloqueio || it.conflitoLote ? '#b91c1c' : '#a16207'}">${esc(mot)}</div>` : ''}</div>${situacaoItem(it)}</div>
@@ -266,6 +266,24 @@
     if (it && it.status === 'pendente') { if (JSON.stringify(it.form) !== JSON.stringify(s.form)) it.editado = true; it.form = s.form; }
     Object.assign(s, { etapa: 'lote', loteIdx: null, leitura: null }); render(); window.scrollTo(0, 0);
     if (it) verificarItem(it).then(() => { if (s.etapa === 'lote') render(); });
+  }
+
+  /* foto em tela cheia, com zoom, para ler o que está escrito à mão */
+  function ampliar(src) {
+    if (!src) return;
+    const ov = document.createElement('div'); ov.className = 'ats-zoom'; let z = 1;
+    ov.innerHTML = `<div class="ats-zoom-area"><img src="${src}" alt="Atestado"></div>
+      <div class="ats-zoom-bar"><button class="btn" data-z="-">−</button><button class="btn" data-z="+">+</button><button class="btn" data-z="r">Girar</button><button class="btn pri" data-z="x">Fechar</button></div>`;
+    const img = ov.querySelector('img'); let rot = 0;
+    const aplicar = () => { img.style.width = (z * 100) + '%'; img.style.transform = rot ? 'rotate(' + rot + 'deg)' : ''; };
+    ov.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-z]'); if (!b) return;
+      const k = b.dataset.z;
+      if (k === 'x') return ov.remove();
+      if (k === '+') z = Math.min(5, z + 0.75); if (k === '-') z = Math.max(1, z - 0.75); if (k === 'r') rot = (rot + 90) % 360;
+      aplicar();
+    });
+    document.body.appendChild(ov); aplicar();
   }
 
   /* ---------- ações ---------- */
@@ -348,7 +366,7 @@
   async function cancelar(id) {
     const s = st(), a = (s.lista || []).find(x => String(x.id) === String(id)); if (!a) return;
     const w = abrirModal(`<div class="mh">Cancelar atestado?</div><div class="mbd"><p>${esc(a.func_nome)}, ${br(a.inicio)} a ${br(a.fim)}.</p><p class="muted small">Os dias voltam a ser como estavam antes na escala e no vale-transporte. O documento continua arquivado.</p>
-      <div class="fld"><label class="f">Motivo</label><input id="atsMotivo" maxlength="200" placeholder="Ex.: lançado errado"></div></div>
+      <div class="fld"><label class="f">Motivo</label><input type="text" id="atsMotivo" maxlength="200" placeholder="Ex.: lançado errado"></div></div>
       <div class="mf"><button class="btn" data-x="n">Voltar</button><button class="btn danger" data-x="s">Cancelar atestado</button></div>`);
     w.querySelector('[data-x=n]').onclick = () => fecharModal(w);
     w.querySelector('[data-x=s]').onclick = async () => {
@@ -364,6 +382,7 @@
       case 'atsVoltar': if (s.loteIdx != null) return voltarAoLote(); // eslint-disable-line no-fallthrough
       case 'atsLista': Object.assign(s, { etapa: 'lista', leitura: null, corrigindo: null }); render(); window.scrollTo(0, 0); return;
       case 'atsConfirmar': return confirmarLancamento(el);
+      case 'atsZoom': { if (ev) ev.preventDefault(); const it = el.dataset.i != null && s.lote ? s.lote[+el.dataset.i] : null; return ampliar(it ? it.L.previa : s.leitura && s.leitura.previa); }
       case 'atsLoteLancar': return lancarProntos(el);
       case 'atsLoteConferir': { const it = s.lote[+el.dataset.i]; if (!it) return; Object.assign(s, { etapa: 'conferir', loteIdx: +el.dataset.i, leitura: it.L, form: Object.assign({}, it.form), duvidas: it.duvidas, duvidasAlteradas: !!it.editado, corrigindo: null, verif: it.verif, bloqueio: it.bloqueio }); render(); window.scrollTo(0, 0); verificar(); return; }
       case 'atsLoteRemover': { const it = s.lote[+el.dataset.i]; if (it) it.status = 'removido'; render(); return; }
