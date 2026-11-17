@@ -699,6 +699,31 @@ table.list tr:hover td{background:#f8fbfc}
   tr,.card,.kpi,.pmx-card,.pmx-kpi{break-inside:avoid;page-break-inside:avoid}
   a{color:#000!important;text-decoration:none!important}
 }
+/* ---- Setores: cartões por setor ---- */
+.set-resumo{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.set-resumo>div{flex:1 1 130px;background:#fff;color:#111827;border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:var(--r);padding:10px 14px;box-shadow:var(--sh)}
+.set-resumo b{display:block;font-size:22px;color:#0f4c5c;line-height:1.1}
+.set-resumo span{font-size:12px;color:var(--ink2)}
+.set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.set-card{position:relative;background:#fff;color:#111827;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);padding:16px 16px 14px 20px;overflow:hidden;display:flex;flex-direction:column;gap:10px}
+.set-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--cor,var(--pri))}
+.set-head{display:flex;align-items:center;gap:10px;min-width:0}
+.set-ord{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:var(--pri-soft);color:var(--pri);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+.set-nome{font-size:17px;font-weight:800;color:#0f4c5c;overflow-wrap:anywhere;min-width:0}
+.set-tags{display:flex;flex-wrap:wrap;gap:6px}
+.set-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.set-kpis>div{background:#eef4f5;border-radius:10px;padding:8px 4px;text-align:center}
+.set-kpis b{display:block;font-size:20px;color:#0f4c5c;line-height:1.1}
+.set-kpis span{font-size:11px;color:#4b5563}
+.set-regras{font-size:12.5px;color:#4b5563}
+.set-dom{font-size:13px;color:#4b5563}
+.set-dom b{color:#111827}
+.set-acoes{display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding-top:10px;margin-top:auto}
+.set-acoes .btn{min-height:40px;flex:1 1 auto}
+.set-acoes .btn.danger{color:var(--err)}
+.chip-dia{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer;font-weight:600}
+.chip-dia input{width:auto;margin:0}
+@media (max-width:480px){.set-grid{grid-template-columns:1fr}.set-nome{font-size:16px}}
 </style>
 </head>
 <body>
@@ -1034,6 +1059,33 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     return (funcionarios || []).filter(function (f) { return f.ativo && f.setorId === sid && (!f.dataEntrada || f.dataEntrada <= fimSemana(sem)); });
   }
   function regraCobertura(n) { return n >= 3 ? 'reduzida' : n === 2 ? 'dupla' : null; }
+  /* Regras por setor (campos opcionais no cadastro do setor). Sem campo = regra padrão do hotel. */
+  function regrasSetor(setor) {
+    var s = setor || {};
+    var minimo = (s.minimo === Math.floor(s.minimo) && s.minimo >= 1) ? s.minimo : 1;
+    var limite = (s.limiteFolga === Math.floor(s.limiteFolga) && s.limiteFolga >= 0) ? s.limiteFolga : null;
+    var semFolga = (Array.isArray(s.diasSemFolga) ? s.diasSemFolga : []).filter(function (d) { return d === Math.floor(d) && d >= 0 && d <= 4; });
+    return { minimo: minimo, limite: limite, semFolga: semFolga };
+  }
+  /** o dia d (0 = domingo) pode ter qtd pessoas de folga neste setor? */
+  function cabeFolgaNoDia(rg, d, qtd) {
+    if (rg.semFolga.indexOf(d) >= 0) return qtd === 0;
+    return rg.limite === null || qtd <= rg.limite;
+  }
+  /** a combinação (ou a lista de dias de folga) cai em algum dia sem folga do setor? */
+  function folgaBloqueada(rg, dias) { return (dias || []).some(function (d) { return rg.semFolga.indexOf(d) >= 0; }); }
+  /** padrão de combinações p = {1: n, 2: n, 3: n, 4: n} respeita as regras do setor? */
+  function cabeFolgasPadrao(rg, p) {
+    var off = [0, 0, 0, 0, 0, 0, 0];
+    [1, 2, 3, 4].forEach(function (g) { GRUPOS[g].dias.forEach(function (d) { off[d] += p[g] || 0; }); });
+    return off.every(function (q, d) { return cabeFolgaNoDia(rg, d, q); });
+  }
+  /** atribuições (atr: {id: combinação ou folgas}) respeitam as regras do setor? */
+  function cabeFolgasAtr(rg, atr, lista) {
+    var off = [0, 0, 0, 0, 0, 0, 0];
+    lista.forEach(function (f) { var fo = atr[f.id] ? folgasDe(atr[f.id]) : null; if (fo) fo.forEach(function (x, d) { if (x) off[d]++; }); });
+    return off.every(function (q, d) { return cabeFolgaNoDia(rg, d, q); });
+  }
   /** f trabalha na data? g = combinação (null = sem folga na semana, ex.: férias em parte da semana) */
   function trabalhaNoDia(f, g, dataISO) {
     if (emFerias(f, dataISO)) return false;
@@ -1053,19 +1105,26 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
   }
   function trabalhandoTerQua(cad, atr, sem) { var t = trabalhandoPorDia(cad, atr, sem); return { ter: t[IDX_TER], qua: t[IDX_QUA] }; }
   /** problemas de cobertura: dia de funcionamento sem ninguém; terça/quarta com mais de 1 (setor com mais de 2) */
-  function problemaCobertura(cad, atr, sem, regra) {
+  function problemaCobertura(cad, atr, sem, regra, minimo) {
     if (!regra) return null;
+    minimo = minimo || 1;
     var t = trabalhandoPorDia(cad, atr, sem), out = [];
-    DIAS_FUNCIONAMENTO.forEach(function (d) { if (!t[d].length) out.push({ d: d, dia: DIAS[d].toLowerCase(), tipo: 'vazio', qtd: 0, nomes: [] }); });
+    DIAS_FUNCIONAMENTO.forEach(function (d) {
+      var minD = (regra === 'reduzida' && (d === IDX_TER || d === IDX_QUA)) ? 1 : minimo;
+      if (t[d].length < minD) out.push({ d: d, dia: DIAS[d].toLowerCase(), tipo: 'vazio', qtd: t[d].length, min: minD, nomes: [] });
+    });
     if (regra === 'reduzida') [IDX_TER, IDX_QUA].forEach(function (d) { if (t[d].length > 1) out.push({ d: d, dia: DIAS[d].toLowerCase(), tipo: 'excesso', qtd: t[d].length, nomes: t[d].map(function (f) { return f.nome; }) }); });
     return out.length ? out : null;
   }
   function textoProblema(nomeSetor, n, x) {
+    if (x.tipo === 'vazio' && x.min > 1) return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): na ' + x.dia + ' trabalham ' + x.qtd + '. O mínimo do setor é ' + x.min + ' trabalhando por dia.';
     if (x.tipo === 'vazio') return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): ninguém trabalha na ' + x.dia + '. Precisa haver sempre pelo menos 1 funcionário trabalhando.';
     return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): na ' + x.dia + ' trabalham ' + x.qtd + ' (' + x.nomes.join(', ') + '). Na terça e na quarta o hotel fecha e o setor deve ter no máximo 1 trabalhando.';
   }
   function explicarImpossivel(setor, n, regra, lista, cad, blq, sem) {
     var msg = 'Setor "' + setor.nome + '" (' + n + ' funcionários): não é possível montar a escala respeitando as regras (combinações seg+ter, ter+qua, qua+qui e dom+seg+qui; sempre pelo menos 1 trabalhando' + (regra === 'reduzida' ? '; no máximo 1 trabalhando na terça e na quarta' : '') + ').';
+    var rgI = regrasSetor(setor);
+    if (rgI.minimo > 1 || rgI.limite !== null || rgI.semFolga.length) msg += ' Regras configuradas no setor: mínimo ' + rgI.minimo + ' trabalhando por dia' + (rgI.limite !== null ? ', máximo ' + rgI.limite + ' de folga por dia' : '') + (rgI.semFolga.length ? ', sem folga na ' + rgI.semFolga.map(function (d) { return DIAS_CURTO[d].toLowerCase(); }).join(' e na ') : '') + '. Ajuste essas regras no cadastro do setor se necessário.';
     var motivos = [];
     var bl = lista.filter(function (f) { return blq[f.id] !== undefined; });
     if (bl.length) motivos.push('Combinações bloqueadas: ' + bl.map(function (f) { return f.nome + ' (' + GRUPOS[blq[f.id]].nome + ')'; }).join(', ') + '.');
@@ -1198,6 +1257,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       var lista = porSetor[sid].slice().sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
       var cad = cadastradosSetor(todos, sid, sem);
       var n = cad.length, regra = regraCobertura(n);
+      var rg = regrasSetor(setor);
 
       // ---- ranking do rodízio de domingo (quem está há mais tempo sem domingo vem primeiro) ----
       var scored = lista.map(function (f) {
@@ -1232,6 +1292,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       // custo de dar a combinação g ao funcionário f
       var INF = 1e9;
       function custo(f, g) {
+        if (folgaBloqueada(rg, GRUPOS[g].dias)) return INF; // dia sem folga neste setor
         if (blq[f.id] !== undefined) return blq[f.id] === g && respeitaSeguidos(f, { g: g }, sem, params.historico) ? 0 : INF;
         if (!respeitaSeguidos(f, { g: g }, sem, params.historico)) return INF; // no máximo 6 dias seguidos de trabalho
         var c = 0;
@@ -1264,8 +1325,10 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
             var b = m - d - a - c3;
             // terça: qua+qui e dom+seg+qui; quarta: seg+ter e dom+seg+qui; segunda: ter+qua e qua+qui; quinta: seg+ter e ter+qua
             var ter = c3 + d + eTer, qua = a + d + eQua;
-            if (regra && (ter < 1 || qua < 1 || b + c3 + eSeg < 1 || a + b + eQui < 1)) continue;
+            var mTQ = regra === 'reduzida' ? 1 : rg.minimo; // terça e quarta: hotel fechado, no máximo 1 trabalhando
+            if (regra && (ter < mTQ || qua < mTQ || b + c3 + eSeg < rg.minimo || a + b + eQui < rg.minimo)) continue;
             if (regra === 'reduzida' && (ter > 1 || qua > 1)) continue;
+            if (!cabeFolgasPadrao(rg, { 1: a, 2: b, 3: c3, 4: d })) continue; // limite de folga por dia / dias sem folga
             var pen = d ? 0 : 50000; // preferir que haja folga de domingo (rodízio)
             if (regra === 'dupla') pen += d ? 3000 * (a + c3) : 0; // com domingo: o outro folga ter+qua
             if (!regra) pen += 5 * (Math.max(a, b, c3) - Math.min(a, b, c3));
@@ -1285,7 +1348,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
         lista.forEach(function (f, i) { var g = vagas[res[i]]; atr[f.id] = g; if (mat[i][res[i]] >= INF) inf = true; total += mat[i][res[i]]; });
         if (inf) continue;
         // conferência exata da cobertura (considera datas de admissão e férias)
-        if (regra && problemaCobertura(cad, atr, sem, regra)) continue;
+        if (regra && problemaCobertura(cad, atr, sem, regra, rg.minimo)) continue;
         validos++;
         if (!melhor || total < melhor.custo) melhor = { custo: total, atr: atr, p: p };
       }
@@ -1409,7 +1472,24 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       regraDoSetor[sid] = regra;
       if (!regra) return;
       var atr = {}; cad.forEach(function (f) { if (at[f.id] && (GRUPOS[at[f.id].g] || Array.isArray(at[f.id].dias))) atr[f.id] = at[f.id]; });
-      (problemaCobertura(cad, atr, sem, regra) || []).forEach(function (x) { erros.push({ setor: nomeSetor(sid), msg: textoProblema(nomeSetor(sid), cad.length, x) }); });
+      (problemaCobertura(cad, atr, sem, regra, regrasSetor(setorPorId[sid]).minimo) || []).forEach(function (x) { erros.push({ setor: nomeSetor(sid), msg: textoProblema(nomeSetor(sid), cad.length, x) }); });
+    });
+
+    // 8) regras do setor: dias sem folga e limite de folgas por dia
+    var folgasSetorDia = {};
+    Object.keys(at).forEach(function (id) {
+      var a = at[id], f = funcPorId[id];
+      if (!f || !elegivel(f, sem) || (!GRUPOS[a.g] && !Array.isArray(a.dias))) return;
+      var r = folgasSetorDia[f.setorId] = folgasSetorDia[f.setorId] || [0, 0, 0, 0, 0, 0, 0];
+      folgasDe(a).forEach(function (x, d) { if (x) r[d]++; });
+    });
+    Object.keys(folgasSetorDia).forEach(function (sid) {
+      var rg = regrasSetor(setorPorId[sid]), nm = nomeSetor(sid);
+      folgasSetorDia[sid].forEach(function (q, d) {
+        if (!q || cabeFolgaNoDia(rg, d, q)) return;
+        if (rg.semFolga.indexOf(d) >= 0) erros.push({ setor: nm, msg: 'Setor "' + nm + '" não permite folga na ' + DIAS[d].toLowerCase() + ', mas há ' + q + ' folga(s) nesse dia.' });
+        else erros.push({ setor: nm, msg: 'Setor "' + nm + '": ' + q + ' pessoas de folga na ' + DIAS[d].toLowerCase() + '. O limite do setor é ' + rg.limite + ' por dia.' });
+      });
     });
 
     // avisos: setor sem ninguém trabalhando em algum dia
@@ -1465,6 +1545,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       var lista = porSetor[sid].slice().sort(function (a, b) { return (a.criadoEm || '').localeCompare(b.criadoEm || '') || a.nome.localeCompare(b.nome); });
       var cad = cadastradosSetor(todos, sid, sem), n = cad.length, regra = regraCobertura(n);
       if (modo === 'festas' && regra === 'reduzida') regra = 'dupla';
+      var rg = regrasSetor(setorPorId[sid]);
       if (lista.length > 9) { erros.push({ setor: setorPorId[sid].nome, msg: 'Setor "' + setorPorId[sid].nome + '": muitos funcionários para a semana especial (máximo 9).' }); return; }
       // ranking de domingo (quem está há mais tempo sem domingo)
       var espera = {};
@@ -1480,7 +1561,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
           if (modo === 'festas') o = [1, 2, 3, 4].map(function (d) { return { g: 0, dias: [d] }; });
           else if (dv[f.id]) o = [{ g: 2, dias: [1, 2, 3, 4], devolucao: true }];
           else o = PERMITIDAS.filter(function (g) { return !(g === 4 && (params.semDomingo || domNoMes[f.id])); }).map(function (g) { return { g: g }; });
-          return o.filter(function (x) { return respeitaSeguidos(f, x, sem, params.historico); });
+          return o.filter(function (x) { return respeitaSeguidos(f, x, sem, params.historico) && !folgaBloqueada(rg, x.dias || GRUPOS[x.g].dias); });
         });
         if (opcoes.some(function (o) { return !o.length; })) return null;
         var melhor = null, idx = lista.map(function () { return 0; });
@@ -1489,7 +1570,8 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
           var x = k, atr = {}, doms = 0;
           lista.forEach(function (f, i) { var o = opcoes[i][x % opcoes[i].length]; x = Math.floor(x / opcoes[i].length); atr[f.id] = o; if (o.g === 4) doms++; });
           if (doms > 1) continue;
-          if (regra && problemaCobertura(cad, atr, sem, regra)) continue;
+          if (regra && problemaCobertura(cad, atr, sem, regra, rg.minimo)) continue;
+          if (!cabeFolgasAtr(rg, atr, lista)) continue;
           var c = 0;
           if (modo === 'festas') {
             var cont = [0, 0, 0, 0, 0];
@@ -1654,7 +1736,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     elegivel: elegivel, gerarEscala: gerarEscala, validarEscala: validarEscala,
     statusDia: statusDia, vtValorEm: vtValorEm, calcularVT: calcularVT, VT_TIPOS: VT_TIPOS, indexarHistorico: indexarHistorico, hungaro: hungaro,
     cadastradosSetor: cadastradosSetor, regraCobertura: regraCobertura, trabalhandoTerQua: trabalhandoTerQua, trabalhandoPorDia: trabalhandoPorDia, IDX_TER: IDX_TER, IDX_QUA: IDX_QUA,
-    PERMITIDAS: PERMITIDAS, DIAS_FUNCIONAMENTO: DIAS_FUNCIONAMENTO,
+    PERMITIDAS: PERMITIDAS, DIAS_FUNCIONAMENTO: DIAS_FUNCIONAMENTO, regrasSetor: regrasSetor,
     respeitaSeguidos: respeitaSeguidos, maiorSequencia: maiorSequencia, MAX_SEGUIDOS: MAX_SEGUIDOS,
     emFerias: emFerias, feriasNoPeriodo: feriasNoPeriodo, motivoFora: motivoFora, feriadosNacionais: feriadosNacionais, pascoa: pascoa,
     IDX_DOMINGO: IDX_DOMINGO, IDX_QUINTA: IDX_QUINTA
@@ -3696,15 +3778,45 @@ function abrirImportFunc() {
 
 /* ---------------- SETORES ---------------- */
 const SUGESTOES = ['Recepção', 'Cozinha', 'Copa', 'Governança / Camareiras', 'Restaurante / Salão', 'Bar', 'Lazer', 'Manutenção', 'Jardinagem', 'Lavanderia', 'Portaria / Segurança', 'Administrativo'];
+function regrasTexto(s) {
+  const rg = C.regrasSetor(s);
+  const p = ['mín. ' + rg.minimo + ' trabalhando por dia', rg.limite === null ? 'sem limite de folga por dia' : 'máx. ' + rg.limite + ' de folga por dia'];
+  if (rg.semFolga.length) p.push('sem folga: ' + rg.semFolga.map(d => C.DIAS_CURTO[d]).join(', '));
+  return p.join(' · ');
+}
 function vSetores() {
   const ativos = S.funcionarios.filter(f => f.ativo);
   const faltam = SUGESTOES.filter(n => !S.setores.some(s => s.nome.toLowerCase() === n.toLowerCase()));
   const lista = setoresOrd();
-  return `<div class="row mb"><div><h1>Setores</h1><p class="sub" style="margin:0">A ordem e a cor de cada setor são usadas na folha de folga</p></div><div class="sp"></div><button class="btn pri edit-only" data-act="novoSetor">${ic('plus')} Novo setor</button></div>
-  ${lista.length ? `<div class="tw"><table class="list"><thead><tr><th class="edit-only">Ordem</th><th>Setor</th><th>Ativos</th><th class="hide-m">Inativos</th><th class="hide-m">Folga domingo (semana atual)</th><th class="edit-only">Ações</th></tr></thead><tbody>
-  ${lista.map((s, i) => { const n = ativos.filter(f => f.setorId === s.id).length, ni = S.funcionarios.filter(f => !f.ativo && f.setorId === s.id).length; const e = S.escalas[C.inicioSemana(C.hojeISO())]; const dom = e ? Object.entries(e.atribuicoes || {}).filter(([id, a]) => a.g === 4 && (funcPorId(id) || a).setorId === s.id).map(([id, a]) => (funcPorId(id) || a).nome) : []; return `<tr><td class="edit-only" style="white-space:nowrap"><button class="btn icon sm" data-act="setorMover" data-id="${s.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Subir">▲</button> <button class="btn icon sm" data-act="setorMover" data-id="${s.id}" data-d="1" ${i === lista.length - 1 ? 'disabled' : ''} title="Descer">▼</button></td><td><span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #0003;vertical-align:-2px;margin-right:8px;background:${corSetor(s.id)}"></span><b>${esc(s.nome)}</b>${n === 1 ? ' <span class="badge b-draft">1 pessoa</span>' : ''}${n >= 3 ? ' <span class="badge b-blue" title="Terça e quarta (hotel fechado): no máximo 1 trabalhando">ter/qua: máx. 1</span>' : ''}</td><td>${n}</td><td class="hide-m">${ni}</td><td class="hide-m">${dom.length ? dom.map(esc).join(', ') : '<span class="muted">—</span>'}</td><td class="edit-only" style="white-space:nowrap"><button class="btn icon sm" data-act="editSetor" data-id="${s.id}" title="Editar nome e cor">${ic('edit')}</button> <button class="btn icon sm danger" data-act="delSetor" data-id="${s.id}" title="Excluir">${ic('trash')}</button></td></tr>`; }).join('')}
-  </tbody></table></div>` : '<div class="card empty"><b>Nenhum setor cadastrado</b>Crie os setores do hotel.</div>'}
-  ${faltam.length ? `<div class="card mt edit-only"><h3>Adicionar setores comuns de hotel com um clique</h3><div class="row">${faltam.map(n => `<button class="btn sm" data-act="addSug" data-n="${esc(n)}">${ic('plus')} ${esc(n)}</button>`).join('')}</div></div>` : ''}`;
+  const e = S.escalas[C.inicioSemana(C.hojeISO())];
+  const totAtivos = ativos.filter(f => setorPorId(f.setorId)).length;
+  const semSetor = ativos.length - totAtivos;
+  const cards = lista.map((s, i) => {
+    const n = ativos.filter(f => f.setorId === s.id).length, ni = S.funcionarios.filter(f => !f.ativo && f.setorId === s.id).length;
+    const rg = C.regrasSetor(s);
+    const dom = e ? Object.entries(e.atribuicoes || {}).filter(([id, a]) => a.g === 4 && (funcPorId(id) || a).setorId === s.id).map(([id, a]) => (funcPorId(id) || a).nome) : [];
+    const tags = [];
+    if (n === 0) tags.push('<span class="badge b-draft">sem ativos</span>');
+    if (n === 1) tags.push('<span class="badge b-draft">1 pessoa</span>');
+    if (n >= 3) tags.push('<span class="badge b-blue" title="Terça e quarta (hotel fechado): no máximo 1 trabalhando">ter/qua: máx. 1</span>');
+    if (n > 0 && rg.minimo > n) tags.push('<span class="badge b-draft" title="O mínimo do setor é maior que o número de ativos">mínimo acima do quadro</span>');
+    return `<article class="set-card" style="--cor:${corSetor(s.id)}">
+      <div class="set-head"><span class="set-ord" title="Posição na folha">${i + 1}</span><div class="set-nome">${esc(s.nome)}</div></div>
+      ${tags.length ? `<div class="set-tags">${tags.join('')}</div>` : ''}
+      <div class="set-kpis"><div><b>${n}</b><span>ativos</span></div><div><b>${ni}</b><span>inativos</span></div><div><b>${rg.minimo}</b><span>mín. trabalhando</span></div></div>
+      <div class="set-regras">${esc(regrasTexto(s))}</div>
+      <div class="set-dom"><span>Folga no domingo (semana atual):</span> ${dom.length ? '<b>' + dom.map(esc).join(', ') + '</b>' : '<span class="muted">—</span>'}</div>
+      <div class="set-acoes edit-only">
+        <button class="btn sm" data-act="setorMover" data-id="${s.id}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Subir na ordem">▲ Subir</button>
+        <button class="btn sm" data-act="setorMover" data-id="${s.id}" data-d="1" ${i === lista.length - 1 ? 'disabled' : ''} title="Descer na ordem">▼ Descer</button>
+        <button class="btn sm" data-act="editSetor" data-id="${s.id}">${ic('edit')} Editar</button>
+        <button class="btn sm danger" data-act="delSetor" data-id="${s.id}">${ic('trash')} Excluir</button>
+      </div>
+    </article>`;
+  }).join('');
+  return `<div class="row mb"><div><h1>Setores</h1><p class="sub" style="margin:0">Cada setor tem cor, ordem e regras próprias para a escala</p></div><div class="sp"></div><button class="btn pri edit-only" data-act="novoSetor">${ic('plus')} Novo setor</button></div>
+  ${lista.length ? `<div class="set-resumo"><div><b>${lista.length}</b><span>setores</span></div><div><b>${totAtivos}</b><span>funcionários ativos</span></div>${semSetor ? `<div><b>${semSetor}</b><span>sem setor definido</span></div>` : ''}</div><div class="set-grid">${cards}</div>` : '<div class="card empty"><b>Nenhum setor cadastrado</b>Crie os setores do hotel.</div>'}
+  ${faltam.length ? `<div class="card mt edit-only"><h3>Adicionar setores comuns de hotel com um clique</h3><div class="row" style="flex-wrap:wrap">${faltam.map(n => `<button class="btn sm" data-act="addSug" data-n="${esc(n)}">${ic('plus')} ${esc(n)}</button>`).join('')}</div></div>` : ''}`;
 }
 async function moverSetor(id, d) {
   const l = setoresOrd(); const i = l.findIndex(s => s.id === id), j = i + d;
@@ -3717,16 +3829,32 @@ async function moverSetor(id, d) {
 }
 function abrirFormSetor(s) {
   const cor = s ? corSetor(s.id) : PALETA[S.setores.length % PALETA.length];
-  const w = abrirModal(`<div class="mh">${s ? 'Editar setor' : 'Novo setor'}</div><form class="mbd"><div class="fld"><label class="f">Nome do setor</label><input type="text" id="sNome" value="${esc(s ? s.nome : '')}" maxlength="60" style="width:100%"></div>
-  <div class="fld"><label class="f">Cor na folha de folga</label><div class="row"><input type="color" id="sCor" class="cor-in" value="${cor}">${PALETA.map(c => `<button type="button" class="btn icon sm" data-cor="${c}" style="background:${c};width:28px;height:28px" title="${c}"></button>`).join('')}</div></div></form>
+  const rg = C.regrasSetor(s);
+  const w = abrirModal(`<div class="mh">${s ? 'Editar setor' : 'Novo setor'}</div><form class="mbd">
+  <div class="fld"><label class="f">Nome do setor</label><input type="text" id="sNome" value="${esc(s ? s.nome : '')}" maxlength="60" style="width:100%"></div>
+  <div class="fld"><label class="f">Cor na folha de folga</label><div class="row" style="flex-wrap:wrap"><input type="color" id="sCor" class="cor-in" value="${cor}">${PALETA.map(c => `<button type="button" class="btn icon sm" data-cor="${c}" style="background:${c};width:28px;height:28px" title="${c}"></button>`).join('')}</div></div>
+  <h3 class="mt" style="margin:16px 0 2px">Regras da escala</h3>
+  <p class="small muted" style="margin:0 0 8px">Usadas na geração automática e na conferência das escalas semanal e mensal.</p>
+  <div class="fld"><label class="f">Mínimo de funcionários trabalhando por dia</label><input type="number" id="sMin" min="1" max="20" inputmode="numeric" value="${rg.minimo}" style="width:100%"><div class="small muted">Em setores com 3 ou mais pessoas, terça e quarta (hotel fechado) continuam com no máximo 1 trabalhando.</div></div>
+  <div class="fld"><label class="f">Máximo de pessoas de folga por dia</label><input type="number" id="sLim" min="0" max="20" inputmode="numeric" placeholder="Sem limite" value="${rg.limite === null ? '' : rg.limite}" style="width:100%"><div class="small muted">Deixe em branco para não limitar. No domingo continua valendo o máximo de 1 folga por setor.</div></div>
+  <div class="fld"><label class="f">Dias em que ninguém do setor folga</label><div class="row" style="flex-wrap:wrap;gap:8px">${[0, 1, 2, 3, 4].map(d => `<label class="chip-dia"><input type="checkbox" class="sDia" value="${d}" ${rg.semFolga.includes(d) ? 'checked' : ''}> ${C.DIAS_CURTO[d]}</label>`).join('')}</div><div class="small muted">Sexta e sábado: ninguém folga (regra fixa do hotel).</div></div>
+  </form>
   <div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Salvar</button></div>`);
   w.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { w.querySelector('#sCor').value = b.dataset.cor; });
   const salvar = async () => {
     const n = w.querySelector('#sNome').value.trim(); const c = w.querySelector('#sCor').value.toUpperCase();
+    const min = parseInt(w.querySelector('#sMin').value, 10);
+    const limRaw = w.querySelector('#sLim').value.trim();
+    const lim = limRaw === '' ? null : parseInt(limRaw, 10);
+    const sem = [...w.querySelectorAll('.sDia:checked')].map(x => +x.value).sort();
     if (!n) return toast('Informe o nome.');
     if (S.setores.some(x => x.nome.toLowerCase() === n.toLowerCase() && (!s || x.id !== s.id))) return toast('Já existe um setor com esse nome.');
+    if (!(min >= 1 && min <= 20)) return toast('O mínimo trabalhando deve ser de 1 a 20.');
+    if (lim !== null && !(lim >= 0 && lim <= 20)) return toast('O limite de folga por dia deve ser de 0 a 20, ou em branco.');
     const ordem = s ? (s.ordem ?? ordemSetor(s.id)) : S.setores.reduce((mx, x) => Math.max(mx, x.ordem ?? -1), -1) + 1;
-    try { await Store.set('setores', s ? s.id : uid('s'), { nome: n, cor: c, ordem, criadoEm: s ? s.criadoEm || agoraISO() : agoraISO() }); log('setor', s ? 'Setor editado: ' + s.nome + (s.nome !== n ? ' → ' + n : '') : 'Setor criado: ' + n); fecharModal(w); } catch (e) { }
+    const dados = Object.assign({}, s || {}, { nome: n, cor: c, ordem, minimo: min, limiteFolga: lim, diasSemFolga: sem, criadoEm: s ? s.criadoEm || agoraISO() : agoraISO() });
+    delete dados.id;
+    try { await Store.set('setores', s ? s.id : uid('s'), dados); log('setor', s ? 'Setor editado: ' + s.nome + (s.nome !== n ? ' → ' + n : '') : 'Setor criado: ' + n); fecharModal(w); } catch (e) { }
   };
   w.querySelector('[data-x=c]').onclick = () => fecharModal(w); w.querySelector('[data-x=s]').onclick = salvar; w.querySelector('form').onsubmit = e => { e.preventDefault(); salvar(); };
 }
