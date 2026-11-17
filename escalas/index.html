@@ -817,6 +817,27 @@ table.list tr:hover td{background:#f8fbfc}
 .pd-al .card{border:0;padding:0;box-shadow:none;background:none;margin:0}
 .pd-al .card>.row:first-child{display:none}
 @media (min-width:700px){.pd-ks{grid-template-columns:repeat(4,1fr)}}
+/* Atestados */
+.faus{font-weight:800;color:#a16207}
+.ats-env{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.ats-env>div{flex:1 1 240px}
+.ats-file{cursor:pointer}
+.ats-lendo{text-align:center;padding:28px 16px}
+.ats-lendo .spin{margin:0 auto 12px}
+.ats-conf{display:grid;gap:12px}
+@media (min-width:900px){.ats-conf{grid-template-columns:minmax(260px,38%) 1fr;align-items:start}.ats-doc{position:sticky;top:12px}}
+.ats-doc img{width:100%;max-height:70vh;object-fit:contain;border-radius:8px;background:#fff;border:1px solid var(--line)}
+.ats-campos{display:flex;flex-direction:column;gap:12px}
+.ats-campos .card{margin:0}
+.ats-dv input,.ats-dv select{border-color:#e9a23b;background:#fffaf0}
+.ats-av{margin:4px 0 0;padding-left:18px}
+.ats-dist li{align-items:flex-start}
+.ats-bts{justify-content:flex-end;gap:8px}
+.ats-bts .btn{min-height:44px}
+.ats-item.off{opacity:.65}
+.ats-it-h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.ats-it-m{margin-top:6px}
+.ats-acoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 /* Usuários e Permissões */
 .nav-quem{margin:14px 4px 4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.08);font-size:12px;line-height:1.3}
 .nav-quem b{display:block;color:#fff;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2060,11 +2081,12 @@ const ICON = {
   wa: '<path d="M3 21l1.6-4.8A9 9 0 1121 12a9 9 0 01-13.2 7.9z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>',
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  atestados: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 8v6M9 11h6M8 17h8"/>',
   usuarios: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6 1.2 0 2.3.2 3.3.5"/><path d="M17.5 12.5l3.5 1.4v2.9c0 2-1.5 3.6-3.5 4.2-2-.6-3.5-2.2-3.5-4.2v-2.9z"/>',
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -2815,7 +2837,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '17/11 13:00';
+const VERSAO_APP = '17/11 14:00';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2963,8 +2985,10 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
-  const grupos = GRUPOS_MENU.map(([t, c]) => [t, c.filter(rotaPermitida)]).filter(g => g[1].length);
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
+  if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
+  const grupos = GRUPOS_MENU.map(([t, c]) => [t, c.filter(r => rotaPermitida(r) && !(r === 'diaria' && ehAdmin()))]).filter(g => g[1].length);
   const quem = S.modo === 'nuvem' && S.pronto && !S.precisaLogin ? '<div class="nav-quem"><b>' + esc(ehAdmin() ? 'Administrador' : (S.usuarioNome || 'Funcionário')) + '</b><span>' + (ehAdmin() ? 'acesso completo' : 'acesso de funcionário') + '</span></div>' : '';
   document.getElementById('nav').innerHTML = !S.pronto || S.precisaLogin ? '' : grupos.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('') + quem;
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
@@ -2978,7 +3002,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -3138,7 +3162,7 @@ function vPainel() {
   const trab = [], folg = [], afast = [], faltas = [];
   ativos.forEach(f => {
     const a = (ajDia[f.id] || {})[hoje];
-    if (a && TIPOS_AFAST[a.t]) { (a.t === 'falta' || a.t === 'faltaJ' ? faltas : afast).push(Object.assign(pessoa(f), { tipo: TIPOS_AFAST[a.t] })); return; }
+    if (a && TIPOS_AFAST[a.t]) { (a.t === 'falta' || a.t === 'faltaJ' ? faltas : afast).push(Object.assign(pessoa(f), { tipo: TIPOS_AFAST[a.t] + (a.ate ? ' · volta ' + C.dataBR(C.addDias(a.ate, 1)).slice(0, 5) : '') })); return; }
     if (!e || !e.atribuicoes || !e.atribuicoes[f.id]) return;
     const st = C.statusDia(e.atribuicoes[f.id], hoje, f, true);
     if (st === 'F') folg.push(pessoa(f));
@@ -3468,7 +3492,8 @@ function folhaModelo(o) {
     sems.forEach(s => { const e = S.escalas[s]; if (e && e.atribuicoes && e.atribuicoes[id]) a = e.atribuicoes[id]; });
     if (!f && !a) return null;
     const sid = f ? f.setorId : a.setorId;
-    const cel = cols.map(d => { const sd = C.inicioSemana(d), e = S.escalas[sd]; const at = e && e.atribuicoes ? e.atribuicoes[id] : null; const st = C.statusDia(at, d, f, !!e); if (st === 'F' && C.addDias(sd, 4) === d && C.statusDia(at, sd, f, true) === 'F') return 'R'; return st === 'F' ? 'F' : st === 'V' ? 'V' : st === '-' ? '-' : ''; });
+    const ausCod = { atestado: 'AT', afast: 'AF', suspensao: 'SU' };
+    const cel = cols.map(d => { const aus = ((vtDoc(d.slice(0, 7)).ajustes || {})[id] || {})[d]; const sd = C.inicioSemana(d), e = S.escalas[sd]; const at = e && e.atribuicoes ? e.atribuicoes[id] : null; const st = C.statusDia(at, d, f, !!e); if (aus && ausCod[aus.t] && st !== 'V') return ausCod[aus.t]; if (st === 'F' && C.addDias(sd, 4) === d && C.statusDia(at, sd, f, true) === 'F') return 'R'; return st === 'F' ? 'F' : st === 'V' ? 'V' : st === '-' ? '-' : ''; });
     const gs = sems.map(s => { const e = S.escalas[s]; return e && e.atribuicoes && e.atribuicoes[id] ? e.atribuicoes[id].g : null; });
     return { id, f, nome: (f || a).nome, funcao: (f || a).funcao || '', sid, sNome: f ? nomeSetor(sid) : (a.setorNome || 'Sem setor'), cel, gs, criado: (f && f.criadoEm) || '' };
   }).filter(Boolean);
@@ -3507,9 +3532,9 @@ function folhaHTML(m, editavel) {
       segmentos(l.cel).forEach(sg => {
         if (sg.tipo === 'V') h += `<td colspan="${sg.n}" class="fv">FÉRIAS</td>`;
         else {
-          const dd = m.cols[sg.i], ed = !!editavel && !S.somenteLeitura && ['T', 'F', 'R', 'X'].includes(sg.tipo);
+          const dd = m.cols[sg.i], ed = !!editavel && !S.somenteLeitura && ['', 'T', 'F', 'R', 'X'].includes(sg.tipo);
           const dat = ed ? ` data-act="escDia" data-sem="${C.inicioSemana(dd)}" data-fid="${l.id}" data-d="${dd}" title="Toque para trocar entre Trabalha e Folga"` : '';
-          h += `<td class="${sg.tipo === '-' ? 'nd' : ''}${ed ? ' ed' : ''}"${dat} style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : sg.tipo === 'R' ? '<span class="fr">F</span>' : ''}</td>`;
+          h += `<td class="${sg.tipo === '-' ? 'nd' : ''}${ed ? ' ed' : ''}"${dat} style="background:${m.feriados[sg.i] ? COR_FERIADO : sg.tipo === '-' ? '#f3f4f6' : g.cor}">${sg.tipo === 'F' ? 'F' : sg.tipo === 'R' ? '<span class="fr">F</span>' : ['AT', 'AF', 'SU'].includes(sg.tipo) ? '<span class="faus">' + sg.tipo + '</span>' : ''}</td>`;
         }
       });
       h += '</tr>';
@@ -3519,6 +3544,7 @@ function folhaHTML(m, editavel) {
   <div class="fimp"><div class="fimp-t">IMPORTANTE</div>${(S.config.textoImportante || '').split('\n').map(p => `<p>${esc(p)}</p>`).join('')}</div>
   <div class="fleg"><span class="fleg-f">F</span><b>FOLGA SEMANAL</b></div>
   <div class="fleg" style="margin-top:4px"><span class="fleg-f fr">F</span><b class="fr">FOLGA DO FERIADO ( SE POSSIVEL )</b></div>
+  ${m.linhas.some(l => l.cel.some(c => ['AT', 'AF', 'SU'].includes(c))) ? '<div class="fleg" style="margin-top:4px"><span class="fleg-f faus">AT</span><b>ATESTADO · AF AFASTAMENTO · SU SUSPENSÃO</b></div>' : ''}
   </div>`;
   return h;
 }
@@ -3545,7 +3571,7 @@ function listaFuncHTML() {
   return `<div class="tw"><table class="list"><thead><tr><th>Nome</th><th class="hide-m">Setor</th><th class="hide-m">Função</th><th>Situação</th><th class="hide-m">Entrada</th><th class="hide-m">Folga atual</th><th class="edit-only">Ações</th></tr></thead><tbody>
   ${fs.map(f => `<tr><td><b>${esc(f.nome)}</b><div class="small muted show-m">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</div>${f.obs ? `<div class="small muted">${esc(f.obs)}</div>` : ''}</td>
   <td class="hide-m">${setorPorId(f.setorId) ? esc(nomeSetor(f.setorId)) : '<span class="badge b-err">Sem setor</span>'}</td><td class="hide-m">${esc(f.funcao || '')}</td>
-  <td>${f.ativo ? (C.emFerias(f, C.hojeISO()) ? '<span class="badge" style="background:#fee2e2;color:#b91c1c">De férias</span>' : '<span class="badge b-ok">Ativo</span>') : '<span class="badge b-off">Inativo</span>'}${(f.ferias || []).filter(p => p.fim >= C.hojeISO()).map(p => `<div class="small muted">Férias ${C.dataBR(p.ini).slice(0, 5)}–${C.dataBR(p.fim).slice(0, 5)}</div>`).join('')}</td><td class="hide-m">${C.dataBR(f.dataEntrada)}</td>
+  <td>${f.ativo ? (C.emFerias(f, C.hojeISO()) ? '<span class="badge" style="background:#fee2e2;color:#b91c1c">De férias</span>' : (() => { const au = window.ausenciaEm && ausenciaEm(f.id, C.hojeISO()); return au ? `<span class="badge" style="background:#fff4d6;color:#a16207">${au.nome}${au.ate ? ' até ' + C.dataBR(au.ate).slice(0, 5) : ''}</span>${au.atestadoId && ehAdmin() ? ' <a href="#atestados" class="small">ver</a>' : ''}` : '<span class="badge b-ok">Ativo</span>'; })()) : '<span class="badge b-off">Inativo</span>'}${(f.ferias || []).filter(p => p.fim >= C.hojeISO()).map(p => `<div class="small muted">Férias ${C.dataBR(p.ini).slice(0, 5)}–${C.dataBR(p.fim).slice(0, 5)}</div>`).join('')}</td><td class="hide-m">${C.dataBR(f.dataEntrada)}</td>
   <td class="hide-m">${e && e.atribuicoes && e.atribuicoes[f.id] ? pillA(e.atribuicoes[f.id]) + ' <span class="small">' + esc(C.rotulo(e.atribuicoes[f.id])) + '</span>' : '<span class="muted small">—</span>'}</td>
   <td class="edit-only" style="white-space:nowrap"><button class="btn icon sm" data-act="editFunc" data-id="${f.id}" title="Editar">${ic('edit')}</button> <button class="btn icon sm" data-act="transfFunc" data-id="${f.id}" title="Transferir de setor">${ic('move')}</button> <button class="btn icon sm danger" data-act="delFunc" data-id="${f.id}" title="Excluir">${ic('trash')}</button></td></tr>`).join('')}
   </tbody></table></div><p class="small muted mt">${fs.length} funcionário(s) listado(s).</p>`;
@@ -4164,7 +4190,7 @@ async function exportarPDF(paraImprimir, opts) {
       const row = [{ content: l.nome.toUpperCase(), styles: { fillColor: rgb(g.cor), halign: 'left' } }];
       segmentos(l.cel).forEach(sg => {
         if (sg.tipo === 'V') row.push({ content: 'FÉRIAS', colSpan: sg.n, styles: { fillColor: rgb(COR_FERIAS), textColor: preto } });
-        else row.push({ content: sg.tipo === 'F' || sg.tipo === 'R' ? 'F' : '', styles: Object.assign({ fillColor: fer(sg.i) || (sg.tipo === '-' ? [243, 244, 246] : rgb(g.cor)) }, sg.tipo === 'R' ? { textColor: [255, 0, 0] } : {}) });
+        else row.push({ content: sg.tipo === 'F' || sg.tipo === 'R' ? 'F' : ['AT', 'AF', 'SU'].includes(sg.tipo) ? sg.tipo : '', styles: Object.assign({ fillColor: fer(sg.i) || (sg.tipo === '-' ? [243, 244, 246] : rgb(g.cor)) }, sg.tipo === 'R' ? { textColor: [255, 0, 0] } : {}) });
       });
       body.push(row);
     });
@@ -4232,7 +4258,7 @@ async function exportarExcel() {
       segmentos(l.cel).forEach(sg => {
         const c = ws.getCell(r, sg.i + 2);
         if (sg.tipo === 'V') { if (sg.n > 1) ws.mergeCells(r, sg.i + 2, r, sg.i + 1 + sg.n); Object.assign(c, { value: 'FÉRIAS', fill: fill(COR_FERIAS), font: { name: 'Calibri', bold: true, size: 10 }, alignment: center }); }
-        else Object.assign(c, { value: sg.tipo === 'F' || sg.tipo === 'R' ? 'F' : null, fill: fill(fer(sg.i) || (sg.tipo === '-' ? '#F3F4F6' : g.cor)), font: Object.assign({ name: 'Calibri', bold: true, size: 11 }, sg.tipo === 'R' ? { color: { argb: 'FFFF0000' } } : {}), alignment: center });
+        else Object.assign(c, { value: sg.tipo === 'F' || sg.tipo === 'R' ? 'F' : ['AT', 'AF', 'SU'].includes(sg.tipo) ? sg.tipo : null, fill: fill(fer(sg.i) || (sg.tipo === '-' ? '#F3F4F6' : g.cor)), font: Object.assign({ name: 'Calibri', bold: true, size: 11 }, sg.tipo === 'R' ? { color: { argb: 'FFFF0000' } } : {}), alignment: center });
       });
       r++;
     });
@@ -4957,10 +4983,11 @@ document.addEventListener('click', async ev => {
   const act = el.dataset.act, id = el.dataset.id;
   if (!ehAdmin()) {
     // a tela já não mostra estes botões ao funcionário; aqui é a segunda trava (a terceira é o servidor)
-    if (!act || act.startsWith('orc') || act.startsWith('usr') || ACOES_SO_ADMIN.includes(act)) { if (act) toast('Só o administrador pode fazer isso.'); return; }
+    if (!act || act.startsWith('orc') || act.startsWith('usr') || act.startsWith('ats') || ACOES_SO_ADMIN.includes(act)) { if (act) toast('Só o administrador pode fazer isso.'); return; }
     if (ACOES_SERVICOS_COMPLETO.includes(act) && !pode('servicos')) return toast('Seu acesso não inclui esta função.');
   }
   if (act && act.startsWith('orc') && window.orcAcao) return window.orcAcao(el, ev);
+  if (act && act.startsWith('ats') && window.atsAcao) return window.atsAcao(el, ev);
   const sem = UI.semana;
   switch (act) {
     case 'escEnviar': return enviarParaAprovacao(el.dataset.mes || UI.mes);
@@ -5250,5 +5277,7 @@ irRota();
 Store.init();
 </script>
 <script src="orcamentos.js?v=1611c"></script>
+<script src="atestados_ler.js?v=1711a"></script>
+<script src="atestados.js?v=1711a"></script>
 </body>
 </html>

@@ -24,8 +24,8 @@ def check(cond, msg):
 
 # (rota, rótulo esperado no topo, grupo)
 ITENS = [
-    ('painel', 'Painel', 'Principal'), ('diaria', 'Escala diária', 'Principal'), ('mensal', 'Escala mensal', 'Principal'),
-    ('funcionarios', 'Funcionários', 'Gestão de pessoas'), ('setores', 'Setores', 'Gestão de pessoas'), ('contratos', 'Contratos', 'Gestão de pessoas'),
+    ('painel', 'Painel', 'Principal'), ('mensal', 'Escala mensal', 'Principal'),
+    ('funcionarios', 'Funcionários', 'Gestão de pessoas'), ('atestados', 'Atestados', 'Gestão de pessoas'), ('setores', 'Setores', 'Gestão de pessoas'), ('contratos', 'Contratos', 'Gestão de pessoas'),
     ('orcamentos', 'Orçamentos', 'Operação'),
     ('servicos', 'Serviços prestados', 'Financeiro'), ('vt', 'Vale-transporte', 'Financeiro'), ('historico', 'Histórico', 'Financeiro'),
     ('usuarios', 'Usuários e Permissões', 'Sistema'), ('exportar', 'Exportar e compartilhar', 'Sistema'), ('backup', 'Backup e configurações', 'Sistema'), ('aparencia', 'Aparência e tema', 'Sistema'),

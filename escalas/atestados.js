@@ -1,0 +1,266 @@
+/* =====================================================================
+   ATESTADOS (só administrador)
+   Envia o documento uma vez -> leitura automática -> conferência -> o servidor distribui:
+   dias de atestado no controle de VT (que alimenta painel, escala, cálculo do VT e funcionários),
+   histórico e trilha. Corrigir e cancelar desfazem exatamente o que foi lançado.
+   ===================================================================== */
+(function (root) {
+  'use strict';
+  const R$ = v => 'R$ ' + (Math.round((+v || 0) * 100) / 100).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const br = iso => iso ? C.dataBR(iso) : '—';
+  const st = () => (UI.ats = UI.ats || { etapa: 'lista' });
+  const hoje = () => C.hojeISO();
+  const fimDe = (ini, dias) => C.addDias(ini, dias - 1);
+  const ERROS = { SOBREPOSTO: 'Já existe atestado dessa pessoa nesse período. Corrija o existente em vez de lançar outro.', DUPLICADO: 'Este mesmo documento já foi lançado.',
+    FUNCIONARIO_NAO_ENCONTRADO: 'Funcionário não encontrado no cadastro.', DADOS_INVALIDOS: 'Confira o funcionário, a data de início e a quantidade de dias (1 a 365).',
+    ATESTADO_NAO_ENCONTRADO: 'Este atestado não existe mais ou já foi cancelado.', SEM_CONEXAO: 'Sem conexão com a internet.', SEM_PERMISSAO: 'Só o administrador pode fazer isso.' };
+  const msgErro = e => { const k = (e && (e.code || e.message) || '').split(':')[0].trim(); return ERROS[k] || ERROS[e && e.code] || 'Não foi possível concluir. Tente de novo.'; };
+
+  async function carregar() {
+    const s = st(); s.carregando = true;
+    try { s.lista = (await Nuvem.rpc('esc_atestados_listar', {})) || []; s.erro = null; }
+    catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); s.erro = /Could not find the function/.test(e.message || '') ? 'O servidor ainda não recebeu esta atualização.' : msgErro(e); }
+    s.carregando = false;
+    if (UI.rota === 'atestados' || UI.rota === 'funcionarios') render();
+  }
+
+  /* ---------- situação de hoje, a partir do controle de VT (serve para todos os perfis) ---------- */
+  const NOMES = { atestado: 'Atestado', afast: 'Afastado', suspensao: 'Suspenso' };
+  function ausenciaEm(fid, dia) {
+    const a = ((vtDoc(dia.slice(0, 7)).ajustes || {})[fid] || {})[dia];
+    return a && NOMES[a.t] ? { t: a.t, nome: NOMES[a.t], ate: a.ate || null, atestadoId: a.atestadoId || null } : null;
+  }
+
+  /* ---------- impacto no vale-transporte (só para mostrar; o servidor só marca os dias) ---------- */
+  function impactoVT(fid, ini, dias, ignorarId) {
+    const f = funcPorId(fid); if (!f || !ini || !(dias > 0)) return null;
+    const fim = fimDe(ini, dias), meses = [];
+    for (let d = ini; d <= fim; d = C.addDias(d, 1)) if (!meses.includes(d.slice(0, 7))) meses.push(d.slice(0, 7));
+    const out = { meses: [], reduz: 0, pagoAMais: 0, diasTrab: 0, fixo: false, semVT: true };
+    meses.forEach(m => {
+      const base = JSON.parse(JSON.stringify(vtDoc(m))); base.ajustes = base.ajustes || {};
+      const meus = Object.assign({}, base.ajustes[fid] || {});
+      if (ignorarId) Object.keys(meus).forEach(k => { if (String(meus[k].atestadoId) === String(ignorarId)) delete meus[k]; });
+      const antes = Object.assign({}, base, { ajustes: Object.assign({}, base.ajustes, { [fid]: meus }) });
+      const dep = JSON.parse(JSON.stringify(antes));
+      for (let d = ini; d <= fim; d = C.addDias(d, 1)) if (d.slice(0, 7) === m) dep.ajustes[fid][d] = { t: 'atestado' };
+      const la = C.calcularVT({ mes: m, funcionarios: [f], escalas: S.escalas, doc: antes }).linhas[0];
+      const ld = C.calcularVT({ mes: m, funcionarios: [f], escalas: S.escalas, doc: dep }).linhas[0];
+      if (!la || !ld) return;
+      out.semVT = false; if (la.fixo) out.fixo = true;
+      la.cel.forEach((c, i) => { if (c.d >= ini && c.d <= fim && c.tipo === 'trab') out.diasTrab++; });
+      const qs = ['q1', 'q2'].map(q => {
+        const a = la[q].valor, b = ld[q].valor, pago = la.pago[q], reducao = Math.max(0, Math.round((a - b) * 100) / 100);
+        const aMais = pago > 0 ? Math.max(0, Math.round((pago - b) * 100) / 100) : 0;
+        out.reduz += pago > 0 ? 0 : reducao; out.pagoAMais += aMais;
+        return { q, antes: a, depois: b, pago, reducao, aMais };
+      }).filter(x => x.reducao > 0 || x.aMais > 0);
+      if (qs.length) out.meses.push({ mes: m, qs });
+    });
+    out.reduz = Math.round(out.reduz * 100) / 100; out.pagoAMais = Math.round(out.pagoAMais * 100) / 100;
+    return out;
+  }
+  function impactoEscala(fid, ini, dias) {
+    const f = funcPorId(fid), fim = fimDe(ini, dias); let trab = 0, folga = 0, semEsc = 0;
+    for (let d = ini; d <= fim; d = C.addDias(d, 1)) {
+      const e = S.escalas[C.inicioSemana(d)];
+      if (!e) { semEsc++; continue; }
+      const s2 = C.statusDia(e.atribuicoes ? e.atribuicoes[fid] : null, d, f, true);
+      if (s2 === 'T' || s2 === 'X') trab++; else if (s2 === 'F') folga++;
+    }
+    return { trab, folga, semEsc };
+  }
+
+  /* ---------- telas ---------- */
+  function vAtestados() {
+    const s = st();
+    if (S.modo !== 'nuvem') return '<h1>Atestados</h1><div class="card empty"><b>Disponível na versão online</b></div>';
+    if (s.etapa === 'lendo') return cab() + `<div class="card ats-lendo"><div class="spin"></div><b>Lendo o documento…</b><p class="muted small">${esc(s.progresso || 'Preparando')}</p><p class="small muted">Na primeira vez o aparelho baixa o leitor (cerca de 10 MB). A leitura é feita no próprio aparelho: o documento não vai para nenhum serviço de fora.</p></div>`;
+    if (s.etapa === 'conferir') return cab() + telaConferir();
+    if (s.etapa === 'feito') return cab() + telaFeito();
+    if (!s.lista && !s.carregando && !s.erro) carregar();
+    return cab() + `<div class="card ats-env">
+      <div><b>Enviar atestado</b><p class="small muted" style="margin:4px 0 0">Foto ou PDF. O sistema lê, identifica o funcionário e prepara tudo. Você só confere e confirma.</p></div>
+      <label class="btn pri ats-file">${ic('plus')} Enviar foto ou PDF<input type="file" id="atsArquivo" accept="image/*,application/pdf" hidden></label>
+      <button class="btn sm" data-act="atsManual">Lançar sem documento</button></div>` + telaLista();
+  }
+  const cab = () => `<div class="row mb"><div><h1>Atestados</h1><p class="sub" style="margin:0">Envie uma vez: escala, vale-transporte, painel e funcionários são atualizados juntos</p></div></div>`;
+
+  function telaLista() {
+    const s = st();
+    if (s.erro) return `<div class="alert e"><span class="ic">!</span><div>${esc(s.erro)} <a href="#" data-act="atsRecarregar">Tentar de novo</a></div></div>`;
+    if (!s.lista) return '<div class="loading"><div class="spin"></div>Carregando atestados…</div>';
+    const filtro = s.filtroFunc || '', h0 = hoje();
+    const lista = s.lista.filter(a => !filtro || a.func_id === filtro);
+    const andamento = lista.filter(a => a.status === 'ativo' && a.inicio <= h0 && a.fim >= h0);
+    const funcsCom = [...new Map(s.lista.map(a => [a.func_id, a.func_nome])).entries()];
+    let h = `<div class="row mb" style="align-items:center;justify-content:space-between"><h2 style="margin:0">Lançados</h2>
+      ${funcsCom.length > 1 ? `<select id="atsFiltro" style="max-width:220px"><option value="">Todos os funcionários</option>${funcsCom.map(([id, n]) => `<option value="${id}" ${id === filtro ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}</div>`;
+    if (andamento.length) h += `<div class="alert w"><span class="ic">!</span><div><b>${andamento.length} afastamento(s) em andamento:</b> ${andamento.map(a => esc(a.func_nome) + ' até ' + br(a.fim)).join(' · ')}</div></div>`;
+    if (!lista.length) return h + '<div class="card empty"><b>Nenhum atestado lançado</b>Envie a foto ou o PDF do atestado acima.</div>';
+    return h + lista.map(a => {
+      const sit = a.status === 'cancelado' ? '<span class="badge b-off">Cancelado</span>' : a.fim < h0 ? '<span class="badge b-ok">Encerrado</span>' : a.inicio > h0 ? '<span class="badge b-blue">Começa ' + br(a.inicio).slice(0, 5) + '</span>' : '<span class="badge b-err">Em andamento</span>';
+      return `<div class="card mb ats-item${a.status === 'cancelado' ? ' off' : ''}"><div class="ats-it-h"><div><b>${esc(a.func_nome)}</b><div class="small muted">${br(a.inicio)} a ${br(a.fim)} · ${a.dias} dia(s) · volta ${br(a.retorno)}</div></div>${sit}</div>
+        <div class="small muted ats-it-m">${a.emissao ? 'Emitido em ' + br(a.emissao) + ' · ' : ''}${a.cid ? 'CID ' + esc(a.cid) + ' · ' : ''}lançado por ${esc(a.aprovado_por || a.enviado_por || '—')} em ${dtHora(a.aprovado_em || a.enviado_em)}${a.corrigido_em ? ' · corrigido em ' + dtHora(a.corrigido_em) : ''}${a.status === 'cancelado' ? ' · cancelado em ' + dtHora(a.cancelado_em) + (a.motivo_cancelamento ? ' (' + esc(a.motivo_cancelamento) + ')' : '') : ''}</div>
+        ${a.obs ? `<div class="small" style="margin-top:4px">${esc(a.obs)}</div>` : ''}
+        <div class="ats-acoes">${a.tem_arquivo ? `<button class="btn sm" data-act="atsVerDoc" data-id="${a.id}">Ver documento</button>` : ''}${a.status === 'ativo' ? `<button class="btn sm" data-act="atsCorrigir" data-id="${a.id}">${ic('edit')} Corrigir</button><button class="btn sm danger" data-act="atsCancelar" data-id="${a.id}">Cancelar</button>` : ''}</div></div>`;
+    }).join('');
+  }
+
+  function telaConferir() {
+    const s = st(), f = s.form, L = s.leitura;
+    const funcs = S.funcionarios.slice().sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome));
+    const ret = f.inicio && f.dias > 0 ? C.addDias(f.inicio, +f.dias) : '';
+    const dv = c => s.duvidas && s.duvidas.includes(c) ? ' ats-dv' : '';
+    const v = s.verif || {}, bloqueio = s.bloqueio;
+    let h = '<div class="ats-conf">';
+    if (L && L.previa) h += `<div class="card ats-doc"><img src="${L.previa}" alt="Atestado enviado"><div class="small muted">${L.tipo === 'pdf' ? 'PDF' : 'Foto'} · leitura ${Math.round(L.confianca || 0)}%</div></div>`;
+    h += '<div class="ats-campos">';
+    if (s.corrigindo) h += `<div class="alert i"><span class="ic">i</span><div>Corrigindo o atestado lançado. Ao salvar, o que foi lançado antes é desfeito e lançado de novo com os dados abaixo.</div></div>`;
+    else if (L) h += L.dados.seguro && !(L.dados.avisos || []).length
+      ? `<div class="alert s"><span class="ic">✓</span><div><b>Documento lido com segurança.</b> Confira e confirme.</div></div>`
+      : `<div class="alert w"><span class="ic">!</span><div><b>Confira antes de lançar.</b><ul class="ats-av">${(L.dados.avisos || []).map(x => '<li>' + esc(x) + '</li>').join('')}</ul></div></div>`;
+    h += `<div class="card">
+      <div class="fld${dv('func')}"><label class="f">Funcionário</label><select id="atsFunc"><option value="">Escolha…</option>${funcs.map(x => `<option value="${x.id}" ${x.id === f.func_id ? 'selected' : ''}>${esc(x.nome)}${x.ativo ? '' : ' (inativo)'} · ${esc(nomeSetor(x.setorId))}</option>`).join('')}</select>
+        ${L && L.dados.nomeDoc ? `<div class="small muted" style="margin-top:4px">Nome no documento: <b>${esc(L.dados.nomeDoc)}</b></div>` : ''}</div>
+      <div class="grid g2">
+        <div class="fld${dv('emissao')}"><label class="f">Data de emissão</label><input type="date" id="atsEmissao" value="${f.emissao || ''}"></div>
+        <div class="fld${dv('inicio')}"><label class="f">Início do afastamento</label><input type="date" id="atsInicio" value="${f.inicio || ''}"></div>
+        <div class="fld${dv('dias')}"><label class="f">Quantidade de dias</label><input type="number" id="atsDias" min="1" max="365" inputmode="numeric" value="${f.dias || ''}"></div>
+        <div class="fld"><label class="f">Retorno previsto</label><input type="text" value="${ret ? br(ret) + ' (' + C.DIAS[C.diaSemana(ret)].toLowerCase() + ')' : '—'}" disabled></div>
+      </div>
+      <div class="fld"><label class="f">CID <span class="small muted">(se estiver no documento; só o administrador vê)</span></label><input id="atsCid" value="${esc(f.cid || '')}" maxlength="12" autocapitalize="characters" placeholder="não informado"></div>
+      <div class="fld"><label class="f">Observação <span class="small muted">(opcional)</span></label><input id="atsObs" value="${esc(f.obs || '')}" maxlength="300"></div>
+    </div>`;
+    // o que será lançado
+    h += '<div class="card"><h3 style="margin:0 0 8px">O que será lançado</h3>';
+    if (!f.func_id || !f.inicio || !(f.dias > 0)) h += '<p class="muted small" style="margin:0">Preencha funcionário, início e quantidade de dias.</p>';
+    else {
+      const fim = fimDe(f.inicio, +f.dias), ie = impactoEscala(f.func_id, f.inicio, +f.dias), iv = impactoVT(f.func_id, f.inicio, +f.dias, s.corrigindo);
+      h += `<ul class="list-sm ats-dist">
+        <li><span><b>Escala</b><div class="small muted">${br(f.inicio)} a ${br(fim)} marcados como <b>AT (atestado)</b>, sem contar como falta. ${ie.trab} dia(s) de trabalho previstos ficam cobertos pelo atestado${ie.semEsc ? ' · ' + ie.semEsc + ' dia(s) ainda sem escala gerada' : ''}. Volta em ${br(C.addDias(fim, 1))}.</div></span></li>
+        <li><span><b>Vale-transporte</b><div class="small muted">${!iv || iv.semVT ? 'Sem vale-transporte cadastrado nesse período: nada muda no VT.' : (iv.reduz > 0 ? 'Deixa de pagar ' + R$(iv.reduz) + ' (dias sem deslocamento). ' : '') + (iv.pagoAMais > 0 ? '<b>' + R$(iv.pagoAMais) + ' já foram pagos</b> por esses dias: aparecem como saldo a descontar no VT, sem desconto em dobro. ' : '') + (iv.reduz <= 0 && iv.pagoAMais <= 0 ? 'Nenhum valor muda (os dias já não eram pagos). ' : '') + (iv.fixo ? 'Esta pessoa tem valor fixo por quinzena: confira o valor no VT.' : '')}${iv && iv.meses.length ? '<br>' + iv.meses.map(m => m.qs.map(q => (q.q === 'q1' ? '1ª' : '2ª') + ' quinzena de ' + m.mes.slice(5) + '/' + m.mes.slice(0, 4) + ': ' + R$(q.antes) + ' → ' + R$(q.depois) + (q.pago ? ' (pago ' + R$(q.pago) + ')' : '')).join('<br>')).join('<br>') : ''}</div></span></li>
+        <li><span><b>Painel e funcionários</b><div class="small muted">Aparece em "Afastados" com a data de volta, e na situação do funcionário.</div></span></li>
+        <li><span><b>Salário</b><div class="small muted">Atestado válido: nenhum desconto salarial é lançado pelos dias justificados.</div></span></li></ul>`;
+      if (v.mesmo_arquivo) h += `<div class="alert e"><span class="ic">!</span><div>Este documento já foi lançado (${esc(v.mesmo_arquivo.func_nome)}, ${br(v.mesmo_arquivo.inicio)}).</div></div>`;
+      if ((v.sobrepostos || []).length) h += `<div class="alert e"><span class="ic">!</span><div>Já existe atestado dessa pessoa nesse período: ${v.sobrepostos.map(x => br(x.inicio) + ' a ' + br(x.fim)).join(', ')}. ${v.sobrepostos.some(x => x.igual) ? 'É o mesmo período: provavelmente o mesmo atestado.' : 'Corrija o existente em vez de lançar outro.'}</div></div>`;
+      if ((v.marcados || []).length) h += `<div class="alert i"><span class="ic">i</span><div>Já marcado nesses dias: ${v.marcados.map(x => br(x.data).slice(0, 5) + ' ' + ((C.VT_TIPOS[x.t] || {}).nome || x.t).toLowerCase()).join(', ')}. O atestado fica no lugar; se ele for cancelado, volta o que estava.</div></div>`;
+    }
+    h += '</div>';
+    h += `<div class="row ats-bts"><button class="btn" data-act="atsVoltar">Cancelar</button><button class="btn ok" data-act="atsConfirmar" ${bloqueio ? 'disabled' : ''}>${ic('check')} ${s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'}</button></div>`;
+    return h + '</div></div>';
+  }
+
+  function telaFeito() {
+    const s = st(), r = s.feito;
+    return `<div class="card ats-feito"><div class="alert s" style="margin:0 0 12px"><span class="ic">✓</span><div><b>${s.feitoCorrecao ? 'Correção salva' : 'Atestado lançado'}.</b> ${esc(r.func_nome)} fica afastado(a) de ${br(r.inicio)} a ${br(r.fim)} e volta em ${br(r.retorno)}.</div></div>
+      <ul class="list-sm">
+        <li><span>Escala: ${r.dias} dia(s) marcados como <b>AT</b></span></li>
+        <li><span>Vale-transporte: dias registrados como atestado${s.resumoVT ? ' · ' + esc(s.resumoVT) : ''}</span></li>
+        <li><span>Painel: em "Afastados" até ${br(r.fim)}</span></li>
+        <li><span>Histórico: registrado com o seu nome e o horário</span></li></ul>
+      <div class="row mt"><a class="btn" href="#painel">Ver no painel</a><a class="btn" href="#vt">Ver no vale-transporte</a><a class="btn" href="#mensal" data-act="verSemana" data-sem="${C.inicioSemana(r.inicio)}">Ver na escala</a><button class="btn pri" data-act="atsLista">Voltar aos atestados</button></div></div>`;
+  }
+
+  /* ---------- ações ---------- */
+  function lerForm() {
+    const s = st(), g = id => (document.getElementById(id) || {}).value;
+    if (!document.getElementById('atsFunc')) return;
+    s.form = { func_id: g('atsFunc') || '', emissao: g('atsEmissao') || '', inicio: g('atsInicio') || '', dias: g('atsDias') ? +g('atsDias') : '', cid: (g('atsCid') || '').trim().toUpperCase(), obs: (g('atsObs') || '').trim() };
+  }
+  async function verificar() {
+    const s = st(), f = s.form;
+    s.verif = null; s.bloqueio = !f.func_id || !f.inicio || !(f.dias >= 1 && f.dias <= 365);
+    if (!s.bloqueio) {
+      try { s.verif = await Nuvem.rpc('esc_atestado_verificar', { p_func_id: f.func_id, p_inicio: f.inicio, p_dias: +f.dias, p_hash: s.leitura ? s.leitura.hash : null, p_ignorar: s.corrigindo || null }); }
+      catch (e) { s.verif = null; }
+      s.bloqueio = !!(s.verif && (s.verif.mesmo_arquivo || (s.verif.sobrepostos || []).length));
+    }
+    if (UI.rota === 'atestados' && s.etapa === 'conferir') { const y = window.scrollY; render(); window.scrollTo(0, y); }
+  }
+  async function enviarArquivo(file) {
+    const s = st();
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) return toast('Arquivo muito grande (máximo 15 MB).');
+    Object.assign(s, { etapa: 'lendo', progresso: 'Abrindo o arquivo', corrigindo: null, leitura: null, verif: null }); render();
+    let L;
+    try {
+      L = await AtestLer.lerArquivo(file, S.funcionarios.map(f => ({ id: f.id, nome: f.nome, ativo: f.ativo })), hoje(), (status, p) => {
+        const t = { 'loading tesseract core': 'Baixando o leitor', 'loading language traineddata': 'Baixando o idioma português', 'initializing api': 'Preparando o leitor', 'recognizing text': 'Lendo o texto' }[status] || 'Preparando';
+        s.progresso = t + (p ? ' · ' + Math.round(p * 100) + '%' : '');
+        const el = document.querySelector('.ats-lendo p'); if (el) el.textContent = s.progresso;
+      });
+    } catch (e) { s.etapa = 'lista'; render(); return modalMsg('Não deu para abrir o arquivo', '<p>Envie uma foto (JPG ou PNG) ou um PDF do atestado.</p>'); }
+    const d = L.dados, duv = [];
+    if (!d.func) duv.push('func'); if (!d.inicio) duv.push('inicio'); if (!d.dias || d.campos.dias) duv.push('dias'); if (!d.emissao) duv.push('emissao');
+    Object.assign(s, { etapa: 'conferir', leitura: L, duvidas: duv, form: { func_id: d.func ? d.func.id : '', emissao: d.emissao || '', inicio: d.inicio || '', dias: d.dias || '', cid: d.cid || '', obs: '' } });
+    render(); verificar();
+  }
+  async function confirmarLancamento(btn) {
+    const s = st(); lerForm(); const f = s.form;
+    if (!f.func_id) return toast('Escolha o funcionário.');
+    if (!f.inicio) return toast('Informe o início do afastamento.');
+    if (!(f.dias >= 1 && f.dias <= 365)) return toast('Informe a quantidade de dias (1 a 365).');
+    await verificar(); if (s.bloqueio) return toast('Resolva os avisos em vermelho antes de lançar.');
+    const iv = impactoVT(f.func_id, f.inicio, +f.dias, s.corrigindo), L = s.leitura;
+    const p = Object.assign({}, f, { id: s.corrigindo || null, vt_resumo: iv });
+    if (L) Object.assign(p, { arquivo: L.arquivo, arquivo_tipo: L.tipo, arquivo_hash: L.hash, texto_lido: L.texto, confianca: L.confianca, nome_doc: L.dados.nomeDoc, leitura_segura: !!(L.dados.seguro && !s.duvidasAlteradas) });
+    const b = document.querySelector('[data-act="atsConfirmar"]'); if (b) { b.disabled = true; b.textContent = 'Lançando…'; }
+    try {
+      const r = await Nuvem.rpc('esc_atestado_salvar', { p });
+      Object.assign(s, { etapa: 'feito', feito: r, feitoCorrecao: !!s.corrigindo, resumoVT: iv && !iv.semVT ? (iv.reduz > 0 ? 'deixa de pagar ' + R$(iv.reduz) : '') + (iv.pagoAMais > 0 ? (iv.reduz > 0 ? ' · ' : '') + R$(iv.pagoAMais) + ' já pagos ficam como saldo a descontar' : '') : '', lista: null, leitura: null });
+      await Nuvem.sincronizar().catch(() => {});
+      render(); window.scrollTo(0, 0); carregar();
+    } catch (e) {
+      if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true);
+      if (b) { b.disabled = false; b.textContent = s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'; }
+      modalMsg('Não foi lançado', '<p>' + esc(msgErro(e)) + '</p>');
+    }
+  }
+  async function verDoc(id) {
+    let r; try { r = await Nuvem.rpc('esc_atestado_obter', { p_id: +id }); } catch (e) { return toast(msgErro(e)); }
+    if (!r || !r.arquivo) return toast('Documento não encontrado.');
+    if (/^data:application\/pdf/.test(r.arquivo)) {
+      const b = await (await fetch(r.arquivo)).blob(), u = URL.createObjectURL(b), w = window.open(u, '_blank');
+      if (!w) location.href = u; return;
+    }
+    abrirModal(`<div class="mh">Atestado arquivado</div><div class="mbd"><img src="${r.arquivo}" alt="Atestado" style="width:100%;border-radius:8px">${r.nome_doc ? `<p class="small muted">Nome lido no documento: ${esc(r.nome_doc)}</p>` : ''}<p class="small muted">Documento médico: visível só para o administrador.</p></div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button></div>`, true);
+  }
+  function corrigir(id) {
+    const s = st(), a = (s.lista || []).find(x => String(x.id) === String(id)); if (!a) return;
+    Object.assign(s, { etapa: 'conferir', corrigindo: a.id, leitura: null, duvidas: [], form: { func_id: a.func_id, emissao: a.emissao || '', inicio: a.inicio, dias: a.dias, cid: a.cid || '', obs: a.obs || '' } });
+    render(); window.scrollTo(0, 0); verificar();
+  }
+  async function cancelar(id) {
+    const s = st(), a = (s.lista || []).find(x => String(x.id) === String(id)); if (!a) return;
+    const w = abrirModal(`<div class="mh">Cancelar atestado?</div><div class="mbd"><p>${esc(a.func_nome)}, ${br(a.inicio)} a ${br(a.fim)}.</p><p class="muted small">Os dias voltam a ser como estavam antes na escala e no vale-transporte. O documento continua arquivado.</p>
+      <div class="fld"><label class="f">Motivo</label><input id="atsMotivo" maxlength="200" placeholder="Ex.: lançado errado"></div></div>
+      <div class="mf"><button class="btn" data-x="n">Voltar</button><button class="btn danger" data-x="s">Cancelar atestado</button></div>`);
+    w.querySelector('[data-x=n]').onclick = () => fecharModal(w);
+    w.querySelector('[data-x=s]').onclick = async () => {
+      const motivo = w.querySelector('#atsMotivo').value; fecharModal(w);
+      try { await Nuvem.rpc('esc_atestado_cancelar', { p_id: +id, p_motivo: motivo }); toast('Atestado cancelado. Os dias voltaram ao que eram.'); await Nuvem.sincronizar().catch(() => {}); carregar(); }
+      catch (e) { toast(msgErro(e)); }
+    };
+  }
+  function acao(el, ev) {
+    const act = el.dataset.act, s = st();
+    switch (act) {
+      case 'atsManual': Object.assign(s, { etapa: 'conferir', corrigindo: null, leitura: null, duvidas: [], verif: null, bloqueio: true, form: { func_id: '', emissao: '', inicio: '', dias: '', cid: '', obs: '' } }); render(); return;
+      case 'atsVoltar': case 'atsLista': Object.assign(s, { etapa: 'lista', leitura: null, corrigindo: null }); render(); window.scrollTo(0, 0); return;
+      case 'atsConfirmar': return confirmarLancamento(el);
+      case 'atsVerDoc': return verDoc(el.dataset.id);
+      case 'atsCorrigir': return corrigir(el.dataset.id);
+      case 'atsCancelar': return cancelar(el.dataset.id);
+      case 'atsRecarregar': ev.preventDefault(); s.erro = null; s.lista = null; render(); return;
+    }
+  }
+  document.addEventListener('change', ev => {
+    const t = ev.target; if (!t || UI.rota !== 'atestados') return;
+    if (t.id === 'atsArquivo') { const f = t.files && t.files[0]; t.value = ''; return enviarArquivo(f); }
+    if (t.id === 'atsFiltro') { st().filtroFunc = t.value; return render(); }
+    if (/^ats(Func|Emissao|Inicio|Dias|Cid|Obs)$/.test(t.id)) { const s = st(); lerForm(); if (s.leitura) s.duvidasAlteradas = true; if (t.id !== 'atsCid' && t.id !== 'atsObs') verificar(); else { const y = window.scrollY; render(); window.scrollTo(0, y); } }
+  });
+
+  Object.assign(root, { vAtestados, atsAcao: acao, atsCarregar: carregar, ausenciaEm, atsImpactoVT: impactoVT });
+})(window);
