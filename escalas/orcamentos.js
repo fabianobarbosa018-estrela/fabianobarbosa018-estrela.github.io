@@ -938,9 +938,7 @@
       limite(tx.length * 5 + 4);
       doc.text(tx, M, y); y += tx.length * 5 + 4;
     });
-    y += 6; limite(70);
-    var fecho = doc.splitTextToSize('E, por estarem assim justos e contratados, assinam este instrumento em duas vias de igual teor.', larg);
-    doc.text(fecho, M, y); y += fecho.length * 5 + 11;
+    y += 14; limite(70);
     var linha = function (x, nome, sub) { doc.line(x, y, x + 78, y); doc.setFontSize(9); doc.text(nome, x, y + 5); if (sub) doc.text(sub, x, y + 9); };
     // assinatura do gerente (guardada nas configurações do sistema, não no repositório)
     var assin = S.config && S.config.assinatura;
