@@ -944,8 +944,10 @@
     var assin = S.config && S.config.assinatura;
     if (assin) {
       if (y - 36 < 22) { doc.addPage(); y = 40; }
-      // assinatura apoiada sobre a linha do CONTRATANTE (base da imagem logo acima da linha)
-      try { doc.addImage(assin, /^data:image\/jpe?g/.test(assin) ? 'JPEG' : 'PNG', M + 6, y - 29, 54, 28); } catch (e) { }
+      // assinatura apoiada sobre a linha do CONTRATANTE, na proporção original da imagem (sem esticar)
+      var altSig = 26, largSig = 40;
+      try { var pr = doc.getImageProperties(assin); if (pr && pr.width && pr.height) largSig = Math.min(70, altSig * pr.width / pr.height); } catch (e) { }
+      try { doc.addImage(assin, /^data:image\/jpe?g/.test(assin) ? 'JPEG' : 'PNG', M + 4, y - altSig - 1, largSig, altSig); } catch (e) { }
     }
     linha(M, 'CONTRATANTE', nomeHotel() + ' · Fabiano, gerente operacional'); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
     y += 22;
