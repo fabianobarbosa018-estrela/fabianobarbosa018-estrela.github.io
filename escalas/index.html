@@ -737,6 +737,39 @@ table.list tr:hover td{background:#f8fbfc}
 .side.min .nav a{justify-content:center;padding:12px 0}
 .side.min .nav-g{height:1px;font-size:0;padding:0;margin:8px 14px;border-top:1px solid rgba(255,255,255,.15)}
 @media (max-width:900px){.menu-min{display:none}}
+/* Usuários e Permissões */
+.nav-quem{margin:14px 4px 4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.08);font-size:12px;line-height:1.3}
+.nav-quem b{display:block;color:#fff;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-quem span{opacity:.75}
+.side.min .nav-quem{display:none}
+.usr-card{padding:16px}
+.usr-card.off{opacity:.8}
+.usr-h{display:flex;align-items:center;gap:12px}
+.usr-av{width:44px;height:44px;border-radius:50%;background:var(--pri-soft);color:var(--pri);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0}
+.usr-av.adm{background:var(--pri);color:#fff}
+.usr-av svg{width:20px;height:20px}
+.usr-id{flex:1;min-width:0}
+.usr-id b{font-size:16px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.usr-meta{margin:10px 0 0}
+.usr-pode{margin:12px 0 0;padding-left:18px;color:var(--ink2);font-size:13.5px}
+.usr-pode li{margin:3px 0}
+.usr-sess{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.usr-perms{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.usr-perm{display:flex;align-items:center;gap:14px;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;min-height:58px;margin:0}
+.usr-perm:last-child{border-bottom:0}
+.usr-pt{min-width:0}
+.usr-pt b{display:block;font-size:14.5px}
+.usr-pt small{display:block;color:var(--ink2);font-size:12.5px;line-height:1.35;margin-top:2px;font-weight:400}
+.usr-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.usr-acoes .btn{flex:1 1 auto}
+input.sw{appearance:none;-webkit-appearance:none;width:50px;min-width:50px;height:30px;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0;cursor:pointer;transition:background .15s;border:0;margin:0;padding:0}
+input.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+input.sw:checked{background:var(--ok)}
+input.sw:checked::after{transform:translateX(20px)}
+input.sw:disabled{opacity:.5;cursor:not-allowed}
+.usr-nunca{display:flex;flex-wrap:wrap;gap:4px}
+.usr-ativ li{align-items:flex-start;flex-wrap:nowrap}
+@media (max-width:640px){.usr-acoes .btn{flex:1 1 46%}.usr-h{flex-wrap:wrap}.usr-h .badge{margin-left:56px}}
 </style>
   <aside class="side" id="side">
     <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Gestão operacional</small><button class="menu-min" id="btnMin" aria-label="Recolher ou expandir menu" title="Recolher menu">‹</button></div>
@@ -1551,6 +1584,37 @@ function feriadoEm(d) { return feriadosLista().find(f => f.data === d); }
 const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 const historicoArr = () => Object.values(S.escalas);
 
+/* ---------------- PERFIL E PERMISSÕES ----------------
+   Quem manda é o servidor: ele só entrega e só grava o que o administrador liberou. A tela acompanha. */
+const PERMS = [
+  ['escala', 'Escala mensal', 'Criar, gerar e editar a escala e enviar para a sua aprovação. Não aprova nem altera escala aprovada.'],
+  ['servicos', 'Serviços prestados', 'Lançar serviços, cadastrar prestadores e valores, extras, descontos, lotes e pagamentos.'],
+  ['diarias', 'Controle de diárias', 'Ver os diaristas, marcar os dias trabalhados e copiar o controle.'],
+  ['vt', 'Vale-transporte', 'Lançar e consultar o vale-transporte: controle diário, fechamentos e pagamentos.']
+];
+const ehAdmin = () => S.papel !== 'restrito';
+const pode = k => ehAdmin() || !!(S.perms && S.perms[k]);
+const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], conta: [] };
+const rotaPermitida = r => ehAdmin() ? (r !== 'conta' && (r !== 'usuarios' || S.modo === 'nuvem')) : (r in ROTA_PERM) && (!ROTA_PERM[r].length || ROTA_PERM[r].some(pode));
+const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt'].find(rotaPermitida) || 'conta');
+function aplicarPerfil(p) {
+  const antes = JSON.stringify([S.papel, S.perms, S.usuarioNome, S.usuarioLogin]);
+  S.papel = p && p.papel === 'restrito' ? 'restrito' : 'admin';
+  S.perms = S.papel === 'restrito' ? Object.assign({}, p.permissoes) : null;
+  S.usuarioNome = (p && p.nome) || ''; S.usuarioLogin = (p && p.login) || ''; S.usuarioId = (p && p.id) || null;
+  return antes !== JSON.stringify([S.papel, S.perms, S.usuarioNome, S.usuarioLogin]);
+}
+/* O que o funcionário pode gravar (o servidor confere de novo) */
+function podeGravar(col) {
+  if (ehAdmin() || col === 'auditoria') return true;
+  if (col === 'escalas') return pode('escala');
+  if (col === 'vt') return pode('vt');
+  if (col === 'prestadores') return pode('servicos');
+  if (col === 'servicos') return pode('servicos') || pode('diarias');
+  return false;
+}
+const fmtLogin = l => /^\d{10,11}$/.test(l || '') ? '(' + l.slice(0, 2) + ') ' + l.slice(2, l.length - 4) + '-' + l.slice(-4) : (l || '');
+
 const Store = {
   filas: {},
   async init() {
@@ -1619,6 +1683,7 @@ const Store = {
   },
   async set(col, id, data) {
     if (S.somenteLeitura) { toast(S.modo === 'nuvem' ? 'Sem conexão: não é possível alterar agora.' : 'Você tem acesso somente leitura.'); throw new Error('ro'); }
+    if (!podeGravar(col)) { toast('Você não tem permissão para esta alteração.'); throw new Error('perm'); }
     const limpo = JSON.parse(JSON.stringify(data));
     delete limpo.id;
     if (S.modo === 'db') {
@@ -1630,6 +1695,7 @@ const Store = {
   },
   async del(col, id) {
     if (S.somenteLeitura) { toast(S.modo === 'nuvem' ? 'Sem conexão: não é possível alterar agora.' : 'Você tem acesso somente leitura.'); throw new Error('ro'); }
+    if (!ehAdmin()) { toast('Só o administrador pode excluir.'); throw new Error('perm'); }
     if (S.modo === 'db') return this.enfileirar(col + '/' + id, () => DB.collection(col).doc(id).delete()).catch(e => this.falha(e));
     this.remover(col, id);
     this.salvarLocal(); agendarRender();
@@ -1662,7 +1728,7 @@ const Nuvem = {
     return j;
   },
   async iniciar() {
-    if (!this.token()) { S.precisaLogin = true; S.pronto = true; render(); atualizarStatus(); return; }
+    if (!this.token()) { S.precisaLogin = true; S.pronto = true; render(); atualizarStatus(); verConvite(); return; }
     try { await this.carregarTudo(); }
     catch (e) {
       if (e.code === 'SESSAO_INVALIDA') return this.sair(true);
@@ -1678,12 +1744,15 @@ const Nuvem = {
     S.auditoria.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
   },
   async carregarTudo() {
-    await this.carregarPapel();
-    if (S.papel === 'restrito' && !['diaria', 'mensal', 'servicos'].includes(UI.rota)) { UI.rota = 'mensal'; history.replaceState(null, '', '#mensal'); }
     const r = await this.rpc('esc_ler', { p_desde: null });
+    if (r.perfil) aplicarPerfil(r.perfil); else await this.carregarPapel();
     Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true; S.sincAt = new Date();
+    // a tela aberta tem de ser uma que este perfil pode ver
+    if (!rotaPermitida(UI.rota)) UI.rota = rotaInicial();
+    const hh = (location.hash || '').replace('#', '');
+    if (hh !== UI.rota && !(conviteDaUrl() && ehAdmin()) && (!ROTAS.some(x => x[0] === hh) || !rotaPermitida(hh))) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } }
     this.guardarCopia(); render(); atualizarStatus();
   },
   async sincronizar() {
@@ -1692,6 +1761,8 @@ const Nuvem = {
     try {
       if (S.offline) return await this.carregarTudo();
       const r = await this.rpc('esc_ler', { p_desde: S.desde });
+      // o administrador mudou o acesso deste usuário: recarrega tudo já com as permissões novas
+      if (r.perfil && aplicarPerfil(r.perfil)) { if (!ehAdmin()) toast('Suas permissões foram atualizadas.'); return await this.carregarTudo(); }
       if (r.docs && r.docs.length) { this.aplicarDocs(r.docs); this.guardarCopia(); agendarRender(); }
       S.desde = r.agora; S.sincAt = new Date(); if (S.semRede) S.semRede = false; atualizarStatus();
     } catch (e) {
@@ -1705,89 +1776,140 @@ const Nuvem = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sincronizar(); });
     window.addEventListener('online', () => this.sincronizar());
   },
-  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), orcamentos: S.orcamentos, orcCatalogo: S.orcCatalogo, setores: S.setores, funcionarios: S.funcionarios, prestadores: S.prestadores, servicos: S.servicos, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config })); } catch (e) { } },
+  guardarCopia() { try { localStorage.setItem(this.COPIA, JSON.stringify({ em: agoraISO(), orcamentos: S.orcamentos, orcCatalogo: S.orcCatalogo, setores: S.setores, funcionarios: S.funcionarios, prestadores: S.prestadores, servicos: S.servicos, vt: S.vt, escalas: S.escalas, auditoria: S.auditoria.slice(0, 300), config: S.config, perfil: { papel: S.papel, permissoes: S.perms, nome: S.usuarioNome, login: S.usuarioLogin, id: S.usuarioId } })); } catch (e) { } },
   lerCopia() {
-    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { orcamentos: d.orcamentos || [], orcCatalogo: d.orcCatalogo || [], setores: d.setores || [], funcionarios: d.funcionarios || [], prestadores: d.prestadores || [], servicos: d.servicos || {}, vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); S.copiaEm = d.em; return true; } catch (e) { return false; }
+    try { const d = JSON.parse(localStorage.getItem(this.COPIA) || 'null'); if (!d) return false; Object.assign(S, { orcamentos: d.orcamentos || [], orcCatalogo: d.orcCatalogo || [], setores: d.setores || [], funcionarios: d.funcionarios || [], prestadores: d.prestadores || [], servicos: d.servicos || {}, vt: d.vt || {}, escalas: d.escalas || {}, escalasAntigas: {}, auditoria: d.auditoria || [], config: Object.assign({}, CONFIG_PADRAO, d.config || {}) }); aplicarPerfil(d.perfil || null); S.copiaEm = d.em; return true; } catch (e) { return false; }
   },
   async falhaGravacao(e) {
     if (e && e.code === 'SESSAO_INVALIDA') { this.sair(true); throw e; }
     const dom = e && /^DOMINGO_NO_MES/.test(e.message || '');
-    await modalMsg('Alteração não salva', `<div class="alert e"><span class="ic">!</span><div>${e && e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet. A última alteração <b>não foi salva</b>.' : /^COMBINACAO_INVALIDA/.test(e.message || '') ? 'A escala tem uma combinação de folgas não permitida (' + esc((e.message.split(':')[1] || '').trim()) + '). Use só seg+ter, ter+qua, qua+qui ou dom+seg+qui.' : dom ? '<b>' + esc((e.message.split(':')[1] || '').trim()) + '</b> já folgou um domingo neste mês. Cada funcionário só pode folgar 1 domingo por mês, então a escala <b>não foi salva</b>. Atualize a página (tecla F5) e gere de novo.' : 'O servidor recusou a gravação (' + esc(e && e.message) + ').'} Os dados serão recarregados do servidor.</div></div>`);
+    await modalMsg('Alteração não salva', `<div class="alert e"><span class="ic">!</span><div>${e && e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet. A última alteração <b>não foi salva</b>.' : e && e.code === 'SEM_PERMISSAO' ? 'Você não tem permissão para fazer essa alteração, então ela <b>não foi salva</b>.' : /^COMBINACAO_INVALIDA/.test(e.message || '') ? 'A escala tem uma combinação de folgas não permitida (' + esc((e.message.split(':')[1] || '').trim()) + '). Use só seg+ter, ter+qua, qua+qui ou dom+seg+qui.' : dom ? '<b>' + esc((e.message.split(':')[1] || '').trim()) + '</b> já folgou um domingo neste mês. Cada funcionário só pode folgar 1 domingo por mês, então a escala <b>não foi salva</b>. Atualize a página (tecla F5) e gere de novo.' : 'O servidor recusou a gravação (' + esc(e && e.message) + ').'} Os dados serão recarregados do servidor.</div></div>`);
     try { await this.carregarTudo(); } catch (x) { S.offline = true; S.somenteLeitura = true; render(); atualizarStatus(); }
     throw e;
   },
-  async entrar(senha, email) {
+  /* Entrada. Sem login = administrador (senha do sistema); com login = funcionário (e-mail ou telefone + a senha dele). */
+  async entrar(senha, login) {
     try {
-      const tok = email ? await this.rpc('esc_entrar_usuario', { p_email: email, p_senha: senha }, true) : await this.rpc('esc_entrar', { p_senha: senha }, true);
-      localStorage.setItem(this.TOKEN, tok); await this.carregarTudo(); this.agendarSync(); return null;
+      let r;
+      if (login) r = await this.rpc('esc_login_funcionario', { p_login: login, p_senha: senha }, true);
+      else {
+        try { r = await this.rpc('esc_login_admin', { p_senha: senha }, true); }
+        catch (e) {
+          // servidor ainda na versão anterior: usa a entrada antiga do administrador
+          if (!/Could not find the function/.test(e.message || '')) throw e;
+          r = { ok: true, token: await this.rpc('esc_entrar', { p_senha: senha }, true) };
+        }
+      }
+      if (!r || !r.ok || !r.token) return login ? 'Login ou senha incorretos.' : 'Senha incorreta.';
+      localStorage.setItem(this.TOKEN, r.token);
+      try { if (login) localStorage.setItem('esc_login_modo', 'func'); else localStorage.removeItem('esc_login_modo'); } catch (e) { }
+      S.loginModo = null;
+      await this.carregarTudo(); this.agendarSync(); return null;
     }
-    catch (e) { if (e.code === 'PRIMEIRO_ACESSO') return { primeiroAcesso: true }; return e.code === 'SENHA_INCORRETA' ? 'Senha incorreta.' : e.code === 'BLOQUEADO' ? 'Muitas tentativas erradas. Aguarde 15 minutos.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Erro: ' + e.message; }
+    catch (e) { return e.code === 'SENHA_INCORRETA' ? 'Senha incorreta.' : e.code === 'BLOQUEADO' ? 'Muitas tentativas erradas. Aguarde 15 minutos.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Erro: ' + e.message; }
   },
+  /* Primeiro acesso do funcionário: cria a senha pelo link de convite e já entra */
+  async entrarConvite(codigo, senha) {
+    try {
+      const r = await this.rpc('esc_convite_usar', { p_codigo: codigo, p_senha: senha }, true);
+      localStorage.setItem(this.TOKEN, r.token);
+      try { localStorage.setItem('esc_login_modo', 'func'); } catch (e) { }
+      S.convite = null; S.loginModo = null;
+      await this.carregarTudo(); this.agendarSync(); return null;
+    }
+    catch (e) { return e.code === 'CONVITE_INVALIDO' ? 'Este convite não vale mais. Peça um novo link ao gerente.' : e.code === 'SENHA_CURTA' ? 'A senha precisa ter de 6 a 72 caracteres.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : 'Não foi possível criar a senha. Tente de novo.'; }
+  },
+  /* Só para servidor na versão anterior, que ainda não devolve o perfil junto com os dados */
   async carregarPapel() {
-    try { const r = await this.rpc('esc_papel', {}); S.papel = (r && r.papel) || 'admin'; S.emailUsuario = (r && r.email) || ''; }
-    catch (e) { if (e.code === 'SESSAO_INVALIDA') throw e; S.papel = S.papel || 'admin'; }
+    try { const r = await this.rpc('esc_papel', {}); aplicarPerfil(r && r.papel ? { papel: r.papel, nome: r.nome, login: r.login || r.email, id: r.id, permissoes: r.permissoes || { escala: true, servicos: true, diarias: true } } : null); }
+    catch (e) { if (e.code === 'SESSAO_INVALIDA') throw e; if (!S.papel) aplicarPerfil(null); }
   },
   async sair(expirou) {
     if (!expirou) { try { await this.rpc('esc_sair', {}); } catch (e) { } }
     try { localStorage.removeItem(this.TOKEN); localStorage.removeItem(this.COPIA); } catch (e) { }
-    Object.assign(S, { setores: [], funcionarios: [], vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], precisaLogin: true, pronto: true, desde: null });
+    const eraFunc = S.papel === 'restrito';
+    Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO, { nomeHotel: S.config.nomeHotel }), precisaLogin: true, pronto: true, desde: null, papel: undefined, perms: null, usuarioNome: '', usuarioLogin: '', usuarioId: null, loginModo: eraFunc ? 'func' : null });
+    UI.usr = null; UI.visaoSemana = null;
     if (expirou) toast('Sua sessão expirou. Entre de novo.');
     render(); atualizarStatus();
   }
 };
+/* ---------------- ENTRADA ----------------
+   Administrador: só a senha do sistema. Funcionário: e-mail ou telefone + a própria senha.
+   Primeiro acesso do funcionário: pelo link de convite (#convite=código), onde ele cria a senha. */
+function conviteDaUrl() { const m = /^#convite=([0-9a-f]{16,64})$/i.exec(location.hash || ''); return m ? m[1].toLowerCase() : null; }
+function loginModo() {
+  if (conviteDaUrl()) return 'convite';
+  if (S.loginModo) return S.loginModo;
+  if ((location.hash || '') === '#funcionario') return 'func';
+  let lembrado = null; try { lembrado = localStorage.getItem('esc_login_modo'); } catch (e) { }
+  return lembrado === 'func' ? 'func' : 'admin';
+}
+async function verConvite() {
+  const cod = conviteDaUrl();
+  if (!cod || (S.convite && S.convite.codigo === cod)) return;
+  S.convite = { codigo: cod, estado: 'carregando' };
+  try { const r = await Nuvem.rpc('esc_convite_ver', { p_codigo: cod }, true); S.convite = { codigo: cod, estado: 'ok', nome: r.nome, login: r.login }; }
+  catch (e) { S.convite = { codigo: cod, estado: e.code === 'SEM_CONEXAO' ? 'semrede' : 'invalido' }; }
+  if (S.precisaLogin) render();
+}
 function vLogin() {
-  const pend = S.loginPrimeiro;
-  const soFunc = (location.hash || '') === '#funcionario';
-  const criar = soFunc && !pend && S.loginCriar;
-  return `<div style="max-width:380px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1><p class="sub" style="text-align:center">${soFunc ? 'Acesso da funcionária: entre com o seu e-mail. No primeiro acesso, crie a sua senha.' : 'Sistema de escalas de folga'}</p>
-  ${S.erroConexao ? '<div class="alert e"><span class="ic">!</span><div>Sem conexão com a internet.</div></div>' : ''}
-  <form id="fLogin">
-  ${pend ? `<div class="alert i"><span class="ic">i</span><div>Primeiro acesso para <b>${esc(pend)}</b>. Crie a sua senha.</div></div>` : soFunc ? `<div class="fld"><label class="f">Seu e-mail</label><input type="email" id="loginEmail" autocomplete="username" style="width:100%" placeholder="seu@email.com"></div>` : ''}
-  <div class="fld"><label class="f">${pend || criar ? 'Crie sua senha (mínimo 6 caracteres)' : 'Senha'}</label><input type="password" id="loginSenha" autocomplete="${pend || criar ? 'new-password' : 'current-password'}" style="width:100%" autofocus></div>
-  ${pend || criar ? '<div class="fld"><label class="f">Repita a senha</label><input type="password" id="loginSenha2" autocomplete="new-password" style="width:100%"></div>' : ''}
-  <div id="loginErro" class="small" style="color:var(--err);min-height:18px"></div>
-  <button class="btn pri" style="width:100%" type="submit">${criar ? 'Criar acesso' : pend ? 'Criar senha e entrar' : 'Entrar'}</button></form>
-  ${soFunc && !pend && !criar ? '<p class="small" style="text-align:center;margin:14px 0 0"><button type="button" class="btn sm" data-act="loginCriar">Primeiro acesso? Criar minha senha</button></p>' : ''}
-  ${criar ? '<p class="small" style="text-align:center;margin:14px 0 0"><button type="button" class="btn sm" data-act="loginVoltar">Já tenho senha</button></p>' : ''}</div>`;
+  const modo = loginModo(), cv = S.convite;
+  const topo = `<div style="max-width:400px;margin:8vh auto 0" class="card"><h1 style="text-align:center">${esc(S.config.nomeHotel || 'Gestão de Escalas')}</h1>`;
+  const semRede = S.erroConexao ? '<div class="alert e"><span class="ic">!</span><div>Sem conexão com a internet.</div></div>' : '';
+  const erro = '<div id="loginErro" class="small" style="color:var(--err);min-height:18px"></div>';
+  if (modo === 'convite') {
+    if (!cv || cv.estado === 'carregando') return topo + '<p class="sub" style="text-align:center">Conferindo o seu convite…</p></div>';
+    if (cv.estado === 'ok') return topo + `<p class="sub" style="text-align:center">Olá, <b>${esc(cv.nome)}</b>! Crie a sua senha para entrar.</p>${semRede}
+  <form id="fLogin" data-modo="convite">
+  <div class="fld"><label class="f">Seu login</label><input type="text" id="loginConviteLogin" value="${esc(fmtLogin(cv.login))}" disabled style="width:100%"><div class="small muted" style="margin-top:4px">Guarde: nas próximas vezes você entra com ele e com a senha que criar agora.</div></div>
+  <div class="fld"><label class="f">Crie sua senha (mínimo 6 caracteres)</label><input type="password" id="loginSenha" autocomplete="new-password" style="width:100%" autofocus></div>
+  <div class="fld"><label class="f">Repita a senha</label><input type="password" id="loginSenha2" autocomplete="new-password" style="width:100%"></div>
+  ${erro}<button class="btn pri" style="width:100%" type="submit">Criar senha e entrar</button></form></div>`;
+  }
+  // convite vencido, já usado ou sem conexão: mostra a entrada do funcionário, com o aviso
+  const aviso = modo === 'convite' ? `<div class="alert w"><span class="ic">!</span><div>${cv.estado === 'semrede' ? 'Sem conexão para conferir o convite. Tente de novo em instantes.' : 'Este link de convite não vale mais (já foi usado ou venceu). Se você já criou a sua senha, entre abaixo. Se não, peça um novo link ao gerente.'}</div></div>` : '';
+  if (modo === 'admin') return topo + `<p class="sub" style="text-align:center">Sistema de escalas de folga</p>${semRede}
+  <form id="fLogin" data-modo="admin"><div class="fld"><label class="f">Senha</label><input type="password" id="loginSenha" autocomplete="current-password" style="width:100%" autofocus></div>
+  ${erro}<button class="btn pri" style="width:100%" type="submit">Entrar</button></form>
+  <p class="small" style="text-align:center;margin:16px 0 0"><a href="#funcionario" data-act="loginModo" data-m="func">Sou funcionário(a)</a></p></div>`;
+  return topo + `<p class="sub" style="text-align:center">Acesso do funcionário</p>${semRede}${aviso}
+  <form id="fLogin" data-modo="func"><div class="fld"><label class="f">E-mail ou telefone</label><input type="text" id="loginUsuario" autocomplete="username" autocapitalize="none" spellcheck="false" style="width:100%" placeholder="seu e-mail ou telefone com DDD"></div>
+  <div class="fld"><label class="f">Senha</label><input type="password" id="loginSenha" autocomplete="current-password" style="width:100%"></div>
+  ${erro}<button class="btn pri" style="width:100%" type="submit">Entrar</button></form>
+  <p class="small muted" style="text-align:center;margin:14px 0 0">Primeiro acesso? Use o link de convite que o gerente enviou.</p>
+  <p class="small" style="text-align:center;margin:8px 0 0"><a href="#" data-act="loginModo" data-m="admin">Sou o administrador</a></p></div>`;
+}
+/* Link de convite aberto num aparelho em que o administrador já está conectado: o convite não é usado */
+function vConviteLogado() {
+  return `<div class="card" style="max-width:520px;margin:6vh auto 0"><h2 style="margin-top:0">Este é um link de convite de funcionário</h2>
+  <p>Você está conectado como <b>administrador</b> neste aparelho, então o convite <b>não foi usado</b>.</p>
+  <p class="muted">Envie o link para o funcionário: é no celular dele que ele cria a senha.</p>
+  <div class="row mt"><a class="btn pri" href="#usuarios">Voltar ao sistema</a></div></div>`;
 }
 document.addEventListener('submit', async ev => {
   if (ev.target.id !== 'fLogin') return;
   ev.preventDefault();
-  const b = ev.target.querySelector('button'); b.dataset.label = b.textContent;
-  const voltar = (msg) => { const e = document.getElementById('loginErro'); if (e) e.textContent = msg; b.disabled = false; b.textContent = b.dataset.label; };
-  if ((location.hash || '') === '#funcionario' && S.loginCriar && !S.loginPrimeiro) {
-    const em = ((document.getElementById('loginEmail') || {}).value || '').trim().toLowerCase();
-    const senhaC = document.getElementById('loginSenha').value;
-    const repeteC = document.getElementById('loginSenha2').value;
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return voltar('Digite um e-mail válido.');
-    if (senhaC.length < 6) return voltar('A senha precisa ter pelo menos 6 caracteres.');
-    if (senhaC !== repeteC) return voltar('As senhas não são iguais.');
-    b.disabled = true; b.textContent = 'Criando acesso…';
-    try { await Nuvem.rpc('esc_definir_senha', { p_email: em, p_senha: senhaC }, true); }
-    catch (e) { return voltar(e.code === 'SEM_CONVITE' ? 'Seu e-mail ainda não foi convidado. Peça ao gerente do hotel.' : 'Não foi possível criar a senha. Tente de novo.'); }
-    const errC = await Nuvem.entrar(senhaC, em);
-    if (errC && typeof errC === 'object') return voltar('Não foi possível entrar. Tente de novo.');
-    if (errC) return voltar(errC);
-    S.loginCriar = false; return;
-  }
+  const modo = ev.target.dataset.modo, b = ev.target.querySelector('button[type=submit]'), rot = b.textContent;
+  const falha = msg => { const e = document.getElementById('loginErro'); if (e) e.textContent = msg; b.disabled = false; b.textContent = rot; };
   const senha = document.getElementById('loginSenha').value;
-  b.disabled = true; b.textContent = 'Entrando…';
-  if (S.loginPrimeiro) {
-    const repete = document.getElementById('loginSenha2').value;
-    if (senha.length < 6) return voltar('A senha precisa ter pelo menos 6 caracteres.');
-    if (senha !== repete) return voltar('As senhas não são iguais.');
-    try { await Nuvem.rpc('esc_definir_senha', { p_email: S.loginPrimeiro, p_senha: senha }, true); }
-    catch (e) { return voltar(e.code === 'SEM_CONVITE' ? 'Este e-mail não tem convite pendente. Peça ao gerente do hotel.' : 'Não foi possível criar a senha. Tente de novo.'); }
-    const err2 = await Nuvem.entrar(senha, S.loginPrimeiro);
-    if (err2 && typeof err2 === 'object') return voltar('Não foi possível entrar. Tente de novo.');
-    if (err2) return voltar(err2);
-    S.loginPrimeiro = null; return;
+  let err;
+  if (modo === 'convite') {
+    if (senha.length < 6) return falha('A senha precisa ter pelo menos 6 caracteres.');
+    if (senha !== document.getElementById('loginSenha2').value) return falha('As senhas não são iguais.');
+    b.disabled = true; b.textContent = 'Criando sua senha…';
+    err = await Nuvem.entrarConvite(S.convite.codigo, senha);
+  } else if (modo === 'func') {
+    const login = (document.getElementById('loginUsuario').value || '').trim();
+    if (!login) return falha('Digite o seu e-mail ou telefone.');
+    if (!senha) return falha('Digite a sua senha.');
+    b.disabled = true; b.textContent = 'Entrando…';
+    err = await Nuvem.entrar(senha, login);
+  } else {
+    b.disabled = true; b.textContent = 'Entrando…';
+    err = await Nuvem.entrar(senha, null);
   }
-  const emailDigitado = ((document.getElementById('loginEmail') || {}).value || '').trim().toLowerCase();
-  if ((location.hash || '') === '#funcionario' && !emailDigitado) return voltar('Digite o seu e-mail.');
-  const err = await Nuvem.entrar(senha, emailDigitado || null);
-  if (err && typeof err === 'object') { S.loginPrimeiro = emailDigitado; render(); return; }
-  if (err) voltar(err);
+  if (err) falha(err);
 });
 async function log(tipo, texto, semana) {
   const e = { ts: agoraISO(), tipo, texto, semana: semana || null };
@@ -1856,10 +1978,12 @@ const ICON = {
   print: '<path d="M6 9V2h12v7M6 18H4v-7h16v7h-2M8 14h8v8H8z"/>',
   wa: '<path d="M3 21l1.6-4.8A9 9 0 1121 12a9 9 0 01-13.2 7.9z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>',
-  check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
+  check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  usuarios: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6 1.2 0 2.3.2 3.3.5"/><path d="M17.5 12.5l3.5 1.4v2.9c0 2-1.5 3.6-3.5 4.2-2-.6-3.5-2.2-3.5-4.2v-2.9z"/>',
+  conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['historico', 'Histórico'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -1990,7 +2114,8 @@ async function servDia(mes, pid, dd, valor) {
   const dias = Object.assign({}, at.dias || {});
   const v = r2(valor);
   if (v) dias[dd] = v; else delete dias[dd];
-  return servSalvar(mes, pid, { dias });
+  await servSalvar(mes, pid, { dias });
+  log('servicos', (v ? 'Diária lançada: ' : 'Diária retirada: ') + _capNome((S.prestadores.find(x => x.id === pid) || {}).nome || '') + ' · ' + dd + '/' + mes.slice(5, 7) + '/' + mes.slice(0, 4) + (v ? ' · R$ ' + servMoeda(v) : ''));
 }
 /* Cria a planilha do mês para todos os prestadores ativos (valores vêm do mês anterior, por cálculo) */
 function servCriarMes(mes) {
@@ -2061,7 +2186,10 @@ function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
   const mes = UI.servMes, ult = servDiasDoMes(mes), dd2 = dd => String(dd).padStart(2, '0');
-  const grupo = UI.servGrupo || 'diaria';
+  // "serviços" = mensais, combinados, extras, cadastro, lotes e pagamentos; "diárias" = diaristas (ver e marcar os dias). Com as duas, tudo.
+  const svFull = pode('servicos'), svDia = pode('diarias');
+  const gruposOk = Object.keys(servGrupoNome).filter(k => k === 'diaria' ? svDia : k === 'outros' ? svFull : svFull && svDia);
+  const grupo = UI.servGrupo = gruposOk.includes(UI.servGrupo || 'diaria') ? (UI.servGrupo || 'diaria') : gruposOk[0];
   const lotes = servLotesMes(mes, grupo), sel = servPerSel(lotes);
   const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
   const ativos = servPrestadores();
@@ -2071,17 +2199,17 @@ function vServicos() {
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="servAnt">${ic('chevL')}</button><input type="month" id="inServMes" value="${mes}"><button class="btn icon" data-act="servProx">${ic('chevR')}</button>
     <div class="sp"></div>
-    <button class="btn" data-act="servLotes">Lotes do mês</button>
-    <button class="btn" data-act="prestLista">Prestadores</button>
+    ${svFull ? `<button class="btn" data-act="servLotes">Lotes do mês</button>
+    <button class="btn" data-act="prestLista">Prestadores</button>` : ''}
   </div>
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
     <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(x.nome)}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
-    <select id="selGrupo" style="flex:1;min-width:220px">${Object.keys(servGrupoNome).map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
+    <select id="selGrupo" style="flex:1;min-width:220px">${gruposOk.map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
   <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label></div>`;
-  if (!ativos.length) return h + '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>';
+  if (!ativos.length) return h + (svFull ? '<div class="card empty"><b>Nenhum prestador cadastrado</b>Clique em "Prestadores" para cadastrar.</div>' : '<div class="card empty"><b>Nenhum diarista cadastrado</b>O cadastro de prestadores é feito pelo administrador.</div>');
   if (!criado) return h + `<div class="card empty"><b>${servMesNome(mes)} ainda não tem planilha</b>${S.somenteLeitura ? 'Sem permissão para criar agora.' : 'Aguarde um instante.'}</div>`;
   const busca = (UI.servBusca || '').trim();
   const norm = t => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -2125,19 +2253,19 @@ function vServicos() {
   h += `<div class="svc-cards">${calcs.map(c => {
     const q = pagLinha(c), nm = _capNome(c.p.nome || ''), nDias = Object.keys(c.l.dias || {}).length;
     const pix = c.p.pix ? `<div class="svc-pix">PIX ${esc(c.p.pix)}${c.p.titular ? ' · ' + esc(c.p.titular) : ''}</div>` : '';
-    const acao = lote && q.valor > 0 ? (q.pagoOk ? (q.saldo > 0.004 ? `<button class="btn sm pri" data-act="servPagarDif" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Pagar diferença R$ ${servMoeda(q.saldo)}</button>` : '') + `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` :`<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
+    const acao = svFull && lote && q.valor > 0 ? (q.pagoOk ? (q.saldo > 0.004 ? `<button class="btn sm pri" data-act="servPagarDif" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Pagar diferença R$ ${servMoeda(q.saldo)}</button>` : '') + `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` :`<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
     const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
-    const abre = c.modal === 'diaria' ? ` data-act="servAbrirDia" data-pid="${c.p.id}" style="cursor:pointer" title="Abrir para lançar os dias"` : '';
+    const abre = c.modal === 'diaria' && svDia ? ` data-act="servAbrirDia" data-pid="${c.p.id}" style="cursor:pointer" title="Abrir para lançar os dias"` : '';
     return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}</div></div><span class="svc-badge">${estado}</span></div>
       <div class="svc-grid"><div><span>Dias trabalhados</span><b>${nDias}</b></div><div><span>A receber</span><b>R$ ${servMoeda(q.valor)}</b></div><div><span>Já pago</span><b>R$ ${servMoeda(q.pago)}</b></div><div><span>Saldo</span><b class="${q.saldo > 0.004 ? 'neg' : ''}">R$ ${servMoeda(q.saldo)}</b></div></div>
       ${(c.descItens || []).length ? `<div class="small" style="margin:6px 0;color:#C00000"><b>Descontos</b> · abatidos ${lote ? 'deste lote' : 'no mês'}: R$ ${servMoeda(lote ? c.dsc[idx] : c.desc)}${c.descItens.map(d => `<div>• ${esc(d.desc)}: R$ ${servMoeda(d.valor)} <span class="muted">(${esc(d.lote)})</span></div>`).join('')}${c.descSobra > 0 ? `<div class="muted">Não coube no saldo: R$ ${servMoeda(c.descSobra)}</div>` : ''}</div>` : ''}
-      ${pix}<div class="svc-acoes"><button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>${acao}</div></div>`;
+      ${pix}<div class="svc-acoes">${svFull ? `<button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>` : ''}${acao}</div></div>`;
   }).join('')}</div>`;
-  h += `<p class="small muted mt" style="margin-bottom:0">Lance os dias pela pesquisa acima. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p>`;
-  if (lote) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
+  h += svFull ? `<p class="small muted mt" style="margin-bottom:0">Lance os dias pela pesquisa acima. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p>` : `<p class="small muted mt" style="margin-bottom:0">Para marcar um dia trabalhado, pesquise o diarista pelo nome (ou toque no cartão dele) e toque no dia. Pagamentos, extras e cadastro ficam com o administrador.</p>`;
+  if (lote && svFull) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
   h += `<div class="row mt" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="small muted">Todos os serviços ao imprimir:</span><select id="selFormato" style="max-width:320px"><option value="unico" ${UI.servFormato !== 'separado' ? 'selected' : ''}>Um PDF com diaristas e serviços juntos</option><option value="separado" ${UI.servFormato === 'separado' ? 'selected' : ''}>Dois PDFs separados (diaristas e serviços)</option></select></div>
   <div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button>${grupo === 'diaria' ? '<button class="btn pri" data-act="servCopiar">Copiar texto (WhatsApp)</button>' : ''}</div>
-  <div class="row mt"><button class="btn" data-act="servFechPdf">${ic('pdf')} Fechamento (PDF)</button><button class="btn pri" data-act="servFechPrint">Imprimir fechamento</button></div>
+  ${svFull ? `<div class="row mt"><button class="btn" data-act="servFechPdf">${ic('pdf')} Fechamento (PDF)</button><button class="btn pri" data-act="servFechPrint">Imprimir fechamento</button></div>` : ''}
   <p class="small muted mt">Baixar, Excel e Imprimir saem só do lote e do grupo escolhidos acima.</p>`;
   return h;
 }
@@ -2606,7 +2734,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '13/11 12:58';
+const VERSAO_APP = '16/11 23:30';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -2731,6 +2859,10 @@ function alertasGerais() {
       if (trabDom > 0 && folgaDom === 0) out.push({ t: 'w', m: f.nome + ' não tem domingo de folga previsto em ' + servMesNome(mesAtual) + ' (trabalha nos ' + trabDom + ' domingos do mês). Abra a escala para ajustar.', link: 'mensal' });
     });
   }
+  if (ehAdmin()) {
+    const env = Object.values(S.escalas).filter(e => e.status !== 'aprovada' && e.envio).sort((x, y) => x.semana.localeCompare(y.semana));
+    if (env.length) out.unshift({ t: 'w', cat: 'status', m: (env[0].envio.por || 'O funcionário') + ' enviou ' + env.length + ' semana(s) de escala e está aguardando a sua aprovação.', link: 'mensal', mes: env[0].semana.slice(0, 7) });
+  }
   out.forEach(a => { if (!a.cat) a.cat = catAlerta(a.m); });
   return out;
 }
@@ -2748,19 +2880,24 @@ function catAlerta(m) {
    ===================================================================== */
 function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
-  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['exportar', 'backup', 'aparencia']]];
-  const RESTRITO_OK = ['diaria', 'mensal', 'servicos'];
-  const grupos = S.papel === 'restrito' ? GRUPOS_MENU.map(([t, c]) => [t, c.filter(k => RESTRITO_OK.includes(k))]).filter(g => g[1].length) : GRUPOS_MENU;
-  const sairRestrito = S.papel === 'restrito' ? '<div class="nav-g">Conta</div><button class="btn sm" data-act="sairNuvem" style="margin:6px 12px">Sair deste aparelho</button>' : '';
-  document.getElementById('nav').innerHTML = grupos.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('') + sairRestrito;
+  // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
+  if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  const grupos = GRUPOS_MENU.map(([t, c]) => [t, c.filter(rotaPermitida)]).filter(g => g[1].length);
+  const quem = S.modo === 'nuvem' && S.pronto && !S.precisaLogin ? '<div class="nav-quem"><b>' + esc(ehAdmin() ? 'Administrador' : (S.usuarioNome || 'Funcionário')) + '</b><span>' + (ehAdmin() ? 'acesso completo' : 'acesso de funcionário') + '</span></div>' : '';
+  document.getElementById('nav').innerHTML = !S.pronto || S.precisaLogin ? '' : grupos.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('') + quem;
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
   atualizarStatus();
   const v = document.getElementById('view');
   if (!S.pronto) { v.innerHTML = '<div class="loading"><div class="spin"></div>Carregando dados…</div>'; return; }
   document.getElementById('side').classList.toggle('hide', !!S.precisaLogin); document.querySelector('.top').classList.toggle('hide', !!S.precisaLogin);
   if (S.precisaLogin) { v.innerHTML = vLogin(); return; }
+  if (conviteDaUrl()) {
+    if (ehAdmin()) { v.innerHTML = vConviteLogado(); return; }
+    try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
+  }
   const sy = window.scrollY;
-  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -2768,7 +2905,7 @@ function render() {
   if (S.modo === 'nuvem' && (S.offline || S.semRede)) topo += `<div class="alert w"><span class="ic">!</span><div><b>Sem internet.</b> ${S.offline ? 'Mostrando a última cópia salva neste aparelho' + (S.copiaEm ? ' (' + dtHora(S.copiaEm) + ')' : '') + ', só para consulta.' : 'As alterações não serão salvas até a conexão voltar.'} <a href="#" data-act="reconectar">Tentar de novo</a></div></div>`;
   else if (S.somenteLeitura) topo += '<div class="alert i"><span class="ic">i</span><div>Você está em modo somente leitura.</div></div>';
   v.innerHTML = topo + fn();
-  if (UI.rota === 'backup' && S.papel === 'admin') acCarregar();
+  if (UI.rota === 'usuarios' && S.modo === 'nuvem' && !UI.usr) usrCarregar();
   const foco = UI._foco; if (foco) { const el = document.getElementById(foco); if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { } } UI._foco = null; }
   window.scrollTo(0, sy);
 }
@@ -3013,18 +3150,18 @@ function vPainel() {
       <div class="pmx-esc-tx"><div class="pmx-esc-h">Escala da semana <span class="pmx-badge ${e ? (e.status === 'aprovada' ? 'ok' : 'pend') : 'none'}">${e ? (e.status === 'aprovada' ? 'Publicada' : 'Pendente') : 'Não publicada'}</span></div>
       <div class="pmx-esc-s">${esc(semanaLabel(sem))}${e ? ' · ' + ativos.filter(f => e.atribuicoes && e.atribuicoes[f.id]).length + ' funcionários' : ''}</div></div>
     </div>
-    <div class="pmx-esc-b"><button class="pmx-btn-w" data-act="verSemana" data-sem="${sem}">Consultar ${ico.chev}</button>${e && !S.somenteLeitura ? `<button class="pmx-btn-w2" data-act="${e.status === 'aprovada' ? 'editarAprovada' : 'verSemana'}" data-sem="${sem}">Editar</button>` : ''}</div>
+    <div class="pmx-esc-b"><button class="pmx-btn-w" data-act="verSemana" data-sem="${sem}">Consultar ${ico.chev}</button>${e && !S.somenteLeitura && (ehAdmin() || e.status !== 'aprovada') ? `<button class="pmx-btn-w2" data-act="${e.status === 'aprovada' ? 'editarAprovada' : 'verSemana'}" data-sem="${sem}">Editar</button>` : ''}</div>
   </section>
 
   <h3 class="pmx-h3">Acesso rápido</h3>
   <div class="pmx-rap">
-    <a class="pmx-rt" href="#mensal" data-act="verSemana" data-sem="${sem}"><span>${ico.cal}</span>Escala<br>semanal</a>
-    <a class="pmx-rt" href="#mensal"><span>${ico.cal}</span>Escala<br>mensal</a>
-    <a class="pmx-rt" href="#funcionarios"><span>${ico.users}</span>Funcionários</a>
-    <a class="pmx-rt" href="#vt"><span>${ico.work}</span>Vale-transporte</a>
-    <a class="pmx-rt" href="#servicos"><span>${ico.dollar}</span>Serviços<br>prestados</a>
+    ${pode('escala') ? `<a class="pmx-rt" href="#mensal" data-act="verSemana" data-sem="${sem}"><span>${ico.cal}</span>Escala<br>semanal</a>
+    <a class="pmx-rt" href="#mensal"><span>${ico.cal}</span>Escala<br>mensal</a>` : ''}
+    ${ehAdmin() ? `<a class="pmx-rt" href="#funcionarios"><span>${ico.users}</span>Funcionários</a>` : ''}
+    ${pode('vt') ? `<a class="pmx-rt" href="#vt"><span>${ico.work}</span>Vale-transporte</a>` : ''}
+    ${pode('servicos') || pode('diarias') ? `<a class="pmx-rt" href="#servicos"><span>${ico.dollar}</span>Serviços<br>prestados</a>` : ''}
   </div>
-
+  ${ehAdmin() ? `
   <h3 class="pmx-h3">Financeiro · próximos pagamentos</h3>
   <div class="pmx-fin">
     <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 20</div><div class="pmx-fi-s">Serviços prestados (dias 1 a 15)</div><div class="pmx-fi-v">${pagTxt(sp20)}</div></a>
@@ -3034,7 +3171,7 @@ function vPainel() {
   </div>
 
   <h3 class="pmx-h3">Central de alertas</h3>
-  ${alertasBloco()}
+  ${alertasBloco()}` : ''}
 </div>`;
   function inatTxt() { const n = S.funcionarios.length - ativos.length; return n ? ' · ' + n + ' inativo(s)' : ''; }
 }
@@ -3047,7 +3184,7 @@ function alertasBloco() {
   return `<div class="card">
     <div class="row"><h2 style="margin:0">Problemas que pedem atenção</h2><div class="sp"></div>${al.length ? `<span class="badge ${al.some(a => a.t === 'e') ? 'b-err' : 'b-draft'}">${al.length}</span>` : ''}</div>
     ${catsOk.length ? `<div class="cats mt">${catsOk.map(k => `<button class="catb${fAl === k ? ' on' : ''}" data-act="alertaCat" data-cat="${k}">${nomesCat[k]} <b>${cont[k]}</b></button>`).join('')}</div>` : ''}
-    <div class="mt">${visAl.length ? visAl.slice(0, 12).map(a => `<div class="alert ${a.t}"><span class="ic">${a.t === 'e' ? '!' : 'i'}</span><div>${esc(a.m)} ${a.link ? `<a href="#${a.link}" ${a.sem ? `data-act="irSemana" data-sem="${a.sem}"` : ''}>Abrir</a>` : ''}</div></div>`).join('') + (visAl.length > 12 ? `<div class="small muted mt">Mostrando 12 de ${visAl.length}.</div>` : '') : '<div class="alert s"><span class="ic">✓</span><div>Nenhum problema encontrado.</div></div>'}</div>
+    <div class="mt">${visAl.length ? visAl.slice(0, 12).map(a => `<div class="alert ${a.t}"><span class="ic">${a.t === 'e' ? '!' : 'i'}</span><div>${esc(a.m)} ${a.link ? `<a href="#${a.link}" ${a.mes ? `data-act="irMes" data-mes="${a.mes}"` : a.sem ? `data-act="irSemana" data-sem="${a.sem}"` : ''}>Abrir</a>` : ''}</div></div>`).join('') + (visAl.length > 12 ? `<div class="small muted mt">Mostrando 12 de ${visAl.length}.</div>` : '') : '<div class="alert s"><span class="ic">✓</span><div>Nenhum problema encontrado.</div></div>'}</div>
   </div>`;
 }
 
@@ -3147,8 +3284,9 @@ function vMensal() {
     let hw = `<div class="row mb" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><h1>Escala da semana</h1><p class="sub" style="margin:0">${esc(semanaLabel(sw))}</p></div><button class="btn" data-act="voltarMes">← Voltar ao mês</button></div>`;
     if (!S.escalas[sw]) hw += '<div class="alert w mb"><span class="ic">!</span><div>Esta semana ainda não tem escala gerada.</div></div>';
     if (!mw.grupos.length) return hw + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
-    if (!S.somenteLeitura && mw.grupos.length) hw += '<p class="small muted mb">Toque num dia de um funcionário para trocar entre <b>Trabalha</b> e <b>Folga</b>.</p>';
-    return hw + '<div class="sem-folha">' + folhaHTML(mw, true) + '</div>';
+    const podeEditar = ehAdmin() || !(S.escalas[sw] && S.escalas[sw].status === 'aprovada');
+    if (!S.somenteLeitura && mw.grupos.length) hw += podeEditar ? '<p class="small muted mb">Toque num dia de um funcionário para trocar entre <b>Trabalha</b> e <b>Folga</b>.</p>' : '<div class="alert i mb"><span class="ic">i</span><div>Esta semana já foi <b>aprovada</b>. Só o administrador altera uma escala aprovada.</div></div>';
+    return hw + '<div class="sem-folha">' + folhaHTML(mw, podeEditar) + '</div>';
   }
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
@@ -3159,20 +3297,79 @@ function vMensal() {
   <div class="small muted mt">Marque os setores que quer ver e baixar (pode marcar mais de um):</div>
   <div class="row mt" style="gap:6px">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
-  ${!S.somenteLeitura && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><button class="btn ok" data-act="aprovarMes" data-mes="${UI.mes}">${ic('check')} Aprovar escala do mês (${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length} semana(s) em rascunho)</button></div>` : ''}
+  ${escalaFluxoHTML(UI.mes)}
+  ${!S.somenteLeitura && ehAdmin() && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><button class="btn ok" data-act="aprovarMes" data-mes="${UI.mes}">${ic('check')} Aprovar escala do mês (${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length} semana(s) em rascunho)</button></div>` : ''}
   <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
   // Semanas da escala: cartão por semana, com visualizar e editar
   h += `<div class="card mb sem-sec"><div class="row" style="justify-content:space-between;align-items:center"><b>Semanas da escala</b><span class="small muted">${sems.length} semanas no mês</span></div>
   <div class="sem-grid mt">${sems.map(s => {
     const e = S.escalas[s], ap = !!(e && e.status === 'aprovada');
-    const sit = !e ? '<span class="badge b-off">Não gerada</span>' : ap ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Pendente</span>';
-    const edit = !e || S.somenteLeitura ? '' : ap ? `<button class="btn sm pri" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar</button>` : `<a class="btn sm" href="#mensal" data-act="irSemana" data-sem="${s}">${ic('edit')} Editar</a>`;
+    const sit = !e ? '<span class="badge b-off">Não gerada</span>' : ap ? '<span class="badge b-ok">Aprovada</span>' : e.envio ? '<span class="badge b-blue">Enviada para aprovação</span>' : e.devolucao ? '<span class="badge b-err">Devolvida para ajustes</span>' : '<span class="badge b-draft">Pendente</span>';
+    const edit = !e || S.somenteLeitura ? '' : ap ? (ehAdmin() ? `<button class="btn sm pri" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar</button>` : '') : `<button class="btn sm" data-act="verSemana" data-sem="${s}">${ic('edit')} Editar</button>`;
     return `<div class="sem-card ${ap ? 'ok' : ''}"><div class="sem-d">${semanaLabel(s)}</div>${sit}<div class="sem-acoes"><button class="btn sm" data-act="verSemana" data-sem="${s}">Visualizar</button>${edit}</div></div>`;
   }).join('')}</div></div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
   return h + folhaHTML(m);
+}
+
+/* ---------------- ENVIO PARA APROVAÇÃO ----------------
+   O funcionário monta a escala em rascunho e envia. Só o administrador aprova, ou devolve com um recado. */
+const semanasRascunho = ym => semanasDoMes(ym).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada');
+function escalaFluxoHTML(ym) {
+  const rasc = semanasRascunho(ym);
+  if (!rasc.length || S.somenteLeitura) return '';
+  const env = rasc.filter(s => S.escalas[s].envio), dev = rasc.filter(s => S.escalas[s].devolucao && !S.escalas[s].envio);
+  if (ehAdmin()) {
+    if (!env.length) return '';
+    const x = S.escalas[env[0]].envio;
+    return `<div class="alert i mt" style="margin-bottom:0"><span class="ic">i</span><div><b>${esc(x.por || 'O funcionário')}</b> enviou ${env.length} semana(s) de ${servMesNome(ym)} para aprovação${x.em ? ' em ' + dtHora(x.em) : ''}. Confira e aprove abaixo, ou <a href="#" data-act="escDevolver" data-mes="${ym}">devolva para ajustes</a>.</div></div>`;
+  }
+  let h = '';
+  if (dev.length) { const x = S.escalas[dev[0]].devolucao; h += `<div class="alert w mt" style="margin-bottom:0"><span class="ic">!</span><div><b>O administrador devolveu a escala para ajustes${x.em ? ' em ' + dtHora(x.em) : ''}.</b>${x.motivo ? ' Recado: ' + esc(x.motivo) : ''} Faça os ajustes e envie de novo.</div></div>`; }
+  if (env.length === rasc.length) h += `<div class="alert s mt" style="margin-bottom:0"><span class="ic">✓</span><div><b>Enviada para aprovação</b>${S.escalas[env[0]].envio.em ? ' em ' + dtHora(S.escalas[env[0]].envio.em) : ''}. Agora é com o administrador: a escala só vale depois de aprovada.</div></div>`;
+  else h += `<div class="row mt"><button class="btn ok" data-act="escEnviar" data-mes="${ym}">${ic('check')} Enviar para aprovação (${rasc.length - env.length} semana(s) em rascunho)</button><span class="small muted">Só o administrador aprova. Até lá, a escala não vale.</span></div>`;
+  return h;
+}
+async function enviarParaAprovacao(ym) {
+  if (!pode('escala')) return toast('Seu acesso não inclui a escala.');
+  const rasc = semanasRascunho(ym);
+  if (!rasc.length) return toast('Não há semanas em rascunho neste mês.');
+  const problemas = [];
+  rasc.forEach(s => { const v = C.validarEscala(Object.assign({}, S.escalas[s], { semana: s }), S.funcionarios, S.setores, historicoArr()); v.erros.forEach(x => problemas.push(semanaLabel(s) + ': ' + x.msg)); });
+  if (problemas.length) return modalMsg('Corrija antes de enviar', '<p>A escala ainda tem problemas. Nada foi enviado:</p><ul class="list-sm">' + problemas.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>');
+  if (!await confirmar('Enviar para aprovação?', '<p>O administrador vai conferir e aprovar <b>' + rasc.length + ' semana(s)</b> de ' + servMesNome(ym) + ':</p><ul class="list-sm">' + rasc.map(s => '<li>' + esc(semanaLabel(s)) + '</li>').join('') + '</ul><p class="muted small">A escala só vale depois de aprovada.</p>', 'Enviar para aprovação')) return;
+  const agora = agoraISO();
+  try {
+    for (const s of rasc) {
+      const e = Object.assign({}, S.escalas[s]); delete e.devolucao;
+      await Store.set('escalas', s, Object.assign(e, { envio: { em: agora, por: S.usuarioNome || 'Funcionário' }, alteracoes: (e.alteracoes || []).concat([{ ts: agora, texto: 'Enviada para aprovação' + (S.usuarioNome ? ' por ' + S.usuarioNome : '') }]).slice(-200) }));
+    }
+    log('escala', 'Escala de ' + servMesNome(ym) + ' enviada para aprovação (' + rasc.length + ' semana(s))');
+    toast('Enviado. Agora é com o administrador.');
+  } catch (x) { }
+}
+function devolverEscala(ym) {
+  if (!ehAdmin()) return;
+  const env = semanasRascunho(ym).filter(s => S.escalas[s].envio);
+  if (!env.length) return toast('Não há escala enviada neste mês.');
+  const w = abrirModal(`<div class="mh">Devolver para ajustes</div><div class="mbd"><p style="margin-top:0">As ${env.length} semana(s) enviadas de ${servMesNome(ym)} voltam para quem montou, com o seu recado.</p>
+    <div class="fld"><label class="f">O que precisa ser ajustado</label><textarea id="dvMotivo" maxlength="400" style="width:100%;min-height:90px" placeholder="Ex.: trocar a folga da Ana com a do Bruno na 2ª semana"></textarea></div></div>
+    <div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Devolver</button></div>`);
+  w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+  w.querySelector('[data-x=s]').onclick = async () => {
+    const motivo = w.querySelector('#dvMotivo').value.trim(), agora = agoraISO();
+    fecharModal(w);
+    try {
+      for (const s of env) {
+        const e = Object.assign({}, S.escalas[s]); delete e.envio;
+        await Store.set('escalas', s, Object.assign(e, { devolucao: { em: agora, motivo }, alteracoes: (e.alteracoes || []).concat([{ ts: agora, texto: 'Devolvida para ajustes' + (motivo ? ': ' + motivo : '') }]).slice(-200) }));
+      }
+      log('escala', 'Escala de ' + servMesNome(ym) + ' devolvida para ajustes' + (motivo ? ': ' + motivo : ''));
+      toast('Escala devolvida para ajustes.');
+    } catch (x) { }
+  };
 }
 
 /* =====================================================================
@@ -3448,7 +3645,7 @@ function vHistorico() {
   }
   // alterações
   if (!S.auditoria.length) return h + '<div class="card empty"><b>Nenhuma alteração registrada</b></div>';
-  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x.semana ? ` <a href="#mensal" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Quem</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td style="white-space:nowrap">${x.porId ? '<b>' + esc(x.por || 'Funcionário') + '</b>' : esc(x.por || 'Administrador')}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x.semana ? ` <a href="#mensal" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   return h;
 }
 
@@ -3493,10 +3690,7 @@ function vBackup() {
     <div class="fld"><label class="f">Nova senha (mínimo 6 caracteres)</label><input type="password" id="snNova" autocomplete="new-password"></div>
     <div class="row"><button class="btn pri" data-act="trocarSenha">Trocar senha</button><button class="btn danger" data-act="sairNuvem">Sair deste aparelho</button></div>
     <p class="small muted mt">Trocar a senha desconecta os outros aparelhos.</p></div>
-  ${S.modo === 'nuvem' && S.papel === 'admin' ? `<div class="card" id="acessoCard"><h2>Acesso de funcionários</h2>
-    <p class="small muted" style="margin:0 0 10px">Convide a pessoa pelo e-mail. Ela cria a própria senha na tela de entrada. Ela vê só Escala e Serviços prestados.</p>
-    <div class="row mb"><input type="email" id="acEmail" placeholder="e-mail da funcionária" style="flex:1;min-width:200px"><button class="btn pri" data-act="acConvidar">Convidar</button></div>
-    <div id="acLista"><p class="small muted">Carregando…</p></div></div>` : ''}
+  <div class="card"><h2>Acesso de funcionários</h2><p class="muted" style="margin-top:0">Quem entra no sistema e o que cada pessoa pode fazer.</p><a class="btn pri" href="#usuarios">${ic('usuarios')} Abrir Usuários e Permissões</a></div>
   <div class="card"><h2>Backups automáticos do servidor</h2><div id="bkAuto"><button class="btn sm" data-act="listarBk">Ver backups automáticos</button></div></div>` : ''}
   <div class="card edit-only"><h2>Folha de folga</h2>
     <div class="fld"><label class="f">Nome da empresa (topo do sistema e WhatsApp)</label><input type="text" id="cfgNome" value="${esc(S.config.nomeHotel || '')}" maxlength="100"></div>
@@ -3525,6 +3719,8 @@ function vBackup() {
 async function acaoGerar(sem, opts) {
   opts = opts || {};
   const atual = S.escalas[sem];
+  if (!pode('escala')) { toast('Seu acesso não inclui a escala.'); return false; }
+  if (atual && atual.status === 'aprovada' && !ehAdmin()) { toast('Escala aprovada: só o administrador pode refazer.'); return false; }
   if (atual && !opts.semConfirmar) {
     const nb = Object.values(atual.atribuicoes || {}).filter(a => a.bloq).length;
     const ok = await confirmar('Regenerar escala?', `${semanaEspecial(atual) ? '<div class="alert w"><span class="ic">!</span><div><b>Atenção:</b> esta é uma semana especial (' + (atual.modo === 'festas' ? 'festas' : atual.modo === 'devolucao' ? 'devolução de folgas' : 'copiada do PDF de novembro') + '). Ao regenerar, ela vira uma semana normal e perde esse ajuste.</div></div>' : ''}<p>A escala de <b>${semanaLabel(sem)}</b> ${atual.status === 'aprovada' ? '<b>já está aprovada</b> e' : ''} será refeita automaticamente${nb ? `, mantendo as <b>${nb} combinação(ões) bloqueada(s)</b>` : ''}. Ela voltará para rascunho.</p>`, 'Regenerar');
@@ -3608,7 +3804,7 @@ const MOTIVOS_AJUSTE = { falta: 'Falta', troca: 'Troca de folga', outro: 'Outro'
 async function abrirEdicaoAprovada(sem) {
   const e = S.escalas[sem];
   if (!e || e.status !== 'aprovada') return;
-  if (S.somenteLeitura) { toast('Somente o administrador pode alterar a escala aprovada.'); return; }
+  if (S.somenteLeitura || !ehAdmin()) { toast('Somente o administrador pode alterar a escala aprovada.'); return; }
   const dias = C.diasDaSemana(sem);
   const orig = clone(e.atribuicoes);
   const nomeDe = id => (funcPorId(id) || orig[id]).nome;
@@ -3702,6 +3898,8 @@ async function escEditarDia(sem, fid, d) {
   const e = S.escalas[sem];
   if (!e || !e.atribuicoes || !e.atribuicoes[fid]) return;
   if (S.somenteLeitura) { toast('Somente o administrador pode alterar a escala.'); return; }
+  if (!pode('escala')) { toast('Seu acesso não inclui a escala.'); return; }
+  if (e.status === 'aprovada' && !ehAdmin()) { toast('Escala aprovada: só o administrador pode alterar.'); return; }
   const f = funcPorId(fid), orig = e.atribuicoes, nome = (f || orig[fid]).nome;
   const dias = C.diasDaSemana(sem);
   if (!dias.includes(d)) return;
@@ -3747,7 +3945,7 @@ async function escEditarDia(sem, fid, d) {
 }
 /* Aprova de uma vez todas as semanas em rascunho do mês. Se alguma tiver erro de regra, nenhuma é aprovada. */
 async function aprovarMes(ym) {
-  if (S.somenteLeitura) { toast('Somente o administrador pode aprovar a escala.'); return; }
+  if (S.somenteLeitura || !ehAdmin()) { toast('Somente o administrador pode aprovar a escala.'); return; }
   const { sems } = semanasDoMes(ym);
   const rasc = sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada');
   if (!rasc.length) { toast('Todas as semanas deste mês já estão aprovadas.'); return; }
@@ -4187,14 +4385,14 @@ function vtResumoHTML(m) {
 function vtCadastroHTML(m) {
   const ref = m.dias[m.dim - 1];
   const fs = vtOrdenados().filter(f => f.ativo || (f.vt && f.vt.hist && f.vt.hist.length));
-  let h = `<div class="alert i"><span class="ic">i</span><div>O valor diário é <b>valor da passagem × passagens por dia</b>. Ao mudar um valor, escolha a partir de quando ele vale: os meses anteriores continuam com o valor antigo.</div></div>
+  let h = `<div class="alert i"><span class="ic">i</span><div>O valor diário é <b>valor da passagem × passagens por dia</b>. ${ehAdmin() ? 'Ao mudar um valor, escolha a partir de quando ele vale: os meses anteriores continuam com o valor antigo.' : 'Os valores de cada funcionário são definidos pelo administrador.'}</div></div>
   <div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th>Chave Pix</th><th class="r">Valor da passagem</th><th class="r">Passagens/dia</th><th class="r">Valor diário</th><th>Vale desde</th><th></th></tr></thead><tbody>`;
   fs.forEach(f => {
     const v = C.vtValorEm(f, ref), nao = f.vt && f.vt.nao;
     const px = vtPix(f.id);
     h += `<tr><td><b>${esc(f.nome)}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>
     ${v && v.fixo ? `<td class="r" colspan="2">fixo por quinzena</td><td class="r"><b>${rs(v.q1)} + ${rs(v.q2)}</b></td>` : `<td class="r">${v ? rs(v.valor) : '—'}</td><td class="r">${v ? v.qtd : '—'}</td>`}${v && v.fixo ? '' : `<td class="r"><b>${v ? rs(v.total) : nao ? '<span class="badge b-off">não recebe</span>' : '<span class="badge b-err">não cadastrado</span>'}</b></td>`}
-    <td>${v ? (v.desde <= '2000-12-31' ? 'sempre' : C.dataBR(v.desde)) : ''}</td><td class="r"><button class="btn sm edit-only" data-act="vtValor" data-id="${f.id}">${ic('edit')} Editar</button></td></tr>`;
+    <td>${v ? (v.desde <= '2000-12-31' ? 'sempre' : C.dataBR(v.desde)) : ''}</td><td class="r">${ehAdmin() ? `<button class="btn sm edit-only" data-act="vtValor" data-id="${f.id}">${ic('edit')} Editar</button>` : ''}</td></tr>`;
   });
   return h + '</tbody></table></div>';
 }
@@ -4491,23 +4689,151 @@ async function vtExcel() {
    ===================================================================== */
 function irRota() {
   const h = (location.hash || '').replace('#', '');
-  if (S.papel === 'restrito' && !['diaria', 'mensal', 'servicos'].includes(h === 'escala' ? 'mensal' : h)) { location.hash = '#mensal'; return; }
-  UI.rota = ROTAS.some(r => r[0] === h) ? h : (h === 'escala' ? 'mensal' : (S.papel === 'restrito' ? 'mensal' : 'painel')); // a tela semanal foi retirada: só a escala mensal
+  UI.rota = ROTAS.some(r => r[0] === h) ? h : (h === 'escala' ? 'mensal' : rotaInicial()); // a tela semanal foi retirada: só a escala mensal
+  if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
+  if (UI.rota === 'usuarios') UI.usr = null; // ao abrir, busca a lista atual
+  if (S.precisaLogin) { S.loginModo = null; verConvite(); }
   document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on');
   render(); window.scrollTo(0, 0);
 }
 window.addEventListener('hashchange', irRota);
-async function acCarregar() {
-  const box = document.getElementById('acLista'); if (!box) return;
+/* =====================================================================
+   USUÁRIOS E PERMISSÕES (só o administrador)
+   ===================================================================== */
+async function usrCarregar() {
+  UI.usr = Object.assign({}, UI.usr, { carregando: true });
+  try { UI.usr = { dados: await Nuvem.rpc('esc_usuarios_listar', {}) }; }
+  catch (e) {
+    if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true);
+    UI.usr = { erro: e.code === 'SEM_CONEXAO' ? 'Sem conexão com a internet.' : /Could not find the function/.test(e.message || '') ? 'O servidor ainda não recebeu esta atualização.' : 'Não foi possível carregar os usuários.' };
+  }
+  if (UI.rota === 'usuarios') render();
+}
+const usrPorId = id => ((UI.usr && UI.usr.dados && UI.usr.dados.usuarios) || []).find(u => String(u.id) === String(id));
+const usrIniciais = n => (n || '?').trim().split(/\s+/).slice(0, 2).map(p => p.charAt(0).toUpperCase()).join('');
+const usrErro = e => ({ LIMITE_USUARIOS: 'O limite de funcionários com acesso foi atingido. Bloqueie o acesso atual antes de liberar outra pessoa.', LOGIN_EM_USO: 'Já existe um usuário com esse e-mail ou telefone.', LOGIN_INVALIDO: 'Informe um e-mail válido ou um telefone com DDD.', NOME_INVALIDO: 'Informe o nome (até 80 letras).', USUARIO_BLOQUEADO: 'Desbloqueie o acesso antes de enviar o convite.', SEM_CONEXAO: 'Sem conexão com a internet.', SEM_PERMISSAO: 'Só o administrador pode fazer isso.' }[e && e.code] || 'Não foi possível concluir. Tente de novo.');
+function vUsuarios() {
+  let h = `<div class="row mb"><div><h1>Usuários e Permissões</h1><p class="sub" style="margin:0">Quem entra no sistema e o que cada pessoa pode fazer</p></div></div>`;
+  if (S.modo !== 'nuvem') return h + '<div class="card empty"><b>Disponível na versão online</b>O controle de usuários funciona no sistema com login.</div>';
+  const u = UI.usr || {};
+  if (u.erro) return h + `<div class="alert e"><span class="ic">!</span><div>${esc(u.erro)} <a href="#" data-act="usrRecarregar">Tentar de novo</a></div></div>`;
+  if (!u.dados) return h + '<div class="loading"><div class="spin"></div>Carregando usuários…</div>';
+  const d = u.dados, lista = d.usuarios || [], ativos = lista.filter(x => x.ativo).length, max = d.max || 1, nAdm = (d.admin && d.admin.sessoes) || 1;
+  h += `<div class="card mb usr-card"><div class="usr-h"><span class="usr-av adm">${ic('lock')}</span><div class="usr-id"><b>Administrador</b><div class="small muted">Fabiano · acesso completo</div></div><span class="badge b-ok">Você</span></div>
+    <ul class="usr-pode"><li>Acessa todas as abas, os dados financeiros, as configurações e os backups</li><li>Cria, edita e bloqueia usuários e define as permissões</li><li>Aprova ou devolve as escalas e altera qualquer lançamento</li></ul>
+    <div class="usr-sess"><div class="small">Entra só com a <b>senha do sistema</b>. Não passe essa senha para funcionários: cada um tem a própria conta.<br>Aparelhos conectados como administrador: <b>${nAdm}</b></div>${nAdm > 1 ? '<button class="btn sm" data-act="usrEncerrar">Sair dos outros aparelhos</button>' : ''}</div></div>`;
+  h += `<div class="row mb" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">Funcionário com acesso</h2><div class="small muted">${ativos} de ${max} liberado${max > 1 ? 's' : ''}</div></div>${ativos < max ? `<button class="btn pri" data-act="usrNovo">${ic('plus')} Adicionar funcionário</button>` : ''}</div>`;
+  if (!lista.length) h += '<div class="card empty mb"><b>Nenhum funcionário com acesso</b>Toque em “Adicionar funcionário”. Você escolhe o que a pessoa pode fazer e envia um link para ela criar a própria senha.</div>';
+  lista.forEach(x => {
+    const pend = x.ativo && !x.tem_senha;
+    const st = !x.ativo ? '<span class="badge b-off">Bloqueado</span>' : pend ? '<span class="badge b-draft">Aguardando criar a senha</span>' : '<span class="badge b-ok">Ativo</span>';
+    const meta = [x.ultimo_acesso ? 'Último acesso: ' + dtHora(x.ultimo_acesso) : (x.tem_senha ? '' : 'Ainda não entrou'), x.ultima_atividade ? 'Último lançamento: ' + dtHora(x.ultima_atividade) : ''].filter(Boolean).join(' · ');
+    h += `<div class="card mb usr-card${x.ativo ? '' : ' off'}" data-usr="${x.id}"><div class="usr-h"><span class="usr-av">${esc(usrIniciais(x.nome))}</span><div class="usr-id"><b>${esc(x.nome)}</b><div class="small muted">${esc(fmtLogin(x.login))}</div></div>${st}</div>
+      ${meta ? `<div class="small muted usr-meta">${esc(meta)}</div>` : ''}
+      ${pend ? `<div class="alert w mt" style="margin-bottom:0"><span class="ic">!</span><div>${esc(x.nome.split(' ')[0])} ainda não criou a senha. Envie o link de convite${x.convite_valido ? '' : ' (o anterior venceu)'}.</div></div>` : ''}
+      <div class="usr-perms">${PERMS.map(([k, t, dsc]) => `<label class="usr-perm"><span class="usr-pt"><b>${t}</b><small>${dsc}</small></span><input type="checkbox" class="sw" data-usr-perm="${k}" data-id="${x.id}" ${x.permissoes && x.permissoes[k] ? 'checked' : ''} ${x.ativo ? '' : 'disabled'} aria-label="${t}"></label>`).join('')}</div>
+      <div class="usr-acoes">${!x.ativo ? `<button class="btn pri" data-act="usrBloquear" data-id="${x.id}" data-on="1">Desbloquear acesso</button>` : pend ? `<button class="btn pri" data-act="usrConvite" data-id="${x.id}">${ic('wa')} Enviar convite</button>` : `<button class="btn" data-act="usrConvite" data-id="${x.id}">Redefinir acesso</button>`}
+        <button class="btn" data-act="usrEditar" data-id="${x.id}">${ic('edit')} Editar</button><button class="btn" data-act="usrAtividade" data-id="${x.id}">Ver atividade</button>${x.ativo ? `<button class="btn danger" data-act="usrBloquear" data-id="${x.id}" data-on="0">Bloquear acesso</button>` : ''}</div></div>`;
+  });
+  h += `<div class="card"><h3 style="margin-bottom:6px">O que o funcionário nunca acessa</h3><div class="usr-nunca">${['Orçamentos', 'Contratos', 'Cadastro de funcionários', 'Setores', 'Histórico', 'Exportar', 'Backup e configurações', 'Senha do sistema', 'Usuários e permissões'].map(t => `<span class="chip">${t}</span>`).join('')}</div>
+    <p class="small muted" style="margin:10px 0 0">Também não aprova escala, não altera escala aprovada e não apaga lançamentos. Tudo o que ele grava fica registrado com o nome dele em <a href="#historico" data-act="histTab" data-t="alteracoes">Histórico → alterações</a>.</p></div>`;
+  return h;
+}
+function usrForm(id) {
+  const x = id ? usrPorId(id) : null;
+  abrirModal(`<div class="mh">${x ? 'Editar funcionário' : 'Adicionar funcionário'}</div><div class="mbd">
+    <div class="fld"><label class="f">Nome</label><input id="usNome" value="${esc(x ? x.nome : '')}" maxlength="80" autocomplete="off"></div>
+    <div class="fld"><label class="f">E-mail ou telefone (com DDD)</label><input id="usLogin" value="${esc(x ? fmtLogin(x.login) : '')}" autocapitalize="none" spellcheck="false" autocomplete="off" placeholder="ex.: (81) 99999-0000 ou nome@email.com"><div class="small muted" style="margin-top:4px">É com ele que a pessoa entra. A senha, é ela quem cria.</div></div>
+    ${x ? '' : `<label class="f">O que a pessoa pode fazer</label><div class="usr-perms" style="margin-top:4px">${PERMS.map(([k, t, dsc]) => `<label class="usr-perm"><span class="usr-pt"><b>${t}</b><small>${dsc}</small></span><input type="checkbox" class="sw" data-us-perm="${k}" checked aria-label="${t}"></label>`).join('')}</div>`}
+    <div id="usErro" class="small" style="color:var(--err);min-height:18px;margin-top:8px"></div>
+  </div><div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="usrSalvar" data-id="${x ? x.id : ''}">${x ? 'Salvar' : 'Salvar e gerar convite'}</button></div>`);
+}
+async function usrSalvar(el) {
+  const w = el.closest('.mbg'), id = el.dataset.id, nome = w.querySelector('#usNome').value.trim(), login = w.querySelector('#usLogin').value.trim();
+  const falha = m => { w.querySelector('#usErro').textContent = m; el.disabled = false; };
+  if (!nome) return falha('Informe o nome.');
+  if (!login) return falha('Informe o e-mail ou o telefone.');
+  el.disabled = true;
   try {
-    const lista = await Nuvem.rpc('esc_listar_usuarios', {});
-    if (!lista.length) { box.innerHTML = '<p class="small muted">Nenhum funcionário convidado ainda.</p>'; return; }
-    box.innerHTML = '<ul class="list-sm">' + lista.map(u => {
-      const situ = !u.ativo ? 'acesso revogado' : !u.tem_senha ? 'aguardando primeiro acesso' : 'ativo' + (u.ultimo_acesso ? ' · último acesso ' + dtHora(u.ultimo_acesso) : '');
-      return '<li><span><b>' + esc(u.email) + '</b><div class="small muted">' + situ + '</div></span><span class="row" style="gap:6px">' +
-        (u.ativo ? '<button class="btn sm" data-act="acResetar" data-id="' + esc(u.email) + '">Nova senha</button><button class="btn sm danger" data-act="acRevogar" data-id="' + esc(u.email) + '">Revogar</button>' : '') + '</span></li>';
-    }).join('') + '</ul>';
-  } catch (e) { box.innerHTML = '<p class="small" style="color:var(--err)">Não foi possível carregar a lista.</p>'; }
+    if (id) { await Nuvem.rpc('esc_usuario_editar', { p_id: +id, p_nome: nome, p_login: login }); fecharModal(w); toast('Dados atualizados.'); return usrCarregar(); }
+    const perms = {}; w.querySelectorAll('[data-us-perm]').forEach(c => { perms[c.dataset.usPerm] = c.checked; });
+    const r = await Nuvem.rpc('esc_usuario_criar', { p_nome: nome, p_login: login, p_permissoes: perms });
+    fecharModal(w);
+    await usrCarregar();
+    usrMostrarConvite(usrPorId(r.id) || { nome, login }, r.convite);
+  } catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); falha(usrErro(e)); }
+}
+/* Mensagem pronta com o link de convite: por ele a pessoa cria a própria senha */
+function usrMostrarConvite(x, codigo) {
+  const base = location.origin + location.pathname;
+  const link = base + '?c=' + codigo.slice(0, 6) + '#convite=' + codigo;
+  const tel = /^\d{10,11}$/.test(x.login || '') ? '55' + x.login : '';
+  const msg = 'Olá, ' + (x.nome || '').split(' ')[0] + '! Segue o seu acesso ao sistema do ' + (S.config.nomeHotel || 'hotel') + '.\n\n1) Toque no link e crie a sua senha:\n' + link + '\n\n2) Depois, para entrar:\n' + base + '#funcionario\nLogin: ' + fmtLogin(x.login) + '\n\nO link de criar a senha vale 7 dias e só funciona uma vez.';
+  const w = abrirModal(`<div class="mh">Convite de ${esc(x.nome || '')}</div><div class="mbd">
+    <p style="margin-top:0">Envie esta mensagem para <b>${esc((x.nome || '').split(' ')[0])}</b>. Pelo link, a pessoa cria a própria senha e já entra.</p>
+    <textarea id="cvTxt" readonly style="width:100%;min-height:210px">${esc(msg)}</textarea>
+    <p class="small muted">O link vale 7 dias e só funciona uma vez. Se você gerar outro, este deixa de valer.</p>
+  </div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button><button class="btn" data-x="cp">${ic('copy')} Copiar mensagem</button><a class="btn wa" id="cvWa" href="https://wa.me/${tel}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic('wa')} Enviar pelo WhatsApp</a></div>`);
+  w.querySelector('[data-x=cp]').onclick = async () => { const ok = await servCopiarTexto(msg); toast(ok ? 'Mensagem copiada. Cole no WhatsApp.' : 'Selecione o texto e copie manualmente.'); };
+}
+async function usrConvite(id) {
+  const x = usrPorId(id); if (!x) return;
+  if (x.tem_senha && !await confirmar('Redefinir o acesso de ' + esc(x.nome) + '?', '<p>A senha atual será apagada e os aparelhos dela serão desconectados na hora.</p><p class="muted">Você recebe um novo link de convite para enviar: por ele, a pessoa cria outra senha.</p>', 'Redefinir acesso', true)) return;
+  try { const r = await Nuvem.rpc('esc_usuario_convite', { p_id: +id, p_redefinir: !!x.tem_senha }); await usrCarregar(); usrMostrarConvite(x, r.convite); }
+  catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); toast(usrErro(e)); }
+}
+async function usrBloquear(id, ligar) {
+  const x = usrPorId(id); if (!x) return;
+  if (!ligar && !await confirmar('Bloquear o acesso de ' + esc(x.nome) + '?', '<p>Ela é desconectada na hora e não consegue mais entrar. Os lançamentos que fez continuam guardados.</p><p class="muted">Você pode desbloquear depois.</p>', 'Bloquear acesso', true)) return;
+  try { await Nuvem.rpc('esc_usuario_ativar', { p_id: +id, p_ativo: !!ligar }); toast(ligar ? 'Acesso desbloqueado.' : 'Acesso bloqueado.'); usrCarregar(); }
+  catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); if (e.code === 'LIMITE_USUARIOS') return modalMsg('Limite de acessos', '<p>' + usrErro(e) + '</p>'); toast(usrErro(e)); }
+}
+async function usrPermissao(chk) {
+  const x = usrPorId(chk.dataset.id); if (!x) return;
+  const k = chk.dataset.usrPerm, novas = Object.assign({}, x.permissoes, { [k]: chk.checked });
+  chk.disabled = true;
+  try { x.permissoes = await Nuvem.rpc('esc_usuario_permissoes', { p_id: +x.id, p_permissoes: novas }); toast((PERMS.find(p => p[0] === k) || [0, k])[1] + (chk.checked ? ': liberado.' : ': retirado.')); }
+  catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); toast(usrErro(e)); }
+  if (UI.rota === 'usuarios') render();
+}
+function usrAtividadeTexto(l) {
+  const mesBR = m => m && /^\d{4}-\d{2}$/.test(m) ? m.slice(5) + '/' + m.slice(0, 4) : (m || '');
+  if (l.acao === 'entrar') return 'Entrou no sistema';
+  if (l.acao === 'login_falhou') return 'Errou a senha ao entrar';
+  if (l.acao === 'criou_senha') return 'Criou a senha pelo convite';
+  if (l.acao === 'trocou_senha') return 'Trocou a própria senha';
+  if (l.acao !== 'salvar') return l.acao;
+  const doc = l.doc || '';
+  if (l.colecao === 'escalas') return 'Escala · semana de ' + (/^\d{4}-\d{2}-\d{2}$/.test(doc) ? semanaLabel(doc) : doc);
+  if (l.colecao === 'vt') return 'Vale-transporte · ' + mesBR(doc);
+  if (l.colecao === 'prestadores') return 'Cadastro de prestador · ' + _capNome((S.prestadores.find(p => p.id === doc) || {}).nome || 'prestador');
+  if (l.colecao === 'servicos') { const [m, pid] = doc.split('__'); return 'Serviços prestados · ' + (pid === 'lotes' ? 'lotes de pagamento' : _capNome((S.prestadores.find(p => p.id === pid) || {}).nome || 'prestador')) + ' · ' + mesBR(m); }
+  return l.colecao + ' · ' + doc;
+}
+async function usrAtividade(id) {
+  const x = usrPorId(id); if (!x) return;
+  let lista;
+  try { lista = await Nuvem.rpc('esc_usuario_atividade', { p_id: +id }); }
+  catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); return toast(usrErro(e)); }
+  const linhas = lista.length ? '<ul class="list-sm usr-ativ">' + lista.map(l => `<li><span>${esc(usrAtividadeTexto(l))}</span><span class="small muted" style="white-space:nowrap">${dtHora(l.em)}</span></li>`).join('') + '</ul>' : '<p class="muted">Nenhuma atividade registrada ainda.</p>';
+  abrirModal(`<div class="mh">Atividade de ${esc(x.nome)}</div><div class="mbd"><p class="small muted" style="margin-top:0">Registro feito pelo servidor a cada entrada e a cada gravação (últimos ${lista.length || 0}). A descrição de cada lançamento fica em Histórico → alterações.</p>${linhas}</div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button><a class="btn pri" href="#historico" data-act="histTab" data-t="alteracoes" onclick="fecharModal(this.closest('.mbg'))">Abrir o histórico</a></div>`, true);
+}
+/* ---------------- MINHA CONTA (funcionário) ---------------- */
+function vConta() {
+  const nenhuma = !PERMS.some(p => pode(p[0]));
+  return `<div class="row mb"><div><h1>Minha conta</h1><p class="sub" style="margin:0">Seu acesso ao sistema</p></div></div>
+  ${nenhuma ? '<div class="alert w"><span class="ic">!</span><div>Nenhuma função está liberada para você no momento. Fale com o administrador.</div></div>' : ''}
+  <div class="grid g2">
+  <div class="card"><div class="usr-h"><span class="usr-av">${esc(usrIniciais(S.usuarioNome))}</span><div class="usr-id"><b>${esc(S.usuarioNome || 'Funcionário')}</b><div class="small muted">Login: ${esc(fmtLogin(S.usuarioLogin))}</div></div></div>
+    <h3 style="margin:16px 0 4px">O que você pode fazer</h3>
+    <ul class="list-sm">${PERMS.map(([k, t, dsc]) => `<li><span><b>${t}</b><div class="small muted">${dsc}</div></span><span class="badge ${pode(k) ? 'b-ok' : 'b-off'}">${pode(k) ? 'Liberado' : 'Não liberado'}</span></li>`).join('')}</ul>
+    <p class="small muted mt" style="margin-bottom:0">Quem libera ou retira cada função é o administrador. Tudo o que você grava fica registrado com o seu nome.</p></div>
+  <div class="card"><h2>Trocar minha senha</h2>
+    <div class="fld"><label class="f">Senha atual</label><input type="password" id="mcAtual" autocomplete="current-password"></div>
+    <div class="fld"><label class="f">Nova senha (mínimo 6 caracteres)</label><input type="password" id="mcNova" autocomplete="new-password"></div>
+    <div class="row"><button class="btn pri" data-act="mcTrocar">Trocar senha</button><button class="btn danger" data-act="sairNuvem">Sair deste aparelho</button></div>
+    <p class="small muted mt" style="margin-bottom:0">Trocar a senha desconecta os seus outros aparelhos.</p></div>
+  </div>`;
 }
 function vAparencia() {
   const t = temaAtual();
@@ -4548,12 +4874,22 @@ document.addEventListener('change', async (ev) => {
 document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
+const ACOES_SO_ADMIN = ['aprovar', 'aprovarMes', 'reabrir', 'excluirEscala', 'editarAprovada', 'escDevolver', 'novoFunc', 'importarFunc', 'editFunc', 'transfFunc', 'delFunc', 'novoSetor', 'editSetor', 'setorMover', 'delSetor', 'addSug', 'delAntigas', 'ferAdd', 'ferDel', 'ferNac', 'trocarSenha', 'listarBk', 'baixarBk', 'backup', 'salvarCfg', 'removerAssinatura', 'vtValor', 'expPDF', 'expPrint', 'expXLS', 'baixarSetor', 'enviarSetor'];
+const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
+  if (!ehAdmin()) {
+    // a tela já não mostra estes botões ao funcionário; aqui é a segunda trava (a terceira é o servidor)
+    if (!act || act.startsWith('orc') || act.startsWith('usr') || ACOES_SO_ADMIN.includes(act)) { if (act) toast('Só o administrador pode fazer isso.'); return; }
+    if (ACOES_SERVICOS_COMPLETO.includes(act) && !pode('servicos')) return toast('Seu acesso não inclui esta função.');
+  }
   if (act && act.startsWith('orc') && window.orcAcao) return window.orcAcao(el, ev);
   const sem = UI.semana;
   switch (act) {
+    case 'escEnviar': return enviarParaAprovacao(el.dataset.mes || UI.mes);
+    case 'escDevolver': ev.preventDefault(); return devolverEscala(el.dataset.mes || UI.mes);
+    case 'irMes': UI.mes = el.dataset.mes; UI.visaoSemana = null; return;
     case 'servAnt': UI.servMes = servMesVizinho(UI.servMes || C.hojeISO().slice(0, 7), -1); return render();
     case 'servProx': UI.servMes = servMesVizinho(UI.servMes || C.hojeISO().slice(0, 7), 1); return render();
     case 'prestLista': return servPrestLista();
@@ -4579,6 +4915,7 @@ document.addEventListener('click', async ev => {
     }
     case 'servDiaTog': {
       if (S.somenteLeitura) return toast('Sem permissão para alterar agora.');
+      if (!pode('diarias')) return toast('Seu acesso não inclui o controle de diárias.');
       const mes = UI.servMes, pid = el.dataset.pid, dd = el.dataset.dd;
       const p = S.prestadores.find(x => x.id === pid); if (!p) return;
       const at = S.servicos[servKey(mes, pid)] || {};
@@ -4596,25 +4933,29 @@ document.addEventListener('click', async ev => {
     case 'baixarSetor': return enviarSetorPDF(el.dataset.id, false);
     case 'enviarSetor': return enviarSetorPDF(el.dataset.id);
     case 'alternarTema': return alternarTema();
-    case 'loginCriar': S.loginCriar = true; render(); return;
-    case 'loginVoltar': S.loginCriar = false; render(); return;
-    case 'acConvidar': {
-      const em = (document.getElementById('acEmail').value || '').trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast('Informe um e-mail válido.'); return; }
-      try { await Nuvem.rpc('esc_convidar', { p_email: em }); document.getElementById('acEmail').value = ''; toast('Convite criado. Ela cria a senha na tela de entrada.'); acCarregar(); }
-      catch (e) { toast('Não foi possível convidar: ' + (e.code === 'EMAIL_INVALIDO' ? 'e-mail inválido.' : e.message)); }
+    case 'loginModo': {
+      ev.preventDefault();
+      S.loginModo = el.dataset.m; S.convite = null;
+      if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } }
+      return render();
+    }
+    case 'usrNovo': return usrForm(null);
+    case 'usrEditar': return usrForm(id);
+    case 'usrSalvar': return usrSalvar(el);
+    case 'usrConvite': return usrConvite(id);
+    case 'usrBloquear': return usrBloquear(id, el.dataset.on === '1');
+    case 'usrAtividade': return usrAtividade(id);
+    case 'usrRecarregar': ev.preventDefault(); UI.usr = null; return render();
+    case 'usrEncerrar': {
+      if (!await confirmar('Sair dos outros aparelhos?', '<p>Todos os outros aparelhos conectados como <b>administrador</b> serão desconectados. Este continua conectado.</p><p class="muted">Os funcionários não são afetados. Se alguém mais souber a senha do sistema, troque-a em Backup e configurações.</p>', 'Desconectar os outros')) return;
+      try { const n = await Nuvem.rpc('esc_admin_encerrar_outras', {}); toast(n + ' aparelho(s) desconectado(s).'); usrCarregar(); } catch (e) { toast(usrErro(e)); }
       return;
     }
-    case 'acResetar': {
-      const em = el.dataset.id;
-      if (!await confirmar('Gerar nova senha?', '<p>A senha de <b>' + esc(em) + '</b> será apagada. Ela cria outra no próximo acesso e as sessões atuais são encerradas.</p>', 'Redefinir')) return;
-      try { await Nuvem.rpc('esc_resetar_senha_usuario', { p_email: em }); toast('Senha redefinida.'); acCarregar(); } catch (e) { toast('Não foi possível redefinir a senha.'); }
-      return;
-    }
-    case 'acRevogar': {
-      const em = el.dataset.id;
-      if (!await confirmar('Revogar acesso?', '<p><b>' + esc(em) + '</b> deixará de ter acesso ao sistema.</p>', 'Revogar', true)) return;
-      try { await Nuvem.rpc('esc_revogar_usuario', { p_email: em }); toast('Acesso revogado.'); acCarregar(); } catch (e) { toast('Não foi possível revogar o acesso.'); }
+    case 'mcTrocar': {
+      const at = document.getElementById('mcAtual').value, nv = document.getElementById('mcNova').value;
+      if (nv.length < 6) return toast('A nova senha precisa ter pelo menos 6 caracteres.');
+      try { await Nuvem.rpc('esc_minha_senha', { p_atual: at, p_nova: nv }); document.getElementById('mcAtual').value = ''; document.getElementById('mcNova').value = ''; modalMsg('Senha alterada', '<p>Sua senha foi trocada. Seus outros aparelhos precisarão entrar com a senha nova.</p>'); }
+      catch (e) { toast(e.code === 'SENHA_INCORRETA' ? 'Senha atual incorreta.' : e.code === 'SENHA_CURTA' ? 'A senha precisa ter de 6 a 72 caracteres.' : e.code === 'SEM_CONEXAO' ? 'Sem conexão.' : 'Não foi possível trocar a senha.'); }
       return;
     }
     case 'removerAssinatura': { if (!await confirmar('Remover assinatura?', '<p>Os próximos contratos sairão sem assinatura do gerente.</p>', 'Remover', true)) return; try { await Store.set('config', 'geral', Object.assign({}, S.config, { assinatura: null })); toast('Assinatura removida.'); } catch (e) { } return; }
@@ -4624,7 +4965,7 @@ document.addEventListener('click', async ev => {
     case 'escDia': return escEditarDia(el.dataset.sem, el.dataset.fid, el.dataset.d);
     case 'painelHoje': UI.painelDia = null; return render();
     case 'painelMais': UI.painelMais = UI.painelMais || {}; UI.painelMais[el.dataset.k] = !UI.painelMais[el.dataset.k]; return render();
-    case 'verSemana': UI.visaoSemana = el.dataset.sem; window.scrollTo(0, 0); return render();
+    case 'verSemana': UI.visaoSemana = el.dataset.sem; if (UI.rota !== 'mensal') { UI.mes = el.dataset.sem.slice(0, 7); if (el.tagName !== 'A') location.hash = '#mensal'; return; } window.scrollTo(0, 0); return render();
     case 'voltarMes': UI.visaoSemana = null; window.scrollTo(0, 0); return render();
     case 'alertaCat': { const c = el.dataset.cat; UI.alertaCat = UI.alertaCat === c ? null : c; render(); return; }
     case 'verHoje': {
@@ -4708,6 +5049,7 @@ document.addEventListener('click', async ev => {
     case 'selLimpar': UI.setoresSel = []; return render();
     case 'mesPDF': case 'mesXLS': case 'mesPrint': {
       const ids = setoresOrd().map(x => x.id).filter(id => (UI.setoresSel || []).includes(id));
+      if (!ehAdmin() && semanasRascunho(UI.mes).length) return modalMsg('Escala ainda não aprovada', '<p>A escala de ' + servMesNome(UI.mes) + ' tem semana(s) em rascunho. Só dá para baixar ou imprimir depois que o administrador aprovar.</p><p class="muted">Use <b>Enviar para aprovação</b>.</p>');
       if (!ids.length) return toast('Marque pelo menos um setor para baixar.');
       const antes = { p: UI.expPeriodo, e: UI.expEscopo, s: UI.expSetores };
       UI.expPeriodo = 'mes'; UI.expEscopo = 'setor'; UI.expSetores = ids;
@@ -4787,6 +5129,7 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
+  if (t.dataset && t.dataset.usrPerm) return usrPermissao(t);
   if (t.dataset && t.dataset.svc === 'dia') { window.__svcT = Date.now(); servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, t.value).catch(() => { }); return; }
   if (t.id === 'inServMes' && t.value) { UI.servMes = t.value; render(); return; }
   if (t.id === 'selPer') { UI.servPer = t.value; render(); return; }
@@ -4830,6 +5173,6 @@ document.addEventListener('touchstart', ev => {
 irRota();
 Store.init();
 </script>
-<script src="orcamentos.js"></script>
+<script src="orcamentos.js?v=1611c"></script>
 </body>
 </html>

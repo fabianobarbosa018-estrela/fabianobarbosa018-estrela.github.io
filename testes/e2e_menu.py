@@ -28,7 +28,7 @@ ITENS = [
     ('funcionarios', 'Funcionários', 'Gestão de pessoas'), ('setores', 'Setores', 'Gestão de pessoas'), ('contratos', 'Contratos', 'Gestão de pessoas'),
     ('orcamentos', 'Orçamentos', 'Operação'),
     ('servicos', 'Serviços prestados', 'Financeiro'), ('vt', 'Vale-transporte', 'Financeiro'), ('historico', 'Histórico', 'Financeiro'),
-    ('exportar', 'Exportar e compartilhar', 'Sistema'), ('backup', 'Backup e configurações', 'Sistema'), ('aparencia', 'Aparência e tema', 'Sistema'),
+    ('usuarios', 'Usuários e Permissões', 'Sistema'), ('exportar', 'Exportar e compartilhar', 'Sistema'), ('backup', 'Backup e configurações', 'Sistema'), ('aparencia', 'Aparência e tema', 'Sistema'),
 ]
 
 def novo(b, mobile=False):
