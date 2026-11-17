@@ -929,20 +929,25 @@
     partes.forEach(function (t) { var l = doc.splitTextToSize(t, larg); limite(l.length * 5 + 2); doc.text(l, M, y); y += l.length * 5 + 3; });
     y += 3;
     OrcCalc.clausulasContrato(c, nomeHotel(), HOTEL_CNPJ).forEach(function (cl) {
-      var tl = doc.splitTextToSize(cl.titulo, larg); limite(tl.length * 5 + 1);
+      var tl = doc.splitTextToSize(cl.titulo, larg);
+      var tx = doc.splitTextToSize(cl.texto, larg);
+      // o título nunca fica sozinho no fim da página: vai junto com as primeiras linhas do texto
+      limite(tl.length * 5 + 1 + Math.min(tx.length, 2) * 5);
       doc.setFont('helvetica', 'bold'); doc.text(tl, M, y); y += tl.length * 5 + 1;
       doc.setFont('helvetica', 'normal');
-      var tx = doc.splitTextToSize(cl.texto, larg); limite(tx.length * 5 + 4);
+      limite(tx.length * 5 + 4);
       doc.text(tx, M, y); y += tx.length * 5 + 4;
     });
     y += 6; limite(70);
-    doc.text('E, por estarem assim justos e contratados, assinam este instrumento em duas vias de igual teor.', M, y); y += 16;
+    var fecho = doc.splitTextToSize('E, por estarem assim justos e contratados, assinam este instrumento em duas vias de igual teor.', larg);
+    doc.text(fecho, M, y); y += fecho.length * 5 + 11;
     var linha = function (x, nome, sub) { doc.line(x, y, x + 78, y); doc.setFontSize(9); doc.text(nome, x, y + 5); if (sub) doc.text(sub, x, y + 9); };
     // assinatura do gerente (guardada nas configurações do sistema, não no repositório)
     var assin = S.config && S.config.assinatura;
     if (assin) {
       if (y - 36 < 22) { doc.addPage(); y = 40; }
-      try { doc.addImage(assin, /^data:image\/jpe?g/.test(assin) ? 'JPEG' : 'PNG', M + 2, y - 33, 60, 30); } catch (e) { }
+      // assinatura apoiada sobre a linha do CONTRATANTE (base da imagem logo acima da linha)
+      try { doc.addImage(assin, /^data:image\/jpe?g/.test(assin) ? 'JPEG' : 'PNG', M + 6, y - 29, 54, 28); } catch (e) { }
     }
     linha(M, 'CONTRATANTE', nomeHotel() + ' · Fabiano, gerente operacional'); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
     y += 22;
