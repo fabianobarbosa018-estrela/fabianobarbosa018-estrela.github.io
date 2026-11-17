@@ -737,6 +737,86 @@ table.list tr:hover td{background:#f8fbfc}
 .side.min .nav a{justify-content:center;padding:12px 0}
 .side.min .nav-g{height:1px;font-size:0;padding:0;margin:8px 14px;border-top:1px solid rgba(255,255,255,.15)}
 @media (max-width:900px){.menu-min{display:none}}
+/* Painel diário compacto */
+.pd{display:flex;flex-direction:column;gap:10px;max-width:760px;margin:0 auto}
+.pd *{box-sizing:border-box}
+.pd-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pd-dt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pd-dt b{font-size:17px;color:var(--ink)}
+.pd-st{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+.pd-st.ok{background:var(--ok-bg);color:var(--ok)}
+.pd-st.warn{background:#fff4d6;color:#a16207}
+.pd-dia{display:flex;gap:6px;align-items:center}
+.pd-dia input{height:34px;padding:4px 8px;font-size:13px;border-radius:9px;width:auto}
+.pd-aviso{font-size:12.5px;color:var(--ink2);margin-top:-4px}
+.pd-btn{height:34px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--pri);font-weight:700;font-size:13.5px;cursor:pointer}
+.pd-btn.pri{background:var(--pri);color:#fff;border-color:var(--pri)}
+.pd-ks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pd-k{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 11px;min-height:58px}
+.pd-ki{width:30px;height:30px;flex-shrink:0;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.pd-ki svg{width:19px;height:19px}
+.k-at .pd-ki{background:var(--pri-soft);color:var(--pri2)}
+.k-tr .pd-ki{background:var(--ok-bg);color:var(--ok)}
+.k-fo .pd-ki{background:#fff1dc;color:#c26d0a}
+.k-af .pd-ki{background:#fde4e4;color:#c43535}
+.pd-kt{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.pd-kt b{font-size:21px;color:var(--ink)}
+.pd-kt span{font-size:12.5px;color:var(--ink2);font-weight:600}
+.pd-kt small{font-size:11px;color:var(--ink3)}
+.pd-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.pd-card header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.pd-card header span{font-weight:800;font-size:14.5px;color:var(--ink)}
+.pd-n{min-width:26px;height:22px;padding:0 7px;border-radius:999px;background:var(--pri);color:#fff;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center}
+.pd-n.err{background:#c43535}.pd-n.warn{background:#c58a12}
+.pd-hoje{border-left:4px solid var(--ok)}
+.pd-lista{list-style:none;margin:0;padding:0}
+.pd-lista li{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.pd-lista li:last-child{border-bottom:0}
+.pd-dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.pd-nm{font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pd-nm em{font-style:normal;font-weight:600;font-size:11px;color:#c26d0a;background:#fff1dc;border-radius:6px;padding:1px 5px;margin-left:4px}
+.pd-meta{font-size:12.5px;color:var(--ink2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48vw}
+.pd-more{display:inline-flex;align-items:center;margin-top:6px;border:0;background:none;color:var(--pri2);font-weight:700;font-size:13px;padding:4px 0;cursor:pointer}
+.pd-vazio{font-size:13.5px;color:var(--ink2);padding:4px 0}
+.pd-vazio a{font-weight:700}
+.pd-sub{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.pd-sl{font-size:12.5px;font-weight:700;color:#c26d0a;white-space:nowrap;padding-top:3px;min-width:78px}
+.pd-sub-af .pd-sl{color:#c43535}.pd-sub-oc .pd-sl{color:var(--pri2)}
+.pd-sl b{margin-left:2px}
+.pd-nada{font-size:13px;color:var(--ink3);padding-top:3px}
+.pd-chips{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:0;align-items:center}
+.pd-chip{font-size:12.5px;font-weight:700;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.pd-chip small{font-weight:500;color:var(--ink3);margin-left:4px}
+.pd-chips .pd-more{margin-top:0}
+.pd-oc{margin:0;padding-left:16px;font-size:13px;color:var(--ink2);flex:1}
+.pd-sem-l{display:flex;align-items:center;gap:10px}
+.pd-sem-l>div{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.pd-sem-l b{font-size:14.5px;color:var(--ink)}
+.pd-sem-l small{font-size:12.5px;color:var(--ink2)}
+.pd-sem-i{width:32px;height:32px;border-radius:9px;background:var(--pri-soft);color:var(--pri2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pd-sem-i svg{width:19px;height:19px}
+.pd-badge{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pd-badge.ok{background:var(--ok-bg);color:var(--ok)}.pd-badge.pend{background:#fff4d6;color:#a16207}.pd-badge.none{background:#fde4e4;color:#c43535}
+.pd-alt{font-size:12px;color:#a16207;margin-top:6px}
+.pd-sem-b{display:flex;gap:8px;margin-top:9px}
+.pd-sem-b .pd-btn{flex:1}
+.pd-rap{display:grid;gap:6px}
+.pd-rap a{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 2px;font-size:11.5px;font-weight:700;color:var(--ink);text-decoration:none;text-align:center;line-height:1.15}
+.pd-rap a span{color:var(--pri2);display:flex}
+.pd-rap a svg{width:20px;height:20px}
+.pd-lk{font-size:13px;font-weight:700;color:var(--pri2);text-decoration:none;display:inline-flex;align-items:center;gap:2px}
+.pd-lk svg{width:14px;height:14px}
+.pd-fl{display:grid;grid-template-columns:1fr auto;column-gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.pd-fl span{color:var(--ink);font-weight:600}
+.pd-fl span small{color:var(--ink3);font-weight:500;margin-left:4px}
+.pd-fl b{color:var(--ink);text-align:right}
+.pd-fl>small{grid-column:1/-1;font-size:12px;color:var(--ink2)}
+.pd-fl-t{border-bottom:0;padding-bottom:0}
+.pd-fl-t b{font-size:16px;color:var(--pri)}
+.pd-atr{font-style:normal;color:#c43535;font-weight:700}
+.pd-al .card{border:0;padding:0;box-shadow:none;background:none;margin:0}
+.pd-al .card>.row:first-child{display:none}
+@media (min-width:700px){.pd-ks{grid-template-columns:repeat(4,1fr)}}
 /* Usuários e Permissões */
 .nav-quem{margin:14px 4px 4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.08);font-size:12px;line-height:1.3}
 .nav-quem b{display:block;color:#fff;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2735,7 +2815,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '17/11 12:20';
+const VERSAO_APP = '17/11 13:00';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -3109,70 +3189,65 @@ function vPainel() {
     bolt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
     dollar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.4-1-1.5-1.6-3-1.6-1.8 0-3 .9-3 2.2 0 3 6 1.5 6 4.4 0 1.3-1.3 2.2-3 2.2-1.6 0-2.7-.7-3.1-1.8M12 6v1.9M12 16.2V18"/></svg>'
   };
-  const nomeCurto = p => esc(p.nome);
-  const btnTodos = (k, total) => total > (k === 'trab' ? LIM : k === 'folg' ? 6 : 3) ? `<button class="pmx-more" data-act="painelMais" data-k="${k}">${mais[k] ? 'Ver menos' : 'Ver todos'} ${ico.chev}</button>` : '';
-  return `<div class="pmx">
-  <div class="pmx-top">
-    <div class="pmx-data"><span class="pmx-ic pmx-ic-cal">${ico.cal}</span><div><div class="pmx-dt">${esc(dExt)}</div>${souHoje ? '' : '<div class="pmx-sub-s">Dia selecionado</div>'}</div></div>
-    <span class="pmx-st ${stOp[1]}">${stOp[0]}</span>
+  // ---- painel compacto (celular primeiro) ----
+  const temDados = !!(e || diaristasDia.length);
+  const nAfast = afast.length + faltas.length;
+  const diaCurto = cap(C.DIAS[C.diaSemana(hoje)].toLowerCase()) + ', ' + C.dataBR(hoje);
+  const verTodos = (k, total, lim, rot) => total > lim ? `<button class="pd-more" data-act="painelMais" data-k="${k}">${mais[k] ? 'Ver menos' : (rot || 'Ver todos') + ' (' + total + ')'}</button>` : '';
+  const kpi = (cls, ic, n, rot, sub) => `<div class="pd-k ${cls}"><span class="pd-ki">${ic}</span><div class="pd-kt"><b>${n}</b><span>${rot}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+  const linhaTrab = p => `<li><span class="pd-dot"></span><span class="pd-nm">${esc(p.nome)}${p.diarista ? ' <em>diarista</em>' : ''}</span><span class="pd-meta">${esc(p.setor || '')}${p.horario ? ' · ' + esc(p.horario) : ''}</span></li>`;
+  const chips = (lista, k, lim, comTipo) => lista.length ? `<div class="pd-chips">${(mais[k] ? lista : lista.slice(0, lim)).map(p => `<span class="pd-chip">${esc(p.nome)}<small>${comTipo ? esc(p.tipo) : esc(p.setor || '')}</small></span>`).join('')}${verTodos(k, lista.length, lim)}</div>` : '';
+  const extras = [...trocas.map(a => `Troca de folga: ${esc(a.nome)} (${esc(a.antes)} → ${esc(a.depois)})`), ...cobrindo.map(s => `${esc(nomeId(s.cobertura))} cobre ${esc(nomeId(s.escalado))}`)];
+  const stSem = e ? (e.status === 'aprovada' ? ['Publicada', 'ok'] : e.envio ? ['Aguardando aprovação', 'pend'] : ['Pendente', 'pend']) : ['Não gerada', 'none'];
+  const podeEditarSem = e && !S.somenteLeitura && (ehAdmin() || e.status !== 'aprovada');
+  const atalhos = [
+    pode('escala') && ['#mensal', ico.cal, 'Escala mensal'],
+    ehAdmin() && ['#funcionarios', ico.users, 'Funcionários'],
+    (pode('servicos') || pode('diarias')) && ['#servicos', ico.dollar, 'Serviços'],
+    pode('vt') && ['#vt', ico.work, 'Vale-transp.'],
+    ehAdmin() && ['#orcamentos', ic('orcamentos'), 'Orçamentos']
+  ].filter(Boolean);
+  const al = ehAdmin() ? alertasGerais() : [];
+  const finLinha = (rot, r) => `<div class="pd-fl"><span>${rot}</span><b>${r.estado === 'ok' ? 'R$ ' + servMoeda(r.valor) : r.estado === 'nc' ? 'não calculado' : 'nada em aberto'}</b><small>${r.estado === 'ok' ? C.dataBR(r.data) + (r.atraso ? ' · <i class="pd-atr">em atraso</i>' : '') : ''}</small></div>`;
+  return `<div class="pd">
+  <div class="pd-top">
+    <div class="pd-dt"><b>${esc(diaCurto)}</b><span class="pd-st ${stOp[1]}">${stOp[0]}</span></div>
+    <div class="pd-dia"><input type="date" id="painelDia" value="${hoje}" aria-label="Escolher o dia">${souHoje ? '' : '<button class="pd-btn" data-act="painelHoje">Hoje</button>'}</div>
   </div>
-  <div class="pmx-dia"><input type="date" id="painelDia" value="${hoje}" aria-label="Dia do painel">${souHoje ? '' : '<button class="pmx-btn-sm" data-act="painelHoje">Voltar para hoje</button>'}</div>
+  ${souHoje ? '' : `<div class="pd-aviso">Mostrando ${esc(dExt)}</div>`}
 
-  <div class="pmx-kpis">
-    <div class="pmx-kpi"><span class="pmx-kico" style="color:#0f6b73">${ico.users}</span><div><div class="pmx-kl">Funcionários ativos</div><div class="pmx-kn">${ativos.length}</div><div class="pmx-ks">Equipe cadastrada${inatTxt()}</div></div></div>
-    <div class="pmx-kpi"><span class="pmx-kico" style="color:#1f9d55">${ico.check}</span><div><div class="pmx-kl">Trabalhando hoje</div><div class="pmx-kn">${e || diaristasDia.length ? trab.length : '—'}</div><div class="pmx-ks">${e ? 'Presentes na escala' : 'Sem escala nesta semana'}</div></div></div>
-    <div class="pmx-kpi"><span class="pmx-kico" style="color:#e08a1e">${ico.cal}</span><div><div class="pmx-kl">De folga hoje</div><div class="pmx-kn">${e ? folg.length : '—'}</div><div class="pmx-ks">${e ? 'Conforme a escala' : 'Sem escala nesta semana'}</div></div></div>
-    <div class="pmx-kpi"><span class="pmx-kico" style="color:#d33c3c">${ico.med}</span><div><div class="pmx-kl">Afastados hoje</div><div class="pmx-kn">${afast.length + faltas.length}</div><div class="pmx-ks">${afast.length + faltas.length ? esc([...new Set(afast.concat(faltas).map(p => p.tipo))].join(', ')) : 'Nenhum'}</div></div></div>
-  </div>
-
-  <section class="pmx-sec">
-    <header class="pmx-hd pmx-hd-teal"><span class="pmx-hd-ic">${ico.work}</span><span class="pmx-hd-t">Quem está trabalhando hoje</span><span class="pmx-hd-n">${e || diaristasDia.length ? trab.length : ''}</span></header>
-    ${(e || diaristasDia.length) && trab.length ? `<div class="pmx-tab"><div class="pmx-tr pmx-th"><span>Nome</span><span>Setor</span><span>Horário</span></div>
-      ${trabLista.map(p => `<div class="pmx-tr"><span class="pmx-nm"><i class="pmx-dot"></i>${nomeCurto(p)}</span><span>${esc(p.setor)}</span><span>${p.horario ? esc(p.horario) : '—'}</span></div>`).join('')}</div>
-      <div class="pmx-foot">${btnTodos('trab', trab.length)}</div>` : `<div class="pmx-vazio">${e || diaristasDia.length ? 'Ninguém previsto para trabalhar neste dia.' : 'Esta semana ainda não tem escala gerada.'}</div>`}
-  </section>
-
-  <section class="pmx-sec pmx-folga">
-    <div class="pmx-fg-h"><span class="pmx-fg-ic">${ico.bed}</span><div class="pmx-fg-t">Quem está de folga hoje</div><span class="pmx-fg-n">${e ? folg.length : ''}</span></div>
-    ${e && folg.length ? `<div class="pmx-nomes">${folgLista.map(p => `<span class="pmx-nome">${nomeCurto(p)} <small>${esc(p.setor)}</small></span>`).join('<span class="pmx-sep">•</span>')}</div>
-      <div class="pmx-foot">${btnTodos('folg', folg.length)}</div>` : `<div class="pmx-vazio">${e ? 'Ninguém de folga neste dia.' : 'Sem escala nesta semana.'}</div>`}
-  </section>
-
-  <section class="pmx-sec pmx-oc">
-    <div class="pmx-oc-h"><span class="pmx-oc-ic">${ico.alert}</span><div class="pmx-oc-t">Ocorrências de hoje</div>${ocorr.length ? `<span class="pmx-oc-n">${ocorr.length}</span>` : ''}</div>
-    ${ocorr.length ? `<ul class="pmx-oc-l">${ocLista.map(t => `<li>${t}</li>`).join('')}</ul>
-      <div class="pmx-foot">${ocorr.length > 3 ? `<button class="pmx-more" data-act="painelMais" data-k="oc">${mais.oc ? 'Ver menos' : 'Ver detalhes'} ${ico.chev}</button>` : ''}</div>` : '<div class="pmx-vazio">Nenhuma ocorrência registrada para este dia.</div>'}
-    ${nAltApos ? `<div class="pmx-alt">${nAltApos} alteração(ões) feitas depois da aprovação</div>` : ''}
-  </section>
-
-  <section class="pmx-sec pmx-esc">
-    <div class="pmx-esc-t">
-      <span class="pmx-esc-ic">${ico.cal}</span>
-      <div class="pmx-esc-tx"><div class="pmx-esc-h">Escala da semana <span class="pmx-badge ${e ? (e.status === 'aprovada' ? 'ok' : 'pend') : 'none'}">${e ? (e.status === 'aprovada' ? 'Publicada' : 'Pendente') : 'Não publicada'}</span></div>
-      <div class="pmx-esc-s">${esc(semanaLabel(sem))}${e ? ' · ' + ativos.filter(f => e.atribuicoes && e.atribuicoes[f.id]).length + ' funcionários' : ''}</div></div>
-    </div>
-    <div class="pmx-esc-b"><button class="pmx-btn-w" data-act="verSemana" data-sem="${sem}">Consultar ${ico.chev}</button>${e && !S.somenteLeitura && (ehAdmin() || e.status !== 'aprovada') ? `<button class="pmx-btn-w2" data-act="${e.status === 'aprovada' ? 'editarAprovada' : 'verSemana'}" data-sem="${sem}">Editar</button>` : ''}</div>
-  </section>
-
-  <h3 class="pmx-h3">Acesso rápido</h3>
-  <div class="pmx-rap">
-    ${pode('escala') ? `<a class="pmx-rt" href="#mensal" data-act="verSemana" data-sem="${sem}"><span>${ico.cal}</span>Escala<br>semanal</a>
-    <a class="pmx-rt" href="#mensal"><span>${ico.cal}</span>Escala<br>mensal</a>` : ''}
-    ${ehAdmin() ? `<a class="pmx-rt" href="#funcionarios"><span>${ico.users}</span>Funcionários</a>` : ''}
-    ${pode('vt') ? `<a class="pmx-rt" href="#vt"><span>${ico.work}</span>Vale-transporte</a>` : ''}
-    ${pode('servicos') || pode('diarias') ? `<a class="pmx-rt" href="#servicos"><span>${ico.dollar}</span>Serviços<br>prestados</a>` : ''}
-  </div>
-  ${ehAdmin() ? `
-  <h3 class="pmx-h3">Financeiro · próximos pagamentos</h3>
-  <div class="pmx-fin">
-    <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 20</div><div class="pmx-fi-s">Serviços prestados (dias 1 a 15)</div><div class="pmx-fi-v">${pagTxt(sp20)}</div></a>
-    <a class="pmx-fi" href="#servicos"><div class="pmx-fi-l">Dia 05</div><div class="pmx-fi-s">Serviços prestados (dias 16 ao fim do mês)</div><div class="pmx-fi-v">${pagTxt(sp05)}</div></a>
-    <a class="pmx-fi pmx-fi-ok" href="#servicos"><div class="pmx-fi-l">Já pago no mês</div><div class="pmx-fi-s">${MESES[+mesAtual.slice(5, 7) - 1].toLowerCase()} de ${mesAtual.slice(0, 4)} · ${jaPago.qtd} lote(s) pago(s)</div><div class="pmx-fi-v pmx-fi-big">R$ ${servMoeda(jaPago.total)}</div></a>
-    <a class="pmx-fi pmx-fi-p" href="#servicos"><div class="pmx-fi-l">Pendências do mês</div><div class="pmx-fi-s">${MESES[+mesAtual.slice(5, 7) - 1].toLowerCase()} de ${mesAtual.slice(0, 4)}</div><div class="pmx-fi-v">${pendTxt}</div></a>
+  <div class="pd-ks">
+    ${kpi('k-at', ico.users, ativos.length, 'Ativos', inatTxt().replace(' · ', ''))}
+    ${kpi('k-tr', ico.check, temDados ? trab.length : '—', 'Trabalhando', '')}
+    ${kpi('k-fo', ico.bed, e ? folg.length : '—', 'De folga', '')}
+    ${kpi('k-af', ico.med, nAfast, 'Afastados', '')}
   </div>
 
-  <h3 class="pmx-h3">Central de alertas</h3>
-  ${alertasBloco()}` : ''}
+  <section class="pd-card pd-hoje">
+    <header><span>Trabalhando ${souHoje ? 'hoje' : 'no dia'}</span><b class="pd-n">${temDados ? trab.length : 0}</b></header>
+    ${temDados && trab.length ? `<ul class="pd-lista">${trabLista.map(linhaTrab).join('')}</ul>${verTodos('trab', trab.length, LIM + trab.filter(p => p.diarista).length)}`
+      : `<div class="pd-vazio">${temDados ? 'Ninguém previsto para trabalhar neste dia.' : 'Esta semana ainda não tem escala.'}${!e && pode('escala') && !S.somenteLeitura ? ' <a href="#mensal">Gerar escala</a>' : ''}</div>`}
+    ${e ? `<div class="pd-sub"><span class="pd-sl">De folga <b>${folg.length}</b></span>${folg.length ? chips(folg, 'folg', 6) : '<span class="pd-nada">ninguém</span>'}</div>` : ''}
+    ${nAfast ? `<div class="pd-sub pd-sub-af"><span class="pd-sl">Afastados <b>${nAfast}</b></span>${chips(afast.concat(faltas), 'af', 6, true)}</div>` : ''}
+    ${extras.length ? `<div class="pd-sub pd-sub-oc"><span class="pd-sl">Ocorrências <b>${extras.length}</b></span><ul class="pd-oc">${(mais.oc ? extras : extras.slice(0, 3)).map(t => `<li>${t}</li>`).join('')}</ul>${verTodos('oc', extras.length, 3, 'Ver detalhes')}</div>` : ''}
+  </section>
+
+  <section class="pd-card pd-sem">
+    <div class="pd-sem-l"><span class="pd-sem-i">${ico.cal}</span><div><b>Escala da semana</b><small>${esc(semanaLabel(sem))}${e ? ' · ' + ativos.filter(f => e.atribuicoes && e.atribuicoes[f.id]).length + ' funcionários' : ''}</small></div><span class="pd-badge ${stSem[1]}">${stSem[0]}</span></div>
+    ${nAltApos ? `<div class="pd-alt">${nAltApos} alteração(ões) depois da aprovação</div>` : ''}
+    <div class="pd-sem-b"><button class="pd-btn" data-act="verSemana" data-sem="${sem}">Consultar</button>${podeEditarSem ? `<button class="pd-btn pri" data-act="${e.status === 'aprovada' ? 'editarAprovada' : 'verSemana'}" data-sem="${sem}">Editar</button>` : ''}</div>
+  </section>
+
+  ${atalhos.length ? `<nav class="pd-rap" style="grid-template-columns:repeat(${atalhos.length},1fr)">${atalhos.map(([h, i, t]) => `<a href="${h}"><span>${i}</span>${t}</a>`).join('')}</nav>` : ''}
+
+  ${ehAdmin() ? `<section class="pd-card pd-fin">
+    <header><span>Financeiro · próximos pagamentos</span><a href="#servicos" class="pd-lk">Abrir ${ico.chev}</a></header>
+    ${finLinha('Dia 20 <small>serviços 1 a 15</small>', sp20)}
+    ${finLinha('Dia 05 <small>serviços 16 ao fim</small>', sp05)}
+    <div class="pd-fl pd-fl-t"><span>Total em aberto${saldo.itens.some(x => x.atraso) ? ' <i class="pd-atr">há atraso</i>' : ''}</span><b>R$ ${servMoeda(saldo.total)}</b><small>já pago no mês: R$ ${servMoeda(jaPago.total)}${saldo.semData ? ' · ' + saldo.semData + ' lote(s) sem data' : ''}</small></div>
+  </section>` : ''}
+
+  ${al.length ? `<section class="pd-card pd-al"><header><span>Central de alertas</span><b class="pd-n ${al.some(a => a.t === 'e') ? 'err' : 'warn'}">${al.length}</b></header>${alertasBloco()}</section>` : ''}
 </div>`;
   function inatTxt() { const n = S.funcionarios.length - ativos.length; return n ? ' · ' + n + ' inativo(s)' : ''; }
 }
