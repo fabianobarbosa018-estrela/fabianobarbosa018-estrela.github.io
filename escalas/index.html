@@ -2172,6 +2172,10 @@ function servCalc(mes, pid) {
   const modal = p.modalidade || 'diaria';
   const diasTotal = r2(Object.values(l.dias || {}).reduce((a, v) => a + (+v || 0), 0));
   const valorMes = l.valor != null ? r2(l.valor) : r2(p.valor);
+  // Começou (ou voltou) no meio do mês: paga só do dia de início até o fim, em mês comercial de 30 dias (ex.: dia 4 = 27 dias)
+  const inicioDia = (modal === 'mensal' || modal === 'combinado') && +l.inicioDia > 1 ? Math.min(30, Math.round(+l.inicioDia)) : 0;
+  const diasServ = inicioDia ? 31 - inicioDia : 30;
+  const valorBase = inicioDia ? r2(valorMes * diasServ / 30) : valorMes;
   const lotes = servLotesMes(mes, grupoDe(p)), n = lotes.length;
   const pg = servPagosDoc(l);
   const ixDia = dia => lotes.findIndex(x => dia >= x.de && dia <= x.ate);
@@ -2182,7 +2186,7 @@ function servCalc(mes, pid) {
   const g = lotes.map(() => 0);
   if (tem) {
     if (modal === 'diaria') Object.entries(l.dias || {}).forEach(([dd, v]) => { const i = ixDia(+dd); if (i >= 0) g[i] += +v || 0; });
-    else if (modal === 'mensal' || modal === 'combinado') lotes.forEach((x, i) => { g[i] += valorMes * pctDe(x) / 100; });
+    else if (modal === 'mensal' || modal === 'combinado') lotes.forEach((x, i) => { g[i] += valorBase * pctDe(x) / 100; });
     (l.extras || []).forEach(x => { g[ixItem(x)] += +x.valor || 0; });
   }
   const soma = arr => { const q = lotes.map(() => 0); (arr || []).forEach(x => { q[ixItem(x)] += +x.valor || 0; }); return q.map(r2); };
@@ -2201,7 +2205,7 @@ function servCalc(mes, pid) {
   const liquido = r2(valores.reduce((a, v) => a + v, 0));
   const pago = r2(pagos.filter(x => x.pago).reduce((a, x) => a + (x.valorPago != null ? x.valorPago : x.valor), 0));
   const r = {
-    p, l, modal, diasTotal, valorMes, lotes, g: gg, dsc, adi,
+    p, l, modal, diasTotal, valorMes, valorBase, inicioDia, diasServ, lotes, g: gg, dsc, adi,
     extras: r2((l.extras || []).reduce((a, x) => a + (+x.valor || 0), 0)),
     bruto, desc: r2(dsc.reduce((a, v) => a + v, 0)), adiant: r2(adi.reduce((a, v) => a + v, 0)), descSobra: sobra,
     descItens: (l.descontos || []).map(x => ({ desc: x.desc || 'Desconto', valor: r2(+x.valor || 0), lote: lotes[ixItem(x)] ? lotes[ixItem(x)].nome : '' })),
@@ -2368,7 +2372,7 @@ function vServicos() {
     const acao = svFull && lote && q.valor > 0 ? (q.pagoOk ? (q.saldo > 0.004 ? `<button class="btn sm pri" data-act="servPagarDif" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Pagar diferença R$ ${servMoeda(q.saldo)}</button>` : '') + `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` :`<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
     const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
     const abre = c.modal === 'diaria' && svDia ? ` data-act="servAbrirDia" data-pid="${c.p.id}" style="cursor:pointer" title="Abrir para lançar os dias"` : '';
-    return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}</div></div><span class="svc-badge">${estado}</span></div>
+    return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}${c.inicioDia ? ` · <b>começou dia ${c.inicioDia}: ${c.diasServ} de 30 dias (R$ ${servMoeda(c.valorBase)})</b>` : ''}</div></div><span class="svc-badge">${estado}</span></div>
       <div class="svc-grid"><div><span>Dias trabalhados</span><b>${nDias}</b></div><div><span>A receber</span><b>R$ ${servMoeda(q.valor)}</b></div><div><span>Já pago</span><b>R$ ${servMoeda(q.pago)}</b></div><div><span>Saldo</span><b class="${q.saldo > 0.004 ? 'neg' : ''}">R$ ${servMoeda(q.saldo)}</b></div></div>
       ${(c.descItens || []).length ? `<div class="small" style="margin:6px 0;color:#C00000"><b>Descontos</b> · abatidos ${lote ? 'deste lote' : 'no mês'}: R$ ${servMoeda(lote ? c.dsc[idx] : c.desc)}${c.descItens.map(d => `<div>• ${esc(d.desc)}: R$ ${servMoeda(d.valor)} <span class="muted">(${esc(d.lote)})</span></div>`).join('')}${c.descSobra > 0 ? `<div class="muted">Não coube no saldo: R$ ${servMoeda(c.descSobra)}</div>` : ''}</div>` : ''}
       ${pix}<div class="svc-acoes">${svFull ? `<button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>` : ''}${acao}</div></div>`;
@@ -2419,7 +2423,10 @@ function servAjustes(mes, pid) {
   const pct = c.modal === 'mensal' || c.modal === 'combinado';
   const bloco = (k, titulo, btn) => `<div class="mt"><b>${titulo}</b><div id="ajC_${k}">${(l[k] || []).map(x => servAjLinha(k, x)).join('')}</div><button class="btn sm mt" data-act="ajAdd" data-k="${k}">+ ${btn}</button></div>`;
   const valorBloco = pct
-    ? `<div class="mt"><b>${c.modal === 'mensal' ? 'Valor mensal' : 'Valor combinado'}</b><input id="ajValor" type="number" step="0.01" min="0" value="${c.valorMes}"></div>`
+    ? `<div class="mt"><b>${c.modal === 'mensal' ? 'Valor mensal' : 'Valor combinado'}</b><input id="ajValor" type="number" step="0.01" min="0" value="${c.valorMes}"></div>
+       <div class="mt"><b>Começou no dia</b> <span class="small muted">(só se começou no meio do mês; vazio = mês inteiro)</span>
+         <input id="ajInicio" type="number" min="1" max="30" step="1" inputmode="numeric" placeholder="1" value="${c.inicioDia || ''}" style="max-width:110px">
+         <div class="small muted" id="ajInicioTxt">${c.inicioDia ? 'Paga do dia ' + c.inicioDia + ' ao dia 30: ' + c.diasServ + ' de 30 dias = R$ ' + servMoeda(c.valorBase) : 'Mês inteiro (30 dias).'}</div></div>`
     : `<div class="small muted mt">${c.modal === 'diaria' ? 'Diária: o total vem da soma dos dias lançados, separado pelos lotes de cada dia.' : 'Serviços extras: o total vem só dos serviços listados abaixo.'}</div>`;
   const lotesBloco = c.pagos.map(x => {
     const campoPct = pct ? `<label class="small">% <input data-f="pct" type="number" min="0" max="100" step="0.01" value="${x.pct}" style="width:90px"></label>` : '<span class="small muted">diária</span>';
@@ -2435,6 +2442,12 @@ function servAjustes(mes, pid) {
     </div>
     <div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="ajSalvar" data-pid="${pid}" data-mes="${mes}">Salvar</button></div>`, true);
 }
+document.addEventListener('input', ev => {
+  if (!ev.target || (ev.target.id !== 'ajInicio' && ev.target.id !== 'ajValor')) return;
+  const w = ev.target.closest('.mbg'), t = w && w.querySelector('#ajInicioTxt'); if (!t) return;
+  const v = r2((w.querySelector('#ajValor') || {}).value || 0), d = Math.round(+(w.querySelector('#ajInicio') || {}).value || 0);
+  t.textContent = d > 1 && d <= 30 ? 'Paga do dia ' + d + ' ao dia 30: ' + (31 - d) + ' de 30 dias = R$ ' + servMoeda(r2(v * (31 - d) / 30)) : 'Mês inteiro (30 dias).';
+});
 async function servAjSalvar(el) {
   const w = el.closest('.mbg'), mes = el.dataset.mes, pid = el.dataset.pid;
   const lerLinhas = k => [...w.querySelectorAll(`.ajrow[data-k="${k}"]`)].map(r => {
@@ -2456,6 +2469,7 @@ async function servAjSalvar(el) {
     pagos
   };
   const vi = w.querySelector('#ajValor'); if (vi) patch.valor = r2(vi.value);
+  const ii = w.querySelector('#ajInicio'); if (ii) { const d = Math.round(+ii.value || 0); patch.inicioDia = d > 1 && d <= 30 ? d : null; }
   fecharModal(w);
   try { await servSalvar(mes, pid, patch); log('servicos', 'Ajustes de ' + ((S.prestadores.find(x => x.id === pid) || {}).nome || '') + ' em ' + mes); } catch (e) { }
   render();
@@ -2846,7 +2860,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '17/11 15:30';
+const VERSAO_APP = '17/11 16:00';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
