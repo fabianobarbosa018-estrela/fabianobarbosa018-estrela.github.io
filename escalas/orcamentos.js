@@ -935,10 +935,11 @@
       limite(tl.length * 5 + 1 + Math.min(tx.length, 2) * 5);
       doc.setFont('helvetica', 'bold'); doc.text(tl, M, y); y += tl.length * 5 + 1;
       doc.setFont('helvetica', 'normal');
-      limite(tx.length * 5 + 4);
-      doc.text(tx, M, y); y += tx.length * 5 + 4;
+      // o texto quebra linha a linha entre as páginas (o título fica junto da primeira linha)
+      tx.forEach(function (ln) { if (y + 5 > 280) { doc.addPage(); y = 22; } doc.text(ln, M, y); y += 5; });
+      y += 4;
     });
-    y += 14; limite(70);
+    y += 30; limite(70);
     var linha = function (x, nome, sub) { doc.line(x, y, x + 78, y); doc.setFontSize(9); doc.text(nome, x, y + 5); if (sub) doc.text(sub, x, y + 9); };
     // assinatura do gerente (guardada nas configurações do sistema, não no repositório)
     var assin = S.config && S.config.assinatura;
