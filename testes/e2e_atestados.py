@@ -20,15 +20,15 @@ def check(cond, msg):
         falhas.append(msg)
 
 
-def gerar_atestado(caminho):
+def gerar_atestado(caminho, nome='ANA SILVA', dias='5 (cinco)', inicio='16/11/2026', cid='J11', local=None):
     W, H = 1240, 1500
     im = Image.new('RGB', (W, H), 'white'); d = ImageDraw.Draw(im)
     fn = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
     d.text((380, 120), 'ATESTADO MÉDICO', font=ImageFont.truetype(fn.replace('Sans.', 'Sans-Bold.'), 48), fill='black')
     y = 300
-    for l in ['Atesto, para os devidos fins, que a paciente', 'ANA SILVA esteve sob meus cuidados nesta data',
-              'e necessita de 5 (cinco) dias de afastamento de', 'suas atividades a partir de 16/11/2026.', '',
-              'CID: J11', '', 'Recife, 16/11/2026', '', 'Dr. Paulo Mendes - CRM 12345 PE']:
+    for l in ['Atesto, para os devidos fins, que a paciente', nome + ' esteve sob meus cuidados nesta data',
+              'e necessita de ' + dias + ' dias de afastamento de', 'suas atividades a partir de ' + inicio + '.', '',
+              'CID: ' + cid, '', local or ('Recife, ' + inicio), '', 'Dr. Paulo Mendes - CRM 12345 PE']:
         d.text((120, y), l, font=ImageFont.truetype(fn, 38), fill='black'); y += 70
     im.save(caminho)
 
@@ -131,6 +131,51 @@ def run():
         aj = ajustes(ponte)
         check(not any(d in aj for d in dias), 'cancelamento: VT volta ao que era antes')
         check(ponte.sql("select status, cancelado_por is not null from esc_atestados")[0] == ('cancelado', True), 'cancelamento fica registrado com quem cancelou')
+
+        # ---------- vários documentos de uma vez ----------
+        import shutil
+        i1, i2 = os.path.join(tmp, 'bruno.png'), os.path.join(tmp, 'carla.png')
+        gerar_atestado(i1, 'BRUNO SANTOS', '3 (três)', '10/11/2026', 'M54', 'Recife, 10 de novembro de 2026'); gerar_atestado(i2, 'CARLA SOUZA', '2 (dois)', '12/11/2026', 'A09', 'Recife, 12 de novembro de 2026')
+        i3 = os.path.join(tmp, 'bruno_copia.png'); shutil.copy(i1, i3)
+        A.goto(BASE + '#atestados'); A.wait_for_timeout(500)
+        if A.locator('[data-act="atsLista"]').count(): A.click('[data-act="atsLista"]')
+        A.wait_for_selector('#atsArquivo', state='attached', timeout=20000)
+        check(A.locator('#atsArquivo').get_attribute('multiple') is not None, 'envio aceita vários arquivos')
+        A.set_input_files('#atsArquivo', [i1, i2, i3])
+        A.wait_for_selector('[data-act="atsLoteSair"]', timeout=300000); A.wait_for_timeout(800)
+        lt = A.locator('#view').inner_text()
+        check('3 documento(s) lidos' in lt, 'lote: os 3 documentos lidos')
+        check('Bruno' in lt and 'Carla' in lt, 'lote: identificou Bruno e Carla')
+        check('Documento repetido nesta seleção' in lt, 'lote: a cópia do mesmo documento fica bloqueada')
+        check(A.locator('[data-act="atsLoteLancar"]').count() == 1 and 'Lançar os 2 prontos' in A.locator('[data-act="atsLoteLancar"]').inner_text(), 'lote: 2 prontos para lançar')
+        A.screenshot(path=os.path.join(tmp, 'lote.png'), full_page=True)
+        A.click('[data-act="atsLoteLancar"]'); A.wait_for_function("() => document.querySelectorAll('.ats-item .b-ok').length >= 2 && ![...document.querySelectorAll('button')].some(b => b.textContent.includes('Lançando'))", timeout=30000); A.wait_for_timeout(800)
+        ab, ac = ajustes(ponte, 'f2'), ajustes(ponte, 'f3')
+        check(all(ab.get('2026-11-%02d' % d, {}).get('t') == 'atestado' for d in (10, 11, 12)) and '2026-11-13' not in ab, 'lote: Bruno 10 a 12/11 no VT')
+        check(all(ac.get('2026-11-%02d' % d, {}).get('t') == 'atestado' for d in (12, 13)) and '2026-11-14' not in ac, 'lote: Carla 12 e 13/11 no VT')
+        check(ponte.sql("select count(*) from esc_atestados where status='ativo'")[0][0] == 2, 'lote: 2 atestados registrados (a cópia não)')
+        A.click('[data-act="atsLoteRemover"]'); A.wait_for_timeout(300)
+        A.click('[data-act="atsLoteSair"]'); A.wait_for_selector('#atsArquivo', state='attached', timeout=10000); A.wait_for_timeout(800)
+        check(A.locator('.ats-item').count() >= 3, 'lista mostra os lançados do lote')
+
+        # lote com um documento que precisa de conferência: conferir, completar e lançar
+        i4, i5 = os.path.join(tmp, 'ana2.png'), os.path.join(tmp, 'carla2.png')
+        gerar_atestado(i4, 'ANA SILVA', '2 (dois)', '02/11/2026', 'J11')  # emissão sai em dúvida na leitura
+        gerar_atestado(i5, 'CARLA SOUZA', '1 (um)', '14/11/2026', 'A09', 'Recife, 14 de novembro de 2026')
+        A.set_input_files('#atsArquivo', [i4, i5]); A.wait_for_selector('[data-act="atsLoteSair"]', timeout=300000); A.wait_for_timeout(800)
+        itens = A.locator('.ats-item')
+        idx = [k for k in range(itens.count()) if 'Ana' in itens.nth(k).inner_text()]
+        if idx and 'Conferir' in itens.nth(idx[0]).locator('.badge').inner_text():
+            itens.nth(idx[0]).locator('[data-act="atsLoteConferir"]').click(); A.wait_for_selector('#atsEmissao')
+            check('Documento ' in A.locator('#view').inner_text() and 'Voltar à lista' in A.locator('#view').inner_text(), 'conferir dentro do lote mostra a posição e "Voltar à lista"')
+            A.fill('#atsEmissao', '2026-11-02'); A.dispatch_event('#atsEmissao', 'change'); A.wait_for_timeout(600)
+            A.click('[data-act="atsConfirmar"]'); A.wait_for_selector('[data-act="atsLoteSair"]', timeout=20000); A.wait_for_timeout(600)
+        a2 = ajustes(ponte, 'f1')
+        check(a2.get('2026-11-02', {}).get('t') == 'atestado' and a2.get('2026-11-03', {}).get('t') == 'atestado', 'lote: Ana conferida e lançada, volta à lista do lote')
+        check(ponte.sql("select emissao::text from esc_atestados where func_id='f1' and status='ativo'")[0][0] == '2026-11-02', 'lote: emissão completada pelo administrador gravada')
+        if A.locator('[data-act="atsLoteLancar"]').count():
+            A.click('[data-act="atsLoteLancar"]'); A.wait_for_timeout(2500)
+        check(ajustes(ponte, 'f3').get('2026-11-14', {}).get('t') == 'atestado', 'lote: o outro documento lançado em seguida')
 
         check(not erros_pagina, 'sem erros na página: %s' % erros_pagina[:3])
         b.close()

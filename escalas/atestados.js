@@ -75,13 +75,14 @@
   function vAtestados() {
     const s = st();
     if (S.modo !== 'nuvem') return '<h1>Atestados</h1><div class="card empty"><b>Disponível na versão online</b></div>';
-    if (s.etapa === 'lendo') return cab() + `<div class="card ats-lendo"><div class="spin"></div><b>Lendo o documento…</b><p class="muted small">${esc(s.progresso || 'Preparando')}</p><p class="small muted">Na primeira vez o aparelho baixa o leitor (cerca de 10 MB). A leitura é feita no próprio aparelho: o documento não vai para nenhum serviço de fora.</p></div>`;
+    if (s.etapa === 'lendo') return cab() + `<div class="card ats-lendo"><div class="spin"></div><b>${s.loteTotal > 1 ? 'Lendo documento ' + s.loteAtual + ' de ' + s.loteTotal + '…' : 'Lendo o documento…'}</b><p class="muted small">${esc(s.progresso || 'Preparando')}</p><p class="small muted">Na primeira vez o aparelho baixa o leitor (cerca de 10 MB). A leitura é feita no próprio aparelho: o documento não vai para nenhum serviço de fora.</p></div>`;
     if (s.etapa === 'conferir') return cab() + telaConferir();
     if (s.etapa === 'feito') return cab() + telaFeito();
+    if (s.etapa === 'lote') return cab() + telaLote();
     if (!s.lista && !s.carregando && !s.erro) carregar();
     return cab() + `<div class="card ats-env">
-      <div><b>Enviar atestado</b><p class="small muted" style="margin:4px 0 0">Foto ou PDF. O sistema lê, identifica o funcionário e prepara tudo. Você só confere e confirma.</p></div>
-      <label class="btn pri ats-file">${ic('plus')} Enviar foto ou PDF<input type="file" id="atsArquivo" accept="image/*,application/pdf" hidden></label>
+      <div><b>Enviar atestado</b><p class="small muted" style="margin:4px 0 0">Foto ou PDF, um ou vários de uma vez. O sistema lê, identifica o funcionário e prepara tudo. Você só confere e confirma.</p></div>
+      <label class="btn pri ats-file">${ic('plus')} Enviar fotos ou PDFs<input type="file" id="atsArquivo" accept="image/*,application/pdf" multiple hidden></label>
       <button class="btn sm" data-act="atsManual">Lançar sem documento</button></div>` + telaLista();
   }
   const cab = () => `<div class="row mb"><div><h1>Atestados</h1><p class="sub" style="margin:0">Envie uma vez: escala, vale-transporte, painel e funcionários são atualizados juntos</p></div></div>`;
@@ -116,6 +117,7 @@
     let h = '<div class="ats-conf">';
     if (L && L.previa) h += `<div class="card ats-doc"><img src="${L.previa}" alt="Atestado enviado"><div class="small muted">${L.tipo === 'pdf' ? 'PDF' : 'Foto'} · leitura ${Math.round(L.confianca || 0)}%</div></div>`;
     h += '<div class="ats-campos">';
+    if (s.loteIdx != null) h += `<div class="small muted">Documento ${s.loteIdx + 1} de ${s.lote.length}${s.lote[s.loteIdx].nome ? ' · ' + esc(s.lote[s.loteIdx].nome) : ''}</div>`;
     if (s.corrigindo) h += `<div class="alert i"><span class="ic">i</span><div>Corrigindo o atestado lançado. Ao salvar, o que foi lançado antes é desfeito e lançado de novo com os dados abaixo.</div></div>`;
     else if (L) h += L.dados.seguro && !(L.dados.avisos || []).length
       ? `<div class="alert s"><span class="ic">✓</span><div><b>Documento lido com segurança.</b> Confira e confirme.</div></div>`
@@ -147,7 +149,7 @@
       if ((v.marcados || []).length) h += `<div class="alert i"><span class="ic">i</span><div>Já marcado nesses dias: ${v.marcados.map(x => br(x.data).slice(0, 5) + ' ' + ((C.VT_TIPOS[x.t] || {}).nome || x.t).toLowerCase()).join(', ')}. O atestado fica no lugar; se ele for cancelado, volta o que estava.</div></div>`;
     }
     h += '</div>';
-    h += `<div class="row ats-bts"><button class="btn" data-act="atsVoltar">Cancelar</button><button class="btn ok" data-act="atsConfirmar" ${bloqueio ? 'disabled' : ''}>${ic('check')} ${s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'}</button></div>`;
+    h += `<div class="row ats-bts"><button class="btn" data-act="atsVoltar">${s.loteIdx != null ? 'Voltar à lista' : 'Cancelar'}</button><button class="btn ok" data-act="atsConfirmar" ${bloqueio ? 'disabled' : ''}>${ic('check')} ${s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'}</button></div>`;
     return h + '</div></div>';
   }
 
@@ -160,6 +162,110 @@
         <li><span>Painel: em "Afastados" até ${br(r.fim)}</span></li>
         <li><span>Histórico: registrado com o seu nome e o horário</span></li></ul>
       <div class="row mt"><a class="btn" href="#painel">Ver no painel</a><a class="btn" href="#vt">Ver no vale-transporte</a><a class="btn" href="#mensal" data-act="verSemana" data-sem="${C.inicioSemana(r.inicio)}">Ver na escala</a><button class="btn pri" data-act="atsLista">Voltar aos atestados</button></div></div>`;
+  }
+
+  /* ---------- vários documentos de uma vez ---------- */
+  function itemPronto(it) { return it.status === 'pendente' && !it.bloqueio && !it.conflitoLote && it.L.dados.seguro && !(it.L.dados.avisos || []).length && !it.editado; }
+  function situacaoItem(it) {
+    if (it.status === 'lancado') return '<span class="badge b-ok">Lançado</span>';
+    if (it.status === 'erro') return '<span class="badge b-err">Não lançado</span>';
+    if (it.status === 'removido') return '<span class="badge b-off">Removido</span>';
+    if (it.bloqueio || it.conflitoLote) return '<span class="badge b-err">Bloqueado</span>';
+    return itemPronto(it) ? '<span class="badge b-ok">Pronto</span>' : '<span class="badge" style="background:#fff4d6;color:#a16207">Conferir</span>';
+  }
+  function motivoItem(it) {
+    if (it.status === 'erro') return it.msg;
+    if (it.status !== 'pendente') return '';
+    const v = it.verif || {};
+    if (v.mesmo_arquivo) return 'Este documento já foi lançado antes.';
+    if ((v.sobrepostos || []).length) return 'Já existe atestado dessa pessoa nesse período.';
+    if (it.conflitoLote) return it.conflitoLote;
+    if (!it.form.func_id || !it.form.inicio || !it.form.dias) return 'Faltam dados: toque em Conferir e complete.';
+    if (it.editado) return 'Você alterou os dados: confirme no Conferir.';
+    if (!itemPronto(it)) return (it.L.dados.avisos || [])[0] || 'A leitura não ficou segura: confira.';
+    return '';
+  }
+  function conflitosLote() {
+    const s = st(), vistos = [];
+    s.lote.forEach(it => {
+      it.conflitoLote = '';
+      if (it.status !== 'pendente') return;
+      const f = it.form;
+      for (const o of vistos) {
+        if (o.L.hash === it.L.hash) { it.conflitoLote = 'Documento repetido nesta seleção.'; break; }
+        if (f.func_id && f.func_id === o.form.func_id && f.inicio && o.form.inicio && f.dias && o.form.dias &&
+            f.inicio <= fimDe(o.form.inicio, +o.form.dias) && fimDe(f.inicio, +f.dias) >= o.form.inicio) { it.conflitoLote = 'Outro documento desta seleção é da mesma pessoa no mesmo período.'; break; }
+      }
+      vistos.push(it);
+    });
+  }
+  async function verificarItem(it) {
+    const f = it.form;
+    it.verif = null; it.bloqueio = false;
+    if (!f.func_id || !f.inicio || !(f.dias >= 1 && f.dias <= 365)) return;
+    try { it.verif = await Nuvem.rpc('esc_atestado_verificar', { p_func_id: f.func_id, p_inicio: f.inicio, p_dias: +f.dias, p_hash: it.L.hash, p_ignorar: null }); } catch (e) { it.verif = null; }
+    it.bloqueio = !!(it.verif && (it.verif.mesmo_arquivo || (it.verif.sobrepostos || []).length));
+  }
+  function telaLote() {
+    const s = st(), L = s.lote; conflitosLote();
+    const prontos = L.filter(itemPronto).length, pend = L.filter(it => it.status === 'pendente').length, lanc = L.filter(it => it.status === 'lancado').length;
+    let h = `<div class="card mb"><b>${L.length} documento(s) lidos</b><div class="small muted">${lanc ? lanc + ' lançado(s) · ' : ''}${prontos} pronto(s) para lançar${pend - prontos > 0 ? ' · ' + (pend - prontos) + ' para conferir' : ''}</div>
+      <p class="small muted" style="margin:6px 0 0">"Pronto" = leitura segura, sem dúvidas e sem conflito. Os outros você abre em <b>Conferir</b>, ajusta e confirma um por um.</p>
+      <div class="row mt ats-bts">${pend ? '<button class="btn" data-act="atsLoteSair">Sair sem lançar o resto</button>' : '<button class="btn pri" data-act="atsLoteSair">Concluir</button>'}${prontos ? `<button class="btn ok" data-act="atsLoteLancar">${ic('check')} Lançar os ${prontos} prontos</button>` : ''}</div></div>`;
+    h += L.map((it, i) => {
+      const f = it.form, fn = f.func_id ? (funcPorId(f.func_id) || {}).nome : '', mot = motivoItem(it);
+      return `<div class="card mb ats-item${it.status === 'removido' ? ' off' : ''}"><div class="ats-it-h" style="gap:10px">
+        ${it.L.previa ? `<img src="${it.L.previa}" alt="" style="width:56px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:0 0 auto">` : ''}
+        <div style="flex:1;min-width:0"><b>${fn ? esc(fn) : '<span class="muted">Funcionário não identificado</span>'}</b>
+          <div class="small muted">${f.inicio ? br(f.inicio) : '—'}${f.inicio && f.dias ? ' a ' + br(fimDe(f.inicio, +f.dias)) + ' · ' + f.dias + ' dia(s) · volta ' + br(C.addDias(f.inicio, +f.dias)) : ''}</div>
+          ${mot ? `<div class="small" style="margin-top:3px;color:${it.status === 'erro' || it.bloqueio || it.conflitoLote ? '#b91c1c' : '#a16207'}">${esc(mot)}</div>` : ''}</div>${situacaoItem(it)}</div>
+        ${it.status === 'pendente' ? `<div class="ats-acoes"><button class="btn sm" data-act="atsLoteConferir" data-i="${i}">${ic('edit')} Conferir</button><button class="btn sm" data-act="atsLoteRemover" data-i="${i}">Remover</button></div>` : ''}</div>`;
+    }).join('');
+    return h;
+  }
+  async function enviarVarios(files) {
+    const s = st(); files = files.filter(f => f && f.size <= 15 * 1024 * 1024);
+    if (!files.length) return toast('Arquivos muito grandes (máximo 15 MB cada).');
+    Object.assign(s, { etapa: 'lendo', progresso: 'Abrindo os arquivos', corrigindo: null, leitura: null, verif: null, lote: [], loteIdx: null, loteTotal: files.length, loteAtual: 1 }); render();
+    const funcs = S.funcionarios.map(f => ({ id: f.id, nome: f.nome, ativo: f.ativo }));
+    for (let i = 0; i < files.length; i++) {
+      s.loteAtual = i + 1; const tt = document.querySelector('.ats-lendo b'); if (tt) tt.textContent = 'Lendo documento ' + (i + 1) + ' de ' + files.length + '…';
+      try {
+        const L = await AtestLer.lerArquivo(files[i], funcs, hoje(), progressoLeitura);
+        const it = Object.assign({ nome: files[i].name || '', L, status: 'pendente' }, prepararLeitura(L));
+        await verificarItem(it); s.lote.push(it);
+      } catch (e) { toast('Não deu para abrir ' + (files[i].name || 'um dos arquivos') + '.'); }
+    }
+    s.loteTotal = 0;
+    if (!s.lote.length) { s.etapa = 'lista'; render(); return; }
+    s.etapa = 'lote'; render(); window.scrollTo(0, 0);
+  }
+  async function lancarProntos(btn) {
+    const s = st(); conflitosLote();
+    const alvo = s.lote.filter(itemPronto); if (!alvo.length) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Lançando…'; }
+    let ok = 0;
+    for (const it of alvo) {
+      try { it.res = await Nuvem.rpc('esc_atestado_salvar', { p: payload(it.form, it.L, null, false) }); it.status = 'lancado'; ok++; }
+      catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); it.status = 'erro'; it.msg = msgErro(e); }
+    }
+    s.lista = null; await Nuvem.sincronizar().catch(() => {}); carregar();
+    toast(ok + ' atestado(s) lançado(s).'); render(); window.scrollTo(0, 0); reverificarLote();
+  }
+  function reverificarLote() {
+    const s = st(); if (!s.lote) return;
+    Promise.all(s.lote.filter(it => it.status === 'pendente').map(verificarItem)).then(() => { if (s.etapa === 'lote') render(); });
+  }
+  function payload(f, L, corrigindo, alterado) {
+    const p = Object.assign({}, f, { id: corrigindo || null, vt_resumo: impactoVT(f.func_id, f.inicio, +f.dias, corrigindo) });
+    if (L) Object.assign(p, { arquivo: L.arquivo, arquivo_tipo: L.tipo, arquivo_hash: L.hash, texto_lido: L.texto, confianca: L.confianca, nome_doc: L.dados.nomeDoc, leitura_segura: !!(L.dados.seguro && !alterado) });
+    return p;
+  }
+  function voltarAoLote() {
+    const s = st(), it = s.lote[s.loteIdx]; lerForm();
+    if (it && it.status === 'pendente') { if (JSON.stringify(it.form) !== JSON.stringify(s.form)) it.editado = true; it.form = s.form; }
+    Object.assign(s, { etapa: 'lote', loteIdx: null, leitura: null }); render(); window.scrollTo(0, 0);
+    if (it) verificarItem(it).then(() => { if (s.etapa === 'lote') render(); });
   }
 
   /* ---------- ações ---------- */
@@ -182,19 +288,23 @@
     const s = st();
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) return toast('Arquivo muito grande (máximo 15 MB).');
-    Object.assign(s, { etapa: 'lendo', progresso: 'Abrindo o arquivo', corrigindo: null, leitura: null, verif: null }); render();
+    Object.assign(s, { etapa: 'lendo', progresso: 'Abrindo o arquivo', corrigindo: null, leitura: null, verif: null, loteTotal: 0, loteIdx: null }); render();
     let L;
     try {
-      L = await AtestLer.lerArquivo(file, S.funcionarios.map(f => ({ id: f.id, nome: f.nome, ativo: f.ativo })), hoje(), (status, p) => {
-        const t = { 'loading tesseract core': 'Baixando o leitor', 'loading language traineddata': 'Baixando o idioma português', 'initializing api': 'Preparando o leitor', 'recognizing text': 'Lendo o texto' }[status] || 'Preparando';
-        s.progresso = t + (p ? ' · ' + Math.round(p * 100) + '%' : '');
-        const el = document.querySelector('.ats-lendo p'); if (el) el.textContent = s.progresso;
-      });
+      L = await AtestLer.lerArquivo(file, S.funcionarios.map(f => ({ id: f.id, nome: f.nome, ativo: f.ativo })), hoje(), progressoLeitura);
     } catch (e) { s.etapa = 'lista'; render(); return modalMsg('Não deu para abrir o arquivo', '<p>Envie uma foto (JPG ou PNG) ou um PDF do atestado.</p>'); }
+    Object.assign(s, { etapa: 'conferir', leitura: L, loteIdx: null, duvidasAlteradas: false }, prepararLeitura(L));
+    render(); verificar();
+  }
+  function progressoLeitura(status, p) {
+    const s = st(), t = { 'loading tesseract core': 'Baixando o leitor', 'loading language traineddata': 'Baixando o idioma português', 'initializing api': 'Preparando o leitor', 'recognizing text': 'Lendo o texto' }[status] || 'Preparando';
+    s.progresso = t + (p ? ' · ' + Math.round(p * 100) + '%' : '');
+    const el = document.querySelector('.ats-lendo p'); if (el) el.textContent = s.progresso;
+  }
+  function prepararLeitura(L) {
     const d = L.dados, duv = [];
     if (!d.func) duv.push('func'); if (!d.inicio) duv.push('inicio'); if (!d.dias || d.campos.dias) duv.push('dias'); if (!d.emissao) duv.push('emissao');
-    Object.assign(s, { etapa: 'conferir', leitura: L, duvidas: duv, form: { func_id: d.func ? d.func.id : '', emissao: d.emissao || '', inicio: d.inicio || '', dias: d.dias || '', cid: d.cid || '', obs: '' } });
-    render(); verificar();
+    return { duvidas: duv, form: { func_id: d.func ? d.func.id : '', emissao: d.emissao || '', inicio: d.inicio || '', dias: d.dias || '', cid: d.cid || '', obs: '' } };
   }
   async function confirmarLancamento(btn) {
     const s = st(); lerForm(); const f = s.form;
@@ -203,11 +313,15 @@
     if (!(f.dias >= 1 && f.dias <= 365)) return toast('Informe a quantidade de dias (1 a 365).');
     await verificar(); if (s.bloqueio) return toast('Resolva os avisos em vermelho antes de lançar.');
     const iv = impactoVT(f.func_id, f.inicio, +f.dias, s.corrigindo), L = s.leitura;
-    const p = Object.assign({}, f, { id: s.corrigindo || null, vt_resumo: iv });
-    if (L) Object.assign(p, { arquivo: L.arquivo, arquivo_tipo: L.tipo, arquivo_hash: L.hash, texto_lido: L.texto, confianca: L.confianca, nome_doc: L.dados.nomeDoc, leitura_segura: !!(L.dados.seguro && !s.duvidasAlteradas) });
+    const p = payload(f, L, s.corrigindo, s.duvidasAlteradas);
     const b = document.querySelector('[data-act="atsConfirmar"]'); if (b) { b.disabled = true; b.textContent = 'Lançando…'; }
     try {
       const r = await Nuvem.rpc('esc_atestado_salvar', { p });
+      if (s.loteIdx != null) {
+        const it = s.lote[s.loteIdx]; Object.assign(it, { status: 'lancado', res: r, form: f });
+        Object.assign(s, { etapa: 'lote', loteIdx: null, leitura: null, lista: null });
+        toast('Atestado de ' + r.func_nome + ' lançado.'); await Nuvem.sincronizar().catch(() => {}); render(); window.scrollTo(0, 0); carregar(); reverificarLote(); return;
+      }
       Object.assign(s, { etapa: 'feito', feito: r, feitoCorrecao: !!s.corrigindo, resumoVT: iv && !iv.semVT ? (iv.reduz > 0 ? 'deixa de pagar ' + R$(iv.reduz) : '') + (iv.pagoAMais > 0 ? (iv.reduz > 0 ? ' · ' : '') + R$(iv.pagoAMais) + ' já pagos ficam como saldo a descontar' : '') : '', lista: null, leitura: null });
       await Nuvem.sincronizar().catch(() => {});
       render(); window.scrollTo(0, 0); carregar();
@@ -247,8 +361,14 @@
     const act = el.dataset.act, s = st();
     switch (act) {
       case 'atsManual': Object.assign(s, { etapa: 'conferir', corrigindo: null, leitura: null, duvidas: [], verif: null, bloqueio: true, form: { func_id: '', emissao: '', inicio: '', dias: '', cid: '', obs: '' } }); render(); return;
-      case 'atsVoltar': case 'atsLista': Object.assign(s, { etapa: 'lista', leitura: null, corrigindo: null }); render(); window.scrollTo(0, 0); return;
+      case 'atsVoltar': if (s.loteIdx != null) return voltarAoLote(); // eslint-disable-line no-fallthrough
+      case 'atsLista': Object.assign(s, { etapa: 'lista', leitura: null, corrigindo: null }); render(); window.scrollTo(0, 0); return;
       case 'atsConfirmar': return confirmarLancamento(el);
+      case 'atsLoteLancar': return lancarProntos(el);
+      case 'atsLoteConferir': { const it = s.lote[+el.dataset.i]; if (!it) return; Object.assign(s, { etapa: 'conferir', loteIdx: +el.dataset.i, leitura: it.L, form: Object.assign({}, it.form), duvidas: it.duvidas, duvidasAlteradas: !!it.editado, corrigindo: null, verif: it.verif, bloqueio: it.bloqueio }); render(); window.scrollTo(0, 0); verificar(); return; }
+      case 'atsLoteRemover': { const it = s.lote[+el.dataset.i]; if (it) it.status = 'removido'; render(); return; }
+      case 'atsLoteSair': { const resta = s.lote.filter(it => it.status === 'pendente').length; const sair = () => { Object.assign(s, { etapa: 'lista', lote: null, loteIdx: null }); render(); window.scrollTo(0, 0); };
+        if (!resta) return sair(); return confirmar('Sair da lista?', `<p>${resta} documento(s) ainda não foram lançados e serão descartados desta lista.</p>`, 'Sair').then(ok => { if (ok) sair(); }); }
       case 'atsVerDoc': return verDoc(el.dataset.id);
       case 'atsCorrigir': return corrigir(el.dataset.id);
       case 'atsCancelar': return cancelar(el.dataset.id);
@@ -257,7 +377,7 @@
   }
   document.addEventListener('change', ev => {
     const t = ev.target; if (!t || UI.rota !== 'atestados') return;
-    if (t.id === 'atsArquivo') { const f = t.files && t.files[0]; t.value = ''; return enviarArquivo(f); }
+    if (t.id === 'atsArquivo') { const fs = Array.from(t.files || []); t.value = ''; return fs.length > 1 ? enviarVarios(fs) : enviarArquivo(fs[0]); }
     if (t.id === 'atsFiltro') { st().filtroFunc = t.value; return render(); }
     if (/^ats(Func|Emissao|Inicio|Dias|Cid|Obs)$/.test(t.id)) { const s = st(); lerForm(); if (s.leitura) s.duvidasAlteradas = true; if (t.id !== 'atsCid' && t.id !== 'atsObs') verificar(); else { const y = window.scrollY; render(); window.scrollTo(0, y); } }
   });
