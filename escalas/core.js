@@ -692,6 +692,7 @@
     faltaJ: { cod: 'FJ', nome: 'Falta justificada', paga: false },
     atestado: { cod: 'AT', nome: 'Atestado médico', paga: false },
     afast: { cod: 'AF', nome: 'Afastamento', paga: false },
+    suspensao: { cod: 'SU', nome: 'Suspensão', paga: false },
     semvt: { cod: 'SV', nome: 'Não precisou de transporte', paga: false }
   };
   var r2 = function (x) { return Math.round(x * 100) / 100; };

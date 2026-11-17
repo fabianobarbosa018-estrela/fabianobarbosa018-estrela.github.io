@@ -271,7 +271,7 @@ table.folha.vt .vts{font-weight:800;font-size:12px;color:#1f4ea0}
 table.folha.vt thead tr:nth-child(3) th:not(.fnm):not(.vtt){font-size:13.5px;font-weight:800;padding:4px}
 table.folha.vt thead tr:nth-child(4) th,table.folha.vt thead tr:nth-child(5) th{padding:3px 4px}
 table.folha.vt td.vtc{font-weight:500;cursor:pointer;text-align:right;padding-right:6px}
-table.folha.vt td.vt-folga,table.folha.vt td.vt-semvt,table.folha.vt td.vt-faltaJ,table.folha.vt td.vt-afast{color:#6b7280;text-align:center;font-weight:700}
+table.folha.vt td.vt-folga,table.folha.vt td.vt-semvt,table.folha.vt td.vt-faltaJ,table.folha.vt td.vt-afast,table.folha.vt td.vt-suspensao{color:#6b7280;text-align:center;font-weight:700}
 table.folha.vt td.vt-falta{color:#b91c1c;text-align:center;font-weight:800}
 table.folha.vt td.vt-ferias{background:#FF0000;color:#000;text-align:center;font-weight:700;font-size:10px}
 table.folha.vt td.vt-semEscala{color:#a16207;text-align:center;font-weight:800;background-image:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(0,0,0,.05) 4px,rgba(0,0,0,.05) 8px)}
@@ -1481,6 +1481,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     faltaJ: { cod: 'FJ', nome: 'Falta justificada', paga: false },
     atestado: { cod: 'AT', nome: 'Atestado médico', paga: false },
     afast: { cod: 'AF', nome: 'Afastamento', paga: false },
+    suspensao: { cod: 'SU', nome: 'Suspensão', paga: false },
     semvt: { cod: 'SV', nome: 'Não precisou de transporte', paga: false }
   };
   var r2 = function (x) { return Math.round(x * 100) / 100; };
@@ -2734,7 +2735,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '16/11 23:30';
+const VERSAO_APP = '17/11 12:20';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -3051,7 +3052,7 @@ function vPainel() {
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   const dExt = cap(C.DIAS[C.diaSemana(hoje)].toLowerCase()) + ', ' + (+hoje.slice(8)) + ' de ' + MESES[+hoje.slice(5, 7) - 1].toLowerCase() + ' de ' + hoje.slice(0, 4);
   // ---- quem está em cada situação no dia (cada pessoa conta uma única vez) ----
-  const TIPOS_AFAST = { atestado: 'Atestado', afast: 'Afastado', faltaJ: 'Falta justificada', falta: 'Falta' };
+  const TIPOS_AFAST = { atestado: 'Atestado', afast: 'Afastado', suspensao: 'Suspenso', faltaJ: 'Falta justificada', falta: 'Falta' };
   const ajDia = (vtDoc(mes).ajustes) || {};
   const pessoa = f => ({ id: f.id, nome: f.nome, setorId: f.setorId, setor: nomeSetor(f.setorId), horario: f.horario || '' });
   const trab = [], folg = [], afast = [], faltas = [];
@@ -4314,8 +4315,8 @@ function vVT() {
   if (!m.linhas.length && UI.vtTab !== 'cadastro') return h + `<div class="card empty"><b>Ninguém com vale-transporte neste mês</b>Cadastre o valor da passagem de cada funcionário na aba <a href="#" data-act="vtTab" data-t="cadastro">Valores por funcionário</a>.</div>`;
   if (UI.vtTab === 'resumo') return h + vtResumoHTML(m);
   if (UI.vtTab === 'cadastro') return h + vtCadastroHTML(m);
-  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AT</b> atestado</span><span><b>AF</b> afastamento</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><b>•</b> dia trabalhado de quem tem VT fixo por quinzena</span></div>
-  <p class="small muted edit-only">Toque em um dia para corrigir (falta, afastamento, não precisou de transporte, valor diferente). Toque em <b>PAGO</b> para registrar o pagamento.</p>`;
+  return h + vtTabelaHTML(m, per) + `<div class="legend mt"><span><b>17,00</b> valor do dia trabalhado</span><span><b>F</b> folga</span><span><b>FÉR</b> férias</span><span><b>FI</b> falta não justificada</span><span><b>FJ</b> falta justificada</span><span><b>AT</b> atestado</span><span><b>AF</b> afastamento</span><span><b>SU</b> suspensão</span><span><b>SV</b> não precisou de transporte</span><span><b>?</b> semana sem escala</span><span><b>•</b> dia trabalhado de quem tem VT fixo por quinzena</span></div>
+  <p class="small muted edit-only">Toque em um dia para corrigir (falta, afastamento, suspensão, não precisou de transporte, valor diferente). Toque em <b>PAGO</b> para registrar o pagamento.</p>`;
 }
 
 function vtTabelaHTML(m, per) {
@@ -4609,7 +4610,7 @@ async function vtPDF(per, imprimir) {
   caixas.forEach(([t, v]) => { doc.setFontSize(9); const w = doc.getTextWidth(t) + 8; doc.setFontSize(11); const w2 = doc.getTextWidth(v) + 6; doc.setFillColor(...verde); doc.setDrawColor(0); doc.setLineWidth(0.4); doc.rect(x, y, w + w2, 8, 'FD'); doc.setTextColor(0); doc.setFontSize(9); doc.text(t, x + 3, y + 5.4); doc.setFontSize(11); doc.text(v, x + w + 1, y + 5.6); x += w + w2 + 4; });
   y += 12; doc.setFont('helvetica', 'normal');
   doc.setFontSize(7); doc.setTextColor(90);
-  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AT atestado · AF afastamento · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, H - 4));
+  doc.text('F folga · FÉR férias · FI falta não justificada · FJ falta justificada · AT atestado · AF afastamento · SU suspensão · SV não precisou de transporte · ? semana sem escala', 6, Math.min(y, H - 4));
   const blob = doc.output('blob'), nome = vtNomeArq(per, 'pdf');
   // imprimir também entrega o arquivo (anexo), sem abrir uma aba com endereço temporário
   await salvarArquivo(imprimir ? nome.replace('.pdf', '-impressao.pdf') : nome, blob);
