@@ -373,7 +373,9 @@
     timer: null,
     sug: null,       // sugestões abertas: { item, termo }
     catFiltro: '',
-    ctr: null        // contrato em edição
+    ctr: null,       // contrato em edição
+    assin: {},       // assinaturas eletrônicas por contrato: { id: lista | 'carregando' | 'erro' }
+    assinLink: null  // último link gerado { contrato, url, expira }
   };
   window.ORC_ESTADO = ORC;
 
@@ -841,7 +843,84 @@
       '<div class="card mb"><h3 style="margin-top:0">Condições</h3><div class="grid" style="' + grade + '">' + campo('Aviso prévio para rescisão (dias)', 'diasAviso', c.diasAviso) +
         '<div class="fld"><label class="f">Situação</label><select data-ctr-campo="status">' + statusOpts + '</select></div></div>' +
         '<div class="fld"><label class="f">Observações</label><textarea rows="2" data-ctr-campo="observacoes">' + eh(c.observacoes) + '</textarea></div></div>' +
-      '</div>';
+      '</div>' + cardAssinatura(c);
+  }
+
+  /* ---------------- Assinatura eletrônica a distância ---------------- */
+  var dtHoraBR = function (iso) { if (!iso) return '—'; var d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+  function assinaturaFeita(c) { var l = c && c.id && ORC.assin[c.id]; return Array.isArray(l) ? l.find(function (a) { return a.status === 'assinado'; }) || null : null; }
+  function carregarAssinaturas(id, forcar) {
+    if (!id || typeof Nuvem === 'undefined' || (!forcar && ORC.assin[id] && ORC.assin[id] !== 'erro')) return;
+    ORC.assin[id] = 'carregando';
+    Nuvem.rpc('esc_assinaturas_listar', { p_contrato_id: id }).then(function (r) { ORC.assin[id] = r || []; }, function () { ORC.assin[id] = 'erro'; }).then(function () { if (UI.rota === 'contratos') render(); });
+  }
+  function cardAssinatura(c) {
+    if (!ehAdmin()) return '';
+    var h = '<div class="card mb ctr-assin"><h3 style="margin-top:0">Assinatura do prestador (a distância)</h3>';
+    if (!c.id) return h + '<p class="small muted" style="margin:0">Salve o contrato para poder enviar o link de assinatura.</p></div>';
+    var l = ORC.assin[c.id];
+    if (l === undefined) { carregarAssinaturas(c.id); l = 'carregando'; }
+    if (l === 'carregando') return h + '<p class="small muted" style="margin:0">Carregando…</p></div>';
+    if (l === 'erro') return h + '<p class="small muted" style="margin:0">Não deu para consultar as assinaturas agora. <a href="#" data-act="orcAssinRecarregar">Tentar de novo</a></p></div>';
+    var feita = l.find(function (a) { return a.status === 'assinado'; });
+    var pend = l.find(function (a) { return a.status === 'pendente'; });
+    if (feita) {
+      return h + '<div class="alert s" style="margin-bottom:10px"><span class="ic">✓</span><div><b>Assinado por ' + eh(feita.nome) + '</b><div class="small">CPF ' + eh(feita.cpf) + ' · ' + dtHoraBR(feita.assinado_em) +
+        (feita.ip ? ' · IP ' + eh(feita.ip) : '') + '</div><div class="small muted">Código de verificação ' + eh(String(feita.documento_hash || '').slice(0, 16).toUpperCase()) + '</div></div></div>' +
+        (feita.assinatura ? '<img src="' + feita.assinatura + '" alt="Assinatura" style="max-width:260px;width:100%;background:#fff;border:1px solid var(--line);border-radius:8px">' : '') +
+        '<p class="small muted">O PDF sai com a assinatura e o registro acima, no texto exatamente como foi assinado. Se precisar mudar o contrato, gere um novo link para assinar de novo.</p>' +
+        '<div class="row"><button class="btn sm" data-act="orcAssinEnviar">Pedir nova assinatura</button></div></div>';
+    }
+    if (pend) {
+      var lk = ORC.assinLink && ORC.assinLink.contrato === c.id ? ORC.assinLink.url : '';
+      return h + '<p style="margin:0 0 6px"><span class="badge b-blue">Aguardando assinatura</span></p><div class="small muted">Link enviado em ' + dtHoraBR(pend.criado_em) + ' · vale até ' + dtHoraBR(pend.expira) +
+        (pend.aberto_em ? ' · <b>o prestador já abriu</b> (' + dtHoraBR(pend.aberto_em) + ')' : ' · ainda não foi aberto') + '</div>' +
+        (lk ? botoesLink(lk, c) : '<p class="small muted">Por segurança o link só aparece quando é gerado. Perdeu? Gere outro (o anterior deixa de valer).</p>') +
+        '<div class="row mt"><button class="btn sm" data-act="orcAssinEnviar">Gerar novo link</button><button class="btn sm" data-act="orcAssinCancelar" data-id="' + pend.id + '">Cancelar link</button><button class="btn sm" data-act="orcAssinRecarregar">Atualizar</button></div></div>';
+    }
+    var exp = l.find(function (a) { return a.status === 'expirado'; });
+    return h + '<p class="small muted" style="margin:0 0 10px">Gere um link e mande pelo WhatsApp. O prestador lê o contrato no celular, informa o nome completo e o CPF, assina com o dedo e confirma. Você recebe o contrato assinado aqui.' +
+      (exp ? ' <b>O último link expirou sem assinatura.</b>' : '') + '</p><button class="btn pri" data-act="orcAssinEnviar">✍ Enviar para assinatura</button></div>';
+  }
+  function botoesLink(url, c) {
+    var msg = 'Olá' + (c.contratadoNome ? ', ' + String(c.contratadoNome).split(' ')[0] : '') + '! Segue o contrato ' + (c.numero || '') + ' do ' + nomeHotel() + ' para você ler e assinar pelo celular: ' + url;
+    return '<div class="fld mt"><label class="f">Link de assinatura</label><input type="text" readonly value="' + eh(url) + '" onclick="this.select()"></div>' +
+      '<div class="row"><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msg) + '">Enviar pelo WhatsApp</a><button class="btn" data-act="orcAssinCopiar" data-url="' + eh(url) + '">Copiar link</button></div>';
+  }
+  // o contrato como o prestador vai ver e assinar (mesmo texto do PDF)
+  function documentoContrato(c) {
+    return {
+      numero: c.numero || '', titulo: tituloContrato(c), hotel: nomeHotel(), cnpj: HOTEL_CNPJ, contratante: nomeHotel() + ' · Fabiano, gerente operacional',
+      contratada: { nome: c.contratadoNome || '', doc: c.contratadoDoc || '' },
+      servico: c.servico || '', valor: OrcCalc.num(c.valor) || 0, inicio: c.inicio || '', fim: c.fim || '',
+      clausulas: OrcCalc.clausulasContrato(c, nomeHotel(), HOTEL_CNPJ), emitidoEm: new Date().toISOString()
+    };
+  }
+  function tituloContrato(c) { return c.tipoContrato === 'servico30' ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS (' + diasTxt(c.dias).toUpperCase() + ')' : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS'; }
+  async function enviarAssinatura(btn) {
+    if (!exigeEscrita()) return;
+    lerCtrForm();
+    var c = prepararContrato(ORC.ctr), erros = OrcCalc.validarContrato(c);
+    if (erros.length) return modalMsg('Confira o contrato', '<div class="alert e"><span class="ic">!</span><div><ul style="margin:0;padding-left:18px">' + erros.map(function (e) { return '<li>' + eh(e) + '</li>'; }).join('') + '</ul></div></div>');
+    if (assinaturaFeita(c) && !window.confirm('Este contrato já foi assinado. Gerar um novo link para assinar de novo?')) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Gerando…'; }
+    try {
+      // grava o contrato antes, para o link sair com o texto atual
+      if (c.status === 'rascunho' || !c.status) c.status = 'aguardando';
+      if (!c.id) c.id = uid('ctr');
+      var d = Object.assign({}, c); delete d.id; d.atualizadoEm = new Date().toISOString(); if (!d.criadoEm) d.criadoEm = d.atualizadoEm;
+      await Store.set('orcamentos', c.id, d);
+      var r = await Nuvem.rpc('esc_assinatura_criar', { p_contrato_id: c.id, p_documento: documentoContrato(c), p_dias: 7 });
+      var base = location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '');
+      ORC.assinLink = { contrato: c.id, url: base + 'assinar.html#' + r.link, expira: r.expira };
+      ORC.assin[c.id] = undefined; carregarAssinaturas(c.id, true);
+      render();
+      modalMsg('Link de assinatura pronto', '<p>Mande para <b>' + eh(c.contratadoNome) + '</b>. Vale por 7 dias e só serve para este contrato.</p>' + botoesLink(ORC.assinLink.url, c) +
+        '<p class="small muted mt">Quando ele assinar, o contrato muda para "Assinado" e o PDF sai com a assinatura dele.</p>');
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = '✍ Enviar para assinatura'; }
+      toast('Não deu para gerar o link: ' + ((e && e.message) || 'tente de novo').replace(/^[A-Z_]+:\s*/, ''));
+    }
   }
 
   function lerCtrForm() {
@@ -865,6 +944,7 @@
     if (!c) return;
     ORC.ctr = copiaProfunda(c);
     ORC.ctrTela = 'form'; UI.rota = 'contratos';
+    if (ehAdmin()) carregarAssinaturas(c.id, true);
     render(); window.scrollTo(0, 0);
   }
 
@@ -919,16 +999,18 @@
     var logo = await carregarLogo();
     var y = cabecalhoPdf(doc, logo, W, M, 'CONTRATO', c.numero);
     var limite = function (h) { if (y + h > 280) { doc.addPage(); y = 22; } };
-    var titulo = c.tipoContrato === 'servico30' ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS (' + diasTxt(c.dias).toUpperCase() + ')' : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS';
+    var feita = assinaturaFeita(c), dS = feita && feita.documento;
+    var titulo = dS ? dS.titulo : tituloContrato(c);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text(titulo, W / 2, y, { align: 'center' }); y += 7;
     y += 4;
     var partes = [
       'CONTRATANTE: ' + nomeHotel() + ', CNPJ ' + HOTEL_CNPJ + ', neste ato representado por seu responsável legal.',
-      'CONTRATADA: ' + (c.contratadoNome || '__________________________') + (c.contratadoDoc ? ', CPF/CNPJ ' + c.contratadoDoc : ', CPF/CNPJ ______________________') + '.'
+      feita ? 'CONTRATADA: ' + feita.nome + ', CPF ' + feita.cpf + '.'
+        : 'CONTRATADA: ' + (c.contratadoNome || '__________________________') + (c.contratadoDoc ? ', CPF/CNPJ ' + c.contratadoDoc : ', CPF/CNPJ ______________________') + '.'
     ];
     partes.forEach(function (t) { var l = doc.splitTextToSize(t, larg); limite(l.length * 5 + 2); doc.text(l, M, y); y += l.length * 5 + 3; });
     y += 3;
-    OrcCalc.clausulasContrato(c, nomeHotel(), HOTEL_CNPJ).forEach(function (cl) {
+    (dS ? dS.clausulas : OrcCalc.clausulasContrato(c, nomeHotel(), HOTEL_CNPJ)).forEach(function (cl) {
       var tl = doc.splitTextToSize(cl.titulo, larg);
       var tx = doc.splitTextToSize(cl.texto, larg);
       // o título nunca fica sozinho no fim da página: vai junto com as primeiras linhas do texto
@@ -950,9 +1032,22 @@
       try { var pr = doc.getImageProperties(assin); if (pr && pr.width && pr.height) largSig = Math.min(70, altSig * pr.width / pr.height); } catch (e) { }
       try { doc.addImage(assin, /^data:image\/jpe?g/.test(assin) ? 'JPEG' : 'PNG', M + 4, y - altSig - 1, largSig, altSig); } catch (e) { }
     }
-    linha(M, 'CONTRATANTE', nomeHotel() + ' · Fabiano, gerente operacional'); linha(W - M - 78, 'CONTRATADA', c.contratadoNome || '');
+    if (feita && feita.assinatura) {
+      var altC = 22, largC = 60;
+      try { var pc = doc.getImageProperties(feita.assinatura); if (pc && pc.width && pc.height) { largC = Math.min(74, altC * pc.width / pc.height); if (largC < 30) { largC = 30; altC = largC * pc.height / pc.width; } } } catch (e) { }
+      try { doc.addImage(feita.assinatura, 'PNG', W - M - 78 + 2, y - altC - 1, largC, altC); } catch (e) { }
+    }
+    linha(M, 'CONTRATANTE', nomeHotel() + ' · Fabiano, gerente operacional'); linha(W - M - 78, 'CONTRATADA', feita ? feita.nome + ' · CPF ' + feita.cpf : (c.contratadoNome || ''));
     y += 22;
     linha(M, 'Testemunha 1', 'Nome e CPF'); linha(W - M - 78, 'Testemunha 2', 'Nome e CPF');
+    if (feita) {
+      y += 16; limite(26);
+      var reg = 'Assinado eletronicamente por ' + feita.nome + ', CPF ' + feita.cpf + ', em ' + dtHoraBR(feita.assinado_em) + (feita.ip ? ', IP ' + feita.ip : '') +
+        ', por link pessoal enviado pelo ' + nomeHotel() + '. Código de verificação do texto assinado: ' + String(feita.documento_hash || '').slice(0, 16).toUpperCase() + '.';
+      var rl = doc.splitTextToSize(reg, larg - 6);
+      doc.setDrawColor(150); doc.setFillColor(245, 247, 250); doc.rect(M, y, larg, rl.length * 4.2 + 5, 'FD');
+      doc.setFontSize(8.5); doc.setTextColor(60); doc.text(rl, M + 3, y + 5); doc.setTextColor(0); doc.setDrawColor(0);
+    }
     aplicarMarcaDagua(doc, logo);
     var total = doc.internal.getNumberOfPages();
     for (var p = 1; p <= total; p++) {
@@ -985,6 +1080,11 @@
       case 'orcCtrSalvar': return salvarContrato();
       case 'orcCtrPdf': lerCtrForm(); return gerarContratoPdf(prepararContrato(ORC.ctr));
       case 'orcCtrExcluir': return excluirContrato(id);
+      case 'orcAssinEnviar': return enviarAssinatura(el);
+      case 'orcAssinRecarregar': if (ev) ev.preventDefault(); if (ORC.ctr) carregarAssinaturas(ORC.ctr.id, true); return render();
+      case 'orcAssinCopiar': { var u = el.dataset.url; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function () { toast('Link copiado'); }, function () { window.prompt('Copie o link:', u); }); return; }
+      case 'orcAssinCancelar': if (!window.confirm('Cancelar este link? O prestador não vai mais conseguir assinar por ele.')) return;
+        return Nuvem.rpc('esc_assinatura_cancelar', { p_id: +id }).then(function () { toast('Link cancelado'); if (ORC.ctr) carregarAssinaturas(ORC.ctr.id, true); }, function () { toast('Não deu para cancelar agora.'); });
       case 'orcCtrVoltar': ORC.ctr = null; ORC.ctrTela = 'lista'; render(); return;
       case 'orcCatSalvar': return salvarPrecoCatalogo();
       case 'orcCatOcultar': return ocultarCatalogo(id);
