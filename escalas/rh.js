@@ -65,6 +65,30 @@
         <span><b>${esc(x.f.nome)}</b> <span class="small muted">· ${esc(nomeSetor(x.f.setorId))}</span></span>
         <span class="small">${br(x.prox.toISOString().slice(0, 10))} · ${quando(x)} · ${x.idade} anos</span></div>`).join('') + '</div>';
   }
+  /* Dados pessoais que ainda faltam na ficha (só funcionários ativos) */
+  function faltantes(f) {
+    const rec = rhDe(f.id), p = rec.pessoais || {}, pr = rec.profissionais || {}, falta = [];
+    if (!(f.telefone || p.telefone)) falta.push('telefone');
+    if (!p.cpf) falta.push('CPF');
+    if (!p.rg) falta.push('RG');
+    if (!p.nascimento) falta.push('nascimento');
+    if (!p.endereco) falta.push('endereço');
+    if (!p.mae) falta.push('nome da mãe');
+    if (!p.email) falta.push('e-mail');
+    if (!pr.pis) falta.push('PIS');
+    if (!(rec.emergencia || []).length) falta.push('contato de emergência');
+    return falta;
+  }
+  function pendenciasHtml() {
+    const lista = S.funcionarios.filter(f => f.ativo).map(f => ({ f, falta: faltantes(f) })).filter(x => x.falta.length)
+      .sort((a, b) => b.falta.length - a.falta.length || a.f.nome.localeCompare(b.f.nome));
+    if (!lista.length) return '';
+    return `<div class="card mb rh-pend"><h3 style="margin:0 0 2px">Cadastro incompleto (${lista.length})</h3>
+      <p class="small muted" style="margin:0 0 8px">Quem ainda falta algum dado pessoal. Toque na pessoa para abrir a ficha e mandar o link.</p>` + lista.map(x =>
+      `<div class="rh-pend-linha" data-act="rhFicha" data-id="${x.f.id}" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer">
+        <span><b>${esc(x.f.nome)}</b> <span class="small muted">· ${esc(nomeSetor(x.f.setorId))}</span></span>
+        <span class="small muted" style="text-align:right">falta: ${esc(x.falta.join(', '))}</span></div>`).join('') + '</div>';
+  }
   function vRH() {
     const s = st();
     if (s.ficha) { const f = funcPorId(s.ficha); if (f) return ficha(f); s.ficha = null; }
@@ -72,7 +96,7 @@
     todos.forEach(f => { const x = situacao(f); cont[x]++; });
     const ativos = todos.filter(f => f.ativo).length;
     const ind = (k, n, l, cls) => `<button class="ctr-ind${s.filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-act="rhFiltro" data-f="${k}"><b>${n}</b><span>${l}</span></button>`;
-    let h = (window.CAD ? CAD.barra() : '') + anivHtml() + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
+    let h = (window.CAD ? CAD.barra() : '') + anivHtml() + pendenciasHtml() + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
       ${soLer() ? '' : '<button class="btn pri orc-novo" data-act="rhNovo">+ Novo funcionário</button>'}</div>
       <div class="ctr-inds">${ind('todos', cont.total, 'Cadastrados')}${ind('', ativos, 'Ativos')}${ind('afastado', cont.afastado, 'Afastados', cont.afastado ? 'alerta' : '')}${ind('ferias', cont.ferias, 'De férias')}${ind('suspenso', cont.suspenso, 'Suspensos', cont.suspenso ? 'perigo' : '')}${ind('desligado', cont.desligado, 'Desligados')}</div>
       <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função ou CPF" value="${esc(s.busca)}" autocomplete="off">
