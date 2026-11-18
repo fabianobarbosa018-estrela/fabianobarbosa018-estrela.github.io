@@ -5109,6 +5109,7 @@ async function usrCarregar() {
   try {
     const opc = fn => Nuvem.rpc(fn, fn === 'esc_solicitacoes_listar' ? { p_status: null } : {}).catch(e => { if (e.code === 'SESSAO_INVALIDA') throw e; return null; });
     const [dados, painel, pedidos] = await Promise.all([Nuvem.rpc('esc_usuarios_listar', {}), opc('esc_usuarios_painel'), opc('esc_solicitacoes_listar')]);
+    if (!dados) throw new Error('vazio');
     UI.usr = Object.assign({ aba: (UI.usr && UI.usr.aba) || 'usuarios', aberto: UI.usr && UI.usr.aberto, aud: UI.usr && UI.usr.aud, audFiltro: (UI.usr && UI.usr.audFiltro) || {} }, { dados, painel: painel || {}, pedidos: pedidos || [], servidorAntigo: !painel });
   }
   catch (e) {
