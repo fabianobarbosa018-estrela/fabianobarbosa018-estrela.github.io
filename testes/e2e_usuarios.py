@@ -105,12 +105,12 @@ def run():
 
         # ================= 2. cadastra o funcionário e gera o convite =================
         A.click('#nav a[href="#usuarios"]')
-        A.wait_for_selector('text=Funcionário com acesso', timeout=10000)
+        A.wait_for_selector('text=Funcionários com acesso', timeout=10000)
         check('0 de 1' in A.locator('#view').inner_text() and 'Nenhum funcionário com acesso' in A.locator('#view').inner_text(), 'tela de usuários: nenhum funcionário, limite 0 de 1')
         foto(A, 'admin_usuarios_vazio')
         A.click('button[data-act="usrNovo"]')
         A.wait_for_selector('#usNome')
-        check(A.locator('#modals input[data-us-perm]').count() == 4 and A.locator('#modals input[data-us-perm]:checked').count() == 4, 'cadastro: as 4 permissões aparecem para escolher (ligadas)')
+        check(A.locator('#modals input[data-usr-perm]').count() == 4 and A.locator('#modals input[data-usr-perm]:checked').count() == 4, 'cadastro: as 4 permissões aparecem para escolher (ligadas)')
         A.fill('#usNome', 'Elisa Teste'); A.fill('#usLogin', 'isto não é login'); A.click('button[data-act="usrSalvar"]')
         A.wait_for_function("document.getElementById('usErro') && document.getElementById('usErro').textContent.length > 0", timeout=8000)
         check('telefone com DDD' in A.locator('#usErro').inner_text(), 'cadastro recusa login que não é e-mail nem telefone')
@@ -123,7 +123,7 @@ def run():
         check(A.locator('#cvWa').get_attribute('href').startswith('https://wa.me/5581999990001?text='), 'convite abre o WhatsApp já no número da funcionária')
         foto(A, 'admin_convite')
         modal_botao(A, 'Fechar')
-        A.wait_for_selector('text=Aguardando criar a senha', timeout=8000)
+        A.wait_for_selector('text=Convite pendente', timeout=8000)
         check('1 de 1' in A.locator('#view').inner_text() and A.locator('button[data-act="usrNovo"]').count() == 0, 'limite de 1 funcionário: não oferece cadastrar outro')
         check(rpc(A, [['x', 'esc_usuario_criar', {'p_nome': 'Outra', 'p_login': 'outra@exemplo.com', 'p_permissoes': None}]])['x'] == 'LIMITE_USUARIOS', 'servidor recusa o 2º funcionário (LIMITE_USUARIOS)')
         g = ponte.sql("select convite_hash, senha_hash from esc_usuarios")[0]
@@ -131,7 +131,7 @@ def run():
         # o administrador abre o próprio link de convite: nada acontece com o convite
         A.goto(link); A.wait_for_selector('text=convite de funcionário', timeout=15000)
         check('não foi usado' in A.locator('#view').inner_text(), 'link de convite aberto pelo administrador não é consumido')
-        A.click('text=Voltar ao sistema'); A.wait_for_selector('text=Funcionário com acesso', timeout=10000)
+        A.click('text=Voltar ao sistema'); A.wait_for_selector('text=Funcionários com acesso', timeout=10000)
 
         # ================= 3. FUNCIONÁRIA cria a senha pelo convite =================
         ctxF, F = nova(b, ponte)
@@ -284,7 +284,7 @@ def run():
 
         # ================= 12. cada permissão liga e desliga sozinha =================
         A.evaluate("location.hash = '#usuarios'"); A.wait_for_selector('input[data-usr-perm="vt"]', timeout=10000)
-        check('Ativo' in A.locator('.usr-card[data-usr]').inner_text() and 'Último acesso' in A.locator('.usr-card[data-usr]').inner_text(), 'cartão da funcionária: Ativo, com último acesso')
+        check('Ativo' in A.locator('.usr-linha[data-usr]').inner_text() and 'Último acesso' in A.locator('.usr-linha[data-usr]').inner_text(), 'cartão da funcionária: Ativo, com último acesso')
         foto(A, 'admin_usuarios')
         A.locator('input[data-usr-perm="vt"]').click(); esperar_toast(A, 'Vale-transporte: retirado')
         recarregar(F); F.wait_for_timeout(400)

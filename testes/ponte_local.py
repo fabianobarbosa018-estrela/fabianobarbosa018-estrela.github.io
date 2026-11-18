@@ -68,7 +68,7 @@ class Ponte:
             self.con.commit()
         except psycopg2.Error as e:
             self.con.rollback()
-            return self._reg(fn, 400, {'code': e.pgcode, 'details': None, 'hint': None, 'message': e.diag.message_primary})
+            return self._reg(fn, 400, {'code': e.pgcode, 'details': None, 'hint': e.diag.message_hint, 'message': e.diag.message_primary})
         if f['ret'] == 'void':
             return self._reg(fn, 204, None)
         return self._reg(fn, 200, r)

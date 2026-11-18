@@ -57,7 +57,7 @@ def run():
         check(A.locator('#topTitle').inner_text().strip() == 'Painel', 'link antigo #diaria abre o Painel')
 
         A.goto(BASE + '#atestados'); A.wait_for_selector('#atsArquivo', state='attached', timeout=20000)
-        check('Nenhum atestado' in A.locator('#view').inner_text() or A.locator('.ats-item').count() == 0, 'lista começa vazia')
+        check('Nenhum atestado' in A.locator('#view').inner_text() or A.locator('.ats-card').count() == 0, 'lista começa vazia')
 
         # ---------- envio e leitura automática ----------
         A.set_input_files('#atsArquivo', img)
@@ -125,8 +125,20 @@ def run():
         check(all(aj.get(d, {}).get('t') == 'atestado' for d in dias[:3]) and not any(d in aj for d in dias[3:]), 'correção para 3 dias: 19 e 20/11 voltaram ao normal')
 
         # ---------- cancelamento desfaz ----------
-        A.click('[data-act="atsLista"]'); A.wait_for_selector('[data-act="atsCancelar"]', timeout=10000)
-        A.click('[data-act="atsCancelar"]'); A.wait_for_selector('#atsMotivo')
+        A.click('[data-act="atsLista"]'); A.wait_for_selector('[data-act="atsDetalhes"]', timeout=10000)
+        check(A.locator('.ats-inds .ctr-ind').count() == 5, 'painel com 5 indicadores')
+        c0 = A.locator('.ats-card').first.inner_text()
+        check('Ana' in c0 and 'volta' in c0 and 'dia' in c0 and 'documento' in c0, 'cartão: funcionário, período, dias, retorno e documento')
+        A.locator('[data-act="atsDetalhes"]').first.click(); A.wait_for_selector('.mbg [data-x="canc"]')
+        det = A.locator('#modals .mbg').last.inner_text()
+        check('Recebido' in det and 'Confirmado e lançado' in det and 'Corrigido' in det, 'detalhes mostram quem recebeu, confirmou e corrigiu')
+        A.locator('.mbg [data-x="hist"]').click(); A.wait_for_timeout(400)
+        check('Dias afastado' in A.locator('#modals .mbg').last.inner_text(), 'histórico do funcionário abre')
+        A.locator('#modals .mbg').last.locator('[data-x="f"]').click(); A.wait_for_timeout(300)
+        A.locator('[data-act="atsDetalhes"]').first.click(); A.wait_for_selector('.mbg [data-x="canc"]')
+        A.locator('.mbg [data-x="canc"]').click(); A.wait_for_selector('#atsMotivo')
+        A.locator('#modals .mbg').last.locator('.mf button').last.click(); A.wait_for_timeout(300)
+        check(A.locator('#atsMotivo').count() == 1, 'cancelar exige motivo')
         A.fill('#atsMotivo', 'teste'); A.locator('#modals .mbg').last.locator('.mf button').last.click(); A.wait_for_timeout(1500)
         aj = ajustes(ponte)
         check(not any(d in aj for d in dias), 'cancelamento: VT volta ao que era antes')
@@ -156,7 +168,7 @@ def run():
         check(ponte.sql("select count(*) from esc_atestados where status='ativo'")[0][0] == 2, 'lote: 2 atestados registrados (a cópia não)')
         A.click('[data-act="atsLoteRemover"]'); A.wait_for_timeout(300)
         A.click('[data-act="atsLoteSair"]'); A.wait_for_selector('#atsArquivo', state='attached', timeout=10000); A.wait_for_timeout(800)
-        check(A.locator('.ats-item').count() >= 3, 'lista mostra os lançados do lote')
+        check(A.locator('.ats-card').count() >= 2, 'lista mostra os lançados do lote (cancelados ficam no filtro Cancelados)')
 
         # lote com um documento que precisa de conferência: conferir, completar e lançar
         i4, i5 = os.path.join(tmp, 'ana2.png'), os.path.join(tmp, 'carla2.png')
@@ -176,6 +188,32 @@ def run():
         if A.locator('[data-act="atsLoteLancar"]').count():
             A.click('[data-act="atsLoteLancar"]'); A.wait_for_timeout(2500)
         check(ajustes(ponte, 'f3').get('2026-11-14', {}).get('t') == 'atestado', 'lote: o outro documento lançado em seguida')
+
+        # ---------- em análise: guardar para conferir depois ----------
+        from PIL import Image as _I
+        ilegivel = os.path.join(tmp, 'ilegivel.png'); _I.new('RGB', (800, 1000), (235, 235, 230)).save(ilegivel)
+        if A.locator('[data-act="atsLoteSair"]').count(): A.click('[data-act="atsLoteSair"]')
+        A.goto(BASE + '#atestados'); A.wait_for_timeout(600)
+        if A.locator('[data-act="atsLista"]').count(): A.click('[data-act="atsLista"]')
+        A.wait_for_selector('#atsArquivo', state='attached', timeout=20000)
+        A.set_input_files('#atsArquivo', ilegivel); A.wait_for_selector('[data-act="atsAnalise"]', timeout=180000)
+        check(A.locator('#atsFunc').input_value() == '' and A.locator('#atsInicio').input_value() == '', 'documento ilegível: nada inventado')
+        antes_vt = json.dumps(ajustes(ponte, 'f2'), sort_keys=True)
+        A.click('[data-act="atsAnalise"]'); A.wait_for_selector('.ats-card.analise', timeout=10000)
+        check(ponte.sql("select count(*) from esc_atestados where status='analise'")[0][0] == 1, 'guardado em análise no servidor')
+        check(json.dumps(ajustes(ponte, 'f2'), sort_keys=True) == antes_vt, 'em análise não mexe no VT nem na escala')
+        check('Em análise' in A.locator('.ats-inds').inner_text() and A.locator('.ats-inds .ctr-ind.alerta').count() >= 1, 'painel conta o atestado em análise')
+        A.click('.ats-card.analise [data-act="atsCorrigir"]'); A.wait_for_selector('#atsFunc')
+        A.select_option('#atsFunc', 'f2'); A.fill('#atsInicio', '2026-11-26'); A.dispatch_event('#atsInicio', 'change'); A.fill('#atsDias', '2'); A.dispatch_event('#atsDias', 'change'); A.wait_for_timeout(700)
+        A.click('[data-act="atsConfirmar"]'); A.wait_for_selector('text=Voltar aos atestados', timeout=20000)
+        st_ = ponte.sql("select status, confirmado_por, arquivo is not null from esc_atestados where func_id='f2' and inicio='2026-11-26'")
+        check(st_ and st_[0] == ('ativo', 'Administrador', True), 'conferido e confirmado: lançado, com quem confirmou e o documento original (%s)' % (st_,))
+        check(ajustes(ponte, 'f2').get('2026-11-26', {}).get('t') == 'atestado' and ajustes(ponte, 'f2').get('2026-11-27', {}).get('t') == 'atestado', 'confirmado: VT e escala atualizados')
+        A.click('[data-act="atsLista"]'); A.wait_for_timeout(500)
+        over = A.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
+        check(over <= 2, 'tela cabe no iPhone (%s)' % over)
+        A.screenshot(path=os.path.join(tmp, 'atestados.png'), full_page=True)
+        print('arquivos em', tmp)
 
         check(not erros_pagina, 'sem erros na página: %s' % erros_pagina[:3])
         b.close()

@@ -18,7 +18,7 @@
 
   async function carregar() {
     const s = st(); s.carregando = true;
-    try { s.lista = (await Nuvem.rpc('esc_atestados_listar', {})) || []; s.erro = null; }
+    try { s.lista = (await Nuvem.rpc('esc_atestados_listar', {})) || []; s.erro = null; s.analiseOk = s.lista.some(a => 'confirmado_por' in a); }
     catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); s.erro = /Could not find the function/.test(e.message || '') ? 'O servidor ainda não recebeu esta atualização.' : msgErro(e); }
     s.carregando = false;
     if (UI.rota === 'atestados' || UI.rota === 'funcionarios') render();
@@ -80,32 +80,100 @@
     if (s.etapa === 'feito') return cab() + telaFeito();
     if (s.etapa === 'lote') return cab() + telaLote();
     if (!s.lista && !s.carregando && !s.erro) carregar();
-    return cab() + `<div class="card ats-env">
-      <div><b>Enviar atestado</b><p class="small muted" style="margin:4px 0 0">Foto ou PDF, um ou vários de uma vez. O sistema lê, identifica o funcionário e prepara tudo. Você só confere e confirma.</p></div>
-      <label class="btn pri ats-file">${ic('plus')} Enviar fotos ou PDFs<input type="file" id="atsArquivo" accept="image/*,application/pdf" multiple hidden></label>
-      <button class="btn sm" data-act="atsManual">Lançar sem documento</button></div>` + telaLista();
+    return cab() + telaPainel() + `<div class="card ats-env">
+      <div><b>Enviar atestados</b><p class="small muted" style="margin:4px 0 0">Foto ou PDF, um ou vários de uma vez. O sistema lê e prepara; você confere antes de salvar. O que não estiver legível fica em branco.</p></div>
+      <div class="ats-env-bt"><label class="btn pri ats-file">${ic('plus')} Enviar fotos ou PDFs<input type="file" id="atsArquivo" accept="image/*,application/pdf" multiple hidden></label>
+      <button class="btn sm" data-act="atsManual">Lançar sem documento</button></div></div>` + telaLista();
   }
-  const cab = () => `<div class="row mb"><div><h1>Atestados</h1><p class="sub" style="margin:0">Envie uma vez: escala, vale-transporte, painel e funcionários são atualizados juntos</p></div></div>`;
+  const cab = () => `<div class="orc-topo"><div><h2 style="margin:0">Atestados</h2><div class="small muted">Envie uma vez: escala, vale-transporte, painel e funcionários são atualizados juntos</div></div></div>`;
 
+  // situação de cada atestado hoje
+  const SIT = { analise: ['Em análise', 'b-warn'], andamento: ['Em andamento', 'b-err'], agendado: ['Começa em breve', 'b-blue'], encerrado: ['Encerrado', 'b-ok'], cancelado: ['Cancelado', 'b-off'] };
+  function situacao(a, h0) {
+    if (a.status === 'cancelado') return 'cancelado';
+    if (a.status === 'analise') return 'analise';
+    if (a.inicio > h0) return 'agendado';
+    return a.fim < h0 ? 'encerrado' : 'andamento';
+  }
+  const proxRetorno = (a, h0) => a.status === 'ativo' && a.retorno >= h0 && a.retorno <= C.addDias(h0, 7);
+  function telaPainel() {
+    const s = st(); if (!s.lista) return '';
+    const h0 = hoje(), L = s.lista;
+    const n = { total: L.filter(a => a.status !== 'cancelado').length, analise: L.filter(a => a.status === 'analise').length,
+      andamento: L.filter(a => situacao(a, h0) === 'andamento').length, encerrado: L.filter(a => situacao(a, h0) === 'encerrado').length, retornos: L.filter(a => proxRetorno(a, h0)).length };
+    const ind = (k, v, l, cls) => `<button class="ctr-ind${s.filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-act="atsFiltroSit" data-s="${k}"><b>${v}</b><span>${l}</span></button>`;
+    return '<div class="ctr-inds ats-inds">' + ind('', n.total, 'Atestados') + ind('analise', n.analise, 'Em análise', n.analise ? 'alerta' : '') + ind('andamento', n.andamento, 'Afastamentos em andamento', n.andamento ? 'perigo' : '') +
+      ind('encerrado', n.encerrado, 'Afastamentos encerrados') + ind('retornos', n.retornos, 'Retornos em 7 dias') + '</div>';
+  }
   function telaLista() {
     const s = st();
     if (s.erro) return `<div class="alert e"><span class="ic">!</span><div>${esc(s.erro)} <a href="#" data-act="atsRecarregar">Tentar de novo</a></div></div>`;
     if (!s.lista) return '<div class="loading"><div class="spin"></div>Carregando atestados…</div>';
-    const filtro = s.filtroFunc || '', h0 = hoje();
-    const lista = s.lista.filter(a => !filtro || a.func_id === filtro);
-    const andamento = lista.filter(a => a.status === 'ativo' && a.inicio <= h0 && a.fim >= h0);
-    const funcsCom = [...new Map(s.lista.map(a => [a.func_id, a.func_nome])).entries()];
-    let h = `<div class="row mb" style="align-items:center;justify-content:space-between"><h2 style="margin:0">Lançados</h2>
-      ${funcsCom.length > 1 ? `<select id="atsFiltro" style="max-width:220px"><option value="">Todos os funcionários</option>${funcsCom.map(([id, n]) => `<option value="${id}" ${id === filtro ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}</div>`;
-    if (andamento.length) h += `<div class="alert w"><span class="ic">!</span><div><b>${andamento.length} afastamento(s) em andamento:</b> ${andamento.map(a => esc(a.func_nome) + ' até ' + br(a.fim)).join(' · ')}</div></div>`;
-    if (!lista.length) return h + '<div class="card empty"><b>Nenhum atestado lançado</b>Envie a foto ou o PDF do atestado acima.</div>';
-    return h + lista.map(a => {
-      const sit = a.status === 'cancelado' ? '<span class="badge b-off">Cancelado</span>' : a.fim < h0 ? '<span class="badge b-ok">Encerrado</span>' : a.inicio > h0 ? '<span class="badge b-blue">Começa ' + br(a.inicio).slice(0, 5) + '</span>' : '<span class="badge b-err">Em andamento</span>';
-      return `<div class="card mb ats-item${a.status === 'cancelado' ? ' off' : ''}"><div class="ats-it-h"><div><b>${esc(a.func_nome)}</b><div class="small muted">${br(a.inicio)} a ${br(a.fim)} · ${a.dias} dia(s) · volta ${br(a.retorno)}</div></div>${sit}</div>
-        <div class="small muted ats-it-m">${a.emissao ? 'Emitido em ' + br(a.emissao) + ' · ' : ''}${a.cid ? 'CID ' + esc(a.cid) + ' · ' : ''}lançado por ${esc(a.aprovado_por || a.enviado_por || '—')} em ${dtHora(a.aprovado_em || a.enviado_em)}${a.corrigido_em ? ' · corrigido em ' + dtHora(a.corrigido_em) : ''}${a.status === 'cancelado' ? ' · cancelado em ' + dtHora(a.cancelado_em) + (a.motivo_cancelamento ? ' (' + esc(a.motivo_cancelamento) + ')' : '') : ''}</div>
-        ${a.obs ? `<div class="small" style="margin-top:4px">${esc(a.obs)}</div>` : ''}
-        <div class="ats-acoes">${a.tem_arquivo ? `<button class="btn sm" data-act="atsVerDoc" data-id="${a.id}">Ver documento</button>` : ''}${a.status === 'ativo' ? `<button class="btn sm" data-act="atsCorrigir" data-id="${a.id}">${ic('edit')} Corrigir</button><button class="btn sm danger" data-act="atsCancelar" data-id="${a.id}">Cancelar</button>` : ''}</div></div>`;
-    }).join('');
+    const h0 = hoje(), txt = (s.busca || '').trim().toLowerCase(), fil = s.filtro || '';
+    const lista = s.lista.filter(a => (!s.filtroFunc || a.func_id === s.filtroFunc) &&
+      (!fil ? a.status !== 'cancelado' : fil === 'retornos' ? proxRetorno(a, h0) : situacao(a, h0) === fil) &&
+      (!txt || [a.func_nome, a.cid, a.nome_doc, nomeSetor((funcPorId(a.func_id) || {}).setorId)].join(' ').toLowerCase().includes(txt)));
+    const chips = [['', 'Todos'], ['analise', 'Em análise'], ['andamento', 'Em andamento'], ['agendado', 'Começam em breve'], ['retornos', 'Retornos'], ['encerrado', 'Encerrados'], ['cancelado', 'Cancelados']];
+    let h = `<div class="orc-busca"><input type="search" id="atsBusca" placeholder="Pesquisar por funcionário, setor ou CID" value="${esc(s.busca || '')}" autocomplete="off"></div>
+      <div class="orc-chips">${chips.map(c => `<button class="orc-chip${fil === c[0] ? ' on' : ''}" data-act="atsFiltroSit" data-s="${c[0]}">${c[1]}</button>`).join('')}</div>`;
+    if (s.filtroFunc) h += `<div class="alert i"><span class="ic">i</span><div>Mostrando só <b>${esc((funcPorId(s.filtroFunc) || {}).nome || '')}</b>. <a href="#" data-act="atsFiltroFunc" data-f="">Ver todos</a></div></div>`;
+    h += `<div class="orc-lista-h"><b>${fil || txt || s.filtroFunc ? 'Resultado' : 'Histórico'}</b><span class="small muted">${lista.length} atestado(s)</span></div>`;
+    if (!s.lista.length) return h + '<div class="card empty"><b>Nenhum atestado lançado</b>Envie a foto ou o PDF do atestado acima.</div>';
+    if (!lista.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum atestado encontrado.</p></div>';
+    return h + '<div class="orc-lista">' + lista.map(a => cartao(a, h0)).join('') + '</div>';
+  }
+  function cartao(a, h0) {
+    const sit = situacao(a, h0), x = SIT[sit], f = funcPorId(a.func_id), setor = f ? nomeSetor(f.setorId) : '';
+    const falta = a.status === 'analise' ? [!a.func_id && 'funcionário', !a.inicio && 'início', !a.dias && 'dias'].filter(Boolean) : [];
+    return `<div class="orc-card ats-card ${sit}" data-ats="${a.id}"><div class="orc-card-l1"><span class="orc-num">${a.status === 'analise' ? 'Recebido ' + dtHora(a.enviado_em) : 'Atestado nº ' + a.id}${a.tem_arquivo ? ' · 📎 documento' : ''}</span><span class="badge ${x[1]}">${x[0]}</span></div>
+      <div class="orc-card-l2"><b>${a.func_nome ? esc(a.func_nome) : '<span class="muted">Funcionário a identificar</span>'}</b>${a.dias ? `<span class="orc-val">${a.dias} dia${a.dias > 1 ? 's' : ''}</span>` : ''}</div>
+      <div class="orc-desc">${setor ? esc(setor) + ' · ' : ''}${a.inicio ? br(a.inicio) + (a.dias ? ' a ' + br(a.fim) : '') : 'datas a conferir'}${a.retorno && a.status !== 'analise' ? ' · <b>volta ' + br(a.retorno) + '</b>' : ''}${a.cid ? ' · CID ' + esc(a.cid) : ''}</div>
+      ${falta.length ? `<div class="small" style="color:#a16207;margin-top:3px">Falta conferir: ${falta.join(', ')}</div>` : ''}
+      ${sit === 'cancelado' && a.motivo_cancelamento ? `<div class="small muted" style="margin-top:3px">Motivo: ${esc(a.motivo_cancelamento)}</div>` : ''}
+      <div class="orc-card-bt ats-bt">${a.status === 'analise' ? `<button class="btn sm ok" data-act="atsCorrigir" data-id="${a.id}">Conferir e confirmar</button>` : ''}
+        ${a.tem_arquivo ? `<button class="btn sm" data-act="atsVerDoc" data-id="${a.id}">Documento</button>` : ''}<button class="btn sm" data-act="atsDetalhes" data-id="${a.id}">Detalhes</button>
+        ${a.status === 'ativo' ? `<button class="btn sm" data-act="atsCorrigir" data-id="${a.id}">Corrigir</button>` : ''}</div></div>`;
+  }
+  // detalhes: dados, trilha completa e ações
+  function detalhes(id) {
+    const s = st(), a = (s.lista || []).find(x => String(x.id) === String(id)); if (!a) return;
+    const h0 = hoje(), x = SIT[situacao(a, h0)], f = funcPorId(a.func_id);
+    const linha = (l, v) => v ? `<div><span class="small muted">${l}</span><div>${v}</div></div>` : '';
+    const trilha = [
+      ['Recebido', a.enviado_em, a.enviado_por], [a.status === 'analise' ? '' : 'Confirmado e lançado', a.confirmado_em || a.aprovado_em, a.confirmado_por || a.aprovado_por],
+      ['Corrigido', a.corrigido_em, a.corrigido_por], ['Cancelado', a.cancelado_em, a.cancelado_por]].filter(t => t[0] && t[1]);
+    const w = abrirModal(`<div class="mh">Atestado ${a.func_nome ? 'de ' + esc(a.func_nome) : ''} <span class="badge ${x[1]}" style="margin-left:6px">${x[0]}</span></div><div class="mbd">
+      <div class="orc-info">${linha('Funcionário', a.func_nome ? esc(a.func_nome) : 'a identificar')}${linha('Setor', f ? esc(nomeSetor(f.setorId)) : '')}${linha('Emissão', a.emissao ? br(a.emissao) : '')}
+        ${linha('Início', a.inicio ? br(a.inicio) : '')}${linha('Término', a.fim ? br(a.fim) : '')}${linha('Dias', a.dias ? String(a.dias) : '')}${linha('Retorno', a.retorno ? br(a.retorno) : '')}
+        ${linha('CID', a.cid ? esc(a.cid) : 'não informado')}${linha('Nome lido no documento', a.nome_doc ? esc(a.nome_doc) : '')}${linha('Leitura', a.leitura_segura === true ? 'automática, conferida' : a.leitura_segura === false ? 'conferida manualmente' : '')}</div>
+      ${a.obs ? `<p class="small" style="margin:10px 0 0">${esc(a.obs)}</p>` : ''}
+      ${a.motivo_cancelamento ? `<p class="small" style="margin:10px 0 0"><b>Motivo do cancelamento:</b> ${esc(a.motivo_cancelamento)}</p>` : ''}
+      <h3 style="margin:14px 0 4px">Histórico do documento</h3><ul class="list-sm">${trilha.map(t => `<li><span><b>${t[0]}</b> ${t[2] ? '· ' + esc(t[2]) : ''}</span><span class="small muted">${dtHora(t[1])}</span></li>`).join('')}</ul>
+      <p class="small muted">Documento médico e CID: visíveis só para o administrador. Nenhum registro é apagado.</p></div>
+      <div class="mf ats-det-bt">${a.func_id ? `<button class="btn sm" data-x="hist">Histórico de ${esc((a.func_nome || '').split(' ')[0])}</button>` : ''}${a.tem_arquivo ? '<button class="btn sm" data-x="doc">Ver documento</button>' : ''}
+        ${a.status !== 'cancelado' ? '<button class="btn sm danger" data-x="canc">Cancelar</button>' : ''}<button class="btn sm pri" data-x="f">Fechar</button></div>`, true);
+    w.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-x]'); if (!b) return;
+      fecharModal(w);
+      if (b.dataset.x === 'hist') historicoFunc(a.func_id);
+      if (b.dataset.x === 'doc') verDoc(a.id);
+      if (b.dataset.x === 'canc') cancelar(a.id);
+    });
+  }
+  // histórico do funcionário: todos os atestados e afastamentos dele
+  function historicoFunc(fid) {
+    const s = st(), f = funcPorId(fid), L = (s.lista || []).filter(a => a.func_id === fid), h0 = hoje(), ano = h0.slice(0, 4);
+    const diasAno = L.filter(a => a.status === 'ativo' && a.inicio && a.inicio.slice(0, 4) === ano).reduce((t, a) => t + (a.dias || 0), 0);
+    const w = abrirModal(`<div class="mh">Histórico de ${esc(f ? f.nome : '')}</div><div class="mbd">
+      <div class="orc-info">${[['Setor', f ? esc(nomeSetor(f.setorId)) : '—'], ['Atestados', String(L.filter(a => a.status !== 'cancelado').length)], ['Dias afastado em ' + ano, String(diasAno)], ['Situação hoje', (() => { const au = root.ausenciaEm && root.ausenciaEm(fid, h0); return au ? esc(au.nome) + (au.ate ? ' até ' + br(au.ate) : '') : 'Trabalhando / disponível'; })()]].map(z => `<div><span class="small muted">${z[0]}</span><div><b>${z[1]}</b></div></div>`).join('')}</div>
+      <ul class="list-sm" style="margin-top:12px">${L.map(a => `<li><span><b>${a.inicio ? br(a.inicio) + (a.fim ? ' a ' + br(a.fim) : '') : 'datas a conferir'}</b><div class="small muted">${a.dias ? a.dias + ' dia(s) · ' : ''}${a.cid ? 'CID ' + esc(a.cid) + ' · ' : ''}${SIT[situacao(a, h0)][0]}</div></span><button class="btn sm" data-x="${a.id}">Detalhes</button></li>`).join('') || '<li class="muted">Nenhum atestado.</li>'}</ul></div>
+      <div class="mf"><button class="btn" data-x="lista">Filtrar a lista por ${esc(f ? f.nome.split(' ')[0] : '')}</button><button class="btn pri" data-x="f">Fechar</button></div>`, true);
+    w.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-x]'); if (!b) return;
+      fecharModal(w);
+      if (b.dataset.x === 'lista') { s.filtroFunc = fid; s.filtro = ''; render(); }
+      else if (/^\d+$/.test(b.dataset.x)) detalhes(b.dataset.x);
+    });
   }
 
   function telaConferir() {
@@ -118,7 +186,9 @@
     if (L && L.previa) h += `<div class="card ats-doc"><img src="${L.previa}" alt="Atestado enviado" data-act="atsZoom" title="Toque para ampliar"><div class="small muted">${L.tipo === 'pdf' ? 'PDF' : 'Foto'} · leitura ${Math.round(L.confianca || 0)}% · <a href="#" data-act="atsZoom">🔍 ampliar a foto</a></div></div>`;
     h += '<div class="ats-campos">';
     if (s.loteIdx != null) h += `<div class="small muted">Documento ${s.loteIdx + 1} de ${s.lote.length}${s.lote[s.loteIdx].nome ? ' · ' + esc(s.lote[s.loteIdx].nome) : ''}</div>`;
-    if (s.corrigindo) h += `<div class="alert i"><span class="ic">i</span><div>Corrigindo o atestado lançado. Ao salvar, o que foi lançado antes é desfeito e lançado de novo com os dados abaixo.</div></div>`;
+    const ehAnal = s.corrigindo && ((s.lista || []).find(x => x.id === s.corrigindo) || {}).status === 'analise';
+    if (ehAnal) h += `<div class="alert w"><span class="ic">!</span><div><b>Atestado em análise.</b> Confira os dados com o documento. Ao confirmar, a escala e o vale-transporte são atualizados.</div></div>`;
+    else if (s.corrigindo) h += `<div class="alert i"><span class="ic">i</span><div>Corrigindo o atestado lançado. Ao salvar, o que foi lançado antes é desfeito e lançado de novo com os dados abaixo.</div></div>`;
     else if (L) h += L.dados.seguro && !(L.dados.avisos || []).length
       ? `<div class="alert s"><span class="ic">✓</span><div><b>Documento lido com segurança.</b> Confira e confirme.</div></div>`
       : `<div class="alert w"><span class="ic">!</span><div><b>Confira antes de lançar.</b><ul class="ats-av">${(L.dados.avisos || []).map(x => '<li>' + esc(x) + '</li>').join('')}</ul></div></div>`;
@@ -149,7 +219,8 @@
       if ((v.marcados || []).length) h += `<div class="alert i"><span class="ic">i</span><div>Já marcado nesses dias: ${v.marcados.map(x => br(x.data).slice(0, 5) + ' ' + ((C.VT_TIPOS[x.t] || {}).nome || x.t).toLowerCase()).join(', ')}. O atestado fica no lugar; se ele for cancelado, volta o que estava.</div></div>`;
     }
     h += '</div>';
-    h += `<div class="row ats-bts"><button class="btn" data-act="atsVoltar">${s.loteIdx != null ? 'Voltar à lista' : 'Cancelar'}</button><button class="btn ok" data-act="atsConfirmar" ${bloqueio ? 'disabled' : ''}>${ic('check')} ${s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'}</button></div>`;
+    const emAnalise = s.corrigindo && ((s.lista || []).find(x => x.id === s.corrigindo) || {}).status === 'analise';
+    h += `<div class="row ats-bts"><button class="btn" data-act="atsVoltar">${s.loteIdx != null ? 'Voltar à lista' : 'Cancelar'}</button>${s.analiseOk && (!s.corrigindo || emAnalise) ? `<button class="btn" data-act="atsAnalise" ${v.mesmo_arquivo ? 'disabled' : ''}>Guardar para conferir depois</button>` : ''}<button class="btn ok" data-act="atsConfirmar" ${bloqueio ? 'disabled' : ''}>${ic('check')} ${emAnalise ? 'Confirmar e lançar' : s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'}</button></div>`;
     return h + '</div></div>';
   }
 
@@ -170,6 +241,7 @@
     if (it.status === 'lancado') return '<span class="badge b-ok">Lançado</span>';
     if (it.status === 'erro') return '<span class="badge b-err">Não lançado</span>';
     if (it.status === 'removido') return '<span class="badge b-off">Removido</span>';
+    if (it.status === 'analise') return '<span class="badge b-warn">Em análise</span>';
     if (it.bloqueio || it.conflitoLote) return '<span class="badge b-err">Bloqueado</span>';
     return itemPronto(it) ? '<span class="badge b-ok">Pronto</span>' : '<span class="badge" style="background:#fff4d6;color:#a16207">Conferir</span>';
   }
@@ -211,7 +283,7 @@
     const prontos = L.filter(itemPronto).length, pend = L.filter(it => it.status === 'pendente').length, lanc = L.filter(it => it.status === 'lancado').length;
     let h = `<div class="card mb"><b>${L.length} documento(s) lidos</b><div class="small muted">${lanc ? lanc + ' lançado(s) · ' : ''}${prontos} pronto(s) para lançar${pend - prontos > 0 ? ' · ' + (pend - prontos) + ' para conferir' : ''}</div>
       <p class="small muted" style="margin:6px 0 0">"Pronto" = leitura segura, sem dúvidas e sem conflito. Os outros você abre em <b>Conferir</b>, ajusta e confirma um por um.</p>
-      <div class="row mt ats-bts">${pend ? '<button class="btn" data-act="atsLoteSair">Sair sem lançar o resto</button>' : '<button class="btn pri" data-act="atsLoteSair">Concluir</button>'}${prontos ? `<button class="btn ok" data-act="atsLoteLancar">${ic('check')} Lançar os ${prontos} prontos</button>` : ''}</div></div>`;
+      <div class="row mt ats-bts">${pend ? '<button class="btn" data-act="atsLoteSair">Sair sem lançar o resto</button>' + (s.analiseOk ? '<button class="btn" data-act="atsLoteAnalise">Guardar os demais em análise</button>' : '') : '<button class="btn pri" data-act="atsLoteSair">Concluir</button>'}${prontos ? `<button class="btn ok" data-act="atsLoteLancar">${ic('check')} Lançar os ${prontos} prontos</button>` : ''}</div></div>`;
     h += L.map((it, i) => {
       const f = it.form, fn = f.func_id ? (funcPorId(f.func_id) || {}).nome : '', mot = motivoItem(it);
       return `<div class="card mb ats-item${it.status === 'removido' ? ' off' : ''}"><div class="ats-it-h" style="gap:10px">
@@ -258,7 +330,7 @@
   }
   function payload(f, L, corrigindo, alterado) {
     const p = Object.assign({}, f, { id: corrigindo || null, vt_resumo: impactoVT(f.func_id, f.inicio, +f.dias, corrigindo) });
-    if (L) Object.assign(p, { arquivo: L.arquivo, arquivo_tipo: L.tipo, arquivo_hash: L.hash, texto_lido: L.texto, confianca: L.confianca, nome_doc: L.dados.nomeDoc, leitura_segura: !!(L.dados.seguro && !alterado) });
+    if (L && !L.guardado) Object.assign(p, { arquivo: L.arquivo, arquivo_tipo: L.tipo, arquivo_hash: L.hash, texto_lido: L.texto, confianca: L.confianca, nome_doc: L.dados.nomeDoc, leitura_segura: !!(L.dados.seguro && !alterado) });
     return p;
   }
   function voltarAoLote() {
@@ -340,7 +412,7 @@
         Object.assign(s, { etapa: 'lote', loteIdx: null, leitura: null, lista: null });
         toast('Atestado de ' + r.func_nome + ' lançado.'); await Nuvem.sincronizar().catch(() => {}); render(); window.scrollTo(0, 0); carregar(); reverificarLote(); return;
       }
-      Object.assign(s, { etapa: 'feito', feito: r, feitoCorrecao: !!s.corrigindo, resumoVT: iv && !iv.semVT ? (iv.reduz > 0 ? 'deixa de pagar ' + R$(iv.reduz) : '') + (iv.pagoAMais > 0 ? (iv.reduz > 0 ? ' · ' : '') + R$(iv.pagoAMais) + ' já pagos ficam como saldo a descontar' : '') : '', lista: null, leitura: null });
+      Object.assign(s, { etapa: 'feito', filtro: '', feito: r, feitoCorrecao: !!s.corrigindo, resumoVT: iv && !iv.semVT ? (iv.reduz > 0 ? 'deixa de pagar ' + R$(iv.reduz) : '') + (iv.pagoAMais > 0 ? (iv.reduz > 0 ? ' · ' : '') + R$(iv.pagoAMais) + ' já pagos ficam como saldo a descontar' : '') : '', lista: null, leitura: null });
       await Nuvem.sincronizar().catch(() => {});
       render(); window.scrollTo(0, 0); carregar();
     } catch (e) {
@@ -348,6 +420,24 @@
       if (b) { b.disabled = false; b.textContent = s.corrigindo ? 'Salvar correção' : 'Confirmar e lançar'; }
       modalMsg('Não foi lançado', '<p>' + esc(msgErro(e)) + '</p>');
     }
+  }
+  async function guardarAnalise(btn) {
+    const s = st(); lerForm(); const f = s.form, L = s.leitura;
+    const p = Object.assign(payload(f, L, s.corrigindo, s.duvidasAlteradas), { analise: true });
+    if (btn) btn.disabled = true;
+    try {
+      const r = await Nuvem.rpc('esc_atestado_salvar', { p });
+      if (s.loteIdx != null) { const it = s.lote[s.loteIdx]; Object.assign(it, { status: 'analise' }); Object.assign(s, { etapa: 'lote', loteIdx: null, leitura: null, lista: null }); }
+      else Object.assign(s, { etapa: 'lista', leitura: null, corrigindo: null, lista: null, filtro: 'analise' });
+      toast('Guardado em análise. Nada foi lançado na escala nem no VT ainda.'); render(); window.scrollTo(0, 0); carregar();
+    } catch (e) { if (btn) btn.disabled = false; modalMsg('Não foi guardado', '<p>' + esc(msgErro(e)) + '</p>'); }
+  }
+  async function loteAnalise(btn) {
+    const s = st(), alvo = s.lote.filter(it => it.status === 'pendente' && !(it.verif && it.verif.mesmo_arquivo) && !it.conflitoLote);
+    if (!alvo.length) return; if (btn) btn.disabled = true;
+    let ok = 0;
+    for (const it of alvo) { try { await Nuvem.rpc('esc_atestado_salvar', { p: Object.assign(payload(it.form, it.L, null, true), { analise: true }) }); it.status = 'analise'; ok++; } catch (e) { it.status = 'erro'; it.msg = msgErro(e); } }
+    s.lista = null; carregar(); toast(ok + ' documento(s) guardado(s) em análise.'); render();
   }
   async function verDoc(id) {
     let r; try { r = await Nuvem.rpc('esc_atestado_obter', { p_id: +id }); } catch (e) { return toast(msgErro(e)); }
@@ -358,19 +448,23 @@
     }
     abrirModal(`<div class="mh">Atestado arquivado</div><div class="mbd"><img src="${r.arquivo}" alt="Atestado" style="width:100%;border-radius:8px">${r.nome_doc ? `<p class="small muted">Nome lido no documento: ${esc(r.nome_doc)}</p>` : ''}<p class="small muted">Documento médico: visível só para o administrador.</p></div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button></div>`, true);
   }
-  function corrigir(id) {
+  async function corrigir(id) {
     const s = st(), a = (s.lista || []).find(x => String(x.id) === String(id)); if (!a) return;
-    Object.assign(s, { etapa: 'conferir', corrigindo: a.id, leitura: null, duvidas: [], form: { func_id: a.func_id, emissao: a.emissao || '', inicio: a.inicio, dias: a.dias, cid: a.cid || '', obs: a.obs || '' } });
+    const duv = a.status === 'analise' ? ['func', 'inicio', 'dias', 'emissao'].filter(k => !(k === 'func' ? a.func_id : a[k])) : [];
+    Object.assign(s, { etapa: 'conferir', corrigindo: a.id, leitura: null, duvidas: duv, form: { func_id: a.func_id || '', emissao: a.emissao || '', inicio: a.inicio || '', dias: a.dias || '', cid: a.cid || '', obs: a.obs || '' } });
     render(); window.scrollTo(0, 0); verificar();
+    if (a.tem_arquivo && a.arquivo_tipo !== 'pdf') {
+      try { const r = await Nuvem.rpc('esc_atestado_obter', { p_id: +a.id }); if (r && r.arquivo && /^data:image/.test(r.arquivo) && s.corrigindo === a.id) { s.leitura = { previa: r.arquivo, tipo: 'foto', confianca: r.confianca || 0, guardado: true, dados: { avisos: [], nomeDoc: r.nome_doc, seguro: false } }; render(); } } catch (e) { }
+    }
   }
   async function cancelar(id) {
     const s = st(), a = (s.lista || []).find(x => String(x.id) === String(id)); if (!a) return;
-    const w = abrirModal(`<div class="mh">Cancelar atestado?</div><div class="mbd"><p>${esc(a.func_nome)}, ${br(a.inicio)} a ${br(a.fim)}.</p><p class="muted small">Os dias voltam a ser como estavam antes na escala e no vale-transporte. O documento continua arquivado.</p>
-      <div class="fld"><label class="f">Motivo</label><input type="text" id="atsMotivo" maxlength="200" placeholder="Ex.: lançado errado"></div></div>
+    const w = abrirModal(`<div class="mh">Cancelar atestado?</div><div class="mbd"><p>${esc(a.func_nome || 'Funcionário a identificar')}${a.inicio ? ', ' + br(a.inicio) + (a.fim ? ' a ' + br(a.fim) : '') : ''}.</p><p class="muted small">Os dias voltam a ser como estavam antes na escala e no vale-transporte. O documento continua arquivado.</p>
+      <div class="fld"><label class="f">Motivo *</label><input type="text" id="atsMotivo" maxlength="200" placeholder="Ex.: lançado errado"></div></div>
       <div class="mf"><button class="btn" data-x="n">Voltar</button><button class="btn danger" data-x="s">Cancelar atestado</button></div>`);
     w.querySelector('[data-x=n]').onclick = () => fecharModal(w);
     w.querySelector('[data-x=s]').onclick = async () => {
-      const motivo = w.querySelector('#atsMotivo').value; fecharModal(w);
+      const motivo = w.querySelector('#atsMotivo').value.trim(); if (!motivo) { w.querySelector('#atsMotivo').focus(); return toast('Escreva o motivo do cancelamento.'); } fecharModal(w);
       try { await Nuvem.rpc('esc_atestado_cancelar', { p_id: +id, p_motivo: motivo }); toast('Atestado cancelado. Os dias voltaram ao que eram.'); await Nuvem.sincronizar().catch(() => {}); carregar(); }
       catch (e) { toast(msgErro(e)); }
     };
@@ -382,6 +476,11 @@
       case 'atsVoltar': if (s.loteIdx != null) return voltarAoLote(); // eslint-disable-line no-fallthrough
       case 'atsLista': Object.assign(s, { etapa: 'lista', leitura: null, corrigindo: null }); render(); window.scrollTo(0, 0); return;
       case 'atsConfirmar': return confirmarLancamento(el);
+      case 'atsAnalise': return guardarAnalise(el);
+      case 'atsLoteAnalise': return loteAnalise(el);
+      case 'atsDetalhes': return detalhes(el.dataset.id);
+      case 'atsFiltroSit': s.filtro = el.dataset.s || ''; render(); return;
+      case 'atsFiltroFunc': if (ev) ev.preventDefault(); s.filtroFunc = el.dataset.f || ''; render(); return;
       case 'atsZoom': { if (ev) ev.preventDefault(); const it = el.dataset.i != null && s.lote ? s.lote[+el.dataset.i] : null; return ampliar(it ? it.L.previa : s.leitura && s.leitura.previa); }
       case 'atsLoteLancar': return lancarProntos(el);
       case 'atsLoteConferir': { const it = s.lote[+el.dataset.i]; if (!it) return; Object.assign(s, { etapa: 'conferir', loteIdx: +el.dataset.i, leitura: it.L, form: Object.assign({}, it.form), duvidas: it.duvidas, duvidasAlteradas: !!it.editado, corrigindo: null, verif: it.verif, bloqueio: it.bloqueio }); render(); window.scrollTo(0, 0); verificar(); return; }
@@ -394,6 +493,12 @@
       case 'atsRecarregar': ev.preventDefault(); s.erro = null; s.lista = null; render(); return;
     }
   }
+  let buscaT = null;
+  document.addEventListener('input', ev => {
+    if (!ev.target || ev.target.id !== 'atsBusca') return;
+    st().busca = ev.target.value; window.__svcT = Date.now(); clearTimeout(buscaT);
+    buscaT = setTimeout(() => { const p = ev.target.selectionStart; render(); const n = document.getElementById('atsBusca'); if (n) { n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } } }, 250);
+  });
   document.addEventListener('change', ev => {
     const t = ev.target; if (!t || UI.rota !== 'atestados') return;
     if (t.id === 'atsArquivo') { const fs = Array.from(t.files || []); t.value = ''; return fs.length > 1 ? enviarVarios(fs) : enviarArquivo(fs[0]); }
@@ -401,5 +506,5 @@
     if (/^ats(Func|Emissao|Inicio|Dias|Cid|Obs)$/.test(t.id)) { const s = st(); lerForm(); if (s.leitura) s.duvidasAlteradas = true; if (t.id !== 'atsCid' && t.id !== 'atsObs') verificar(); else { const y = window.scrollY; render(); window.scrollTo(0, y); } }
   });
 
-  Object.assign(root, { vAtestados, atsAcao: acao, atsCarregar: carregar, ausenciaEm, atsImpactoVT: impactoVT });
+  Object.assign(root, { vAtestados, atsAcao: acao, atsCarregar: carregar, ausenciaEm, atsImpactoVT: impactoVT, atsHistoricoFunc: id => { const s = st(); if (!s.lista) { carregar().then(() => historicoFunc(id)); return; } historicoFunc(id); } });
 })(window);
