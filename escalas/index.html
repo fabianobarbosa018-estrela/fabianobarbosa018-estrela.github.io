@@ -942,6 +942,20 @@ input[type=date],input[type=month],input[type=time]{max-width:100%;min-width:0;b
 .ctr-passo.on i{background:var(--pri);border-color:var(--pri);color:#fff}
 .ctr-passo.feito i{border-color:var(--pri);color:var(--pri)}
 .ctr-etapa h3{margin:0 0 10px}
+.rh-av{width:30px;height:30px;border-radius:50%;background:#e6f0f2;color:var(--pri);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;margin-right:8px;vertical-align:middle}
+.rh-av.g{width:48px;height:48px;font-size:17px;background:linear-gradient(135deg,#0f4c5c,#13677a);color:#f3d28b;margin:0}
+.rh-cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rh-card.desligado{opacity:.75}
+.rh-card .orc-card-l2{display:flex;align-items:center}
+.rh-busca{display:flex;gap:8px;flex-wrap:wrap}.rh-busca input{flex:2 1 200px}.rh-busca select{flex:1 1 140px;font-size:16px}
+.rh-abas{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.rh-abas::-webkit-scrollbar{display:none}.rh-abas .orc-chip{white-space:nowrap}
+.rh-acoes{gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.rh-ferias-add{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}.rh-ferias-add .fld{flex:1 1 130px;margin:0}
+.rh-ferias-add input,.rh-ferias-add select{font-size:16px;width:100%;box-sizing:border-box}
+.rh-etapa input,.rh-etapa select,.rh-etapa textarea{font-size:16px;width:100%;box-sizing:border-box}
+.rh-passos .ctr-passo{min-width:0;flex:1 1 0}.rh-passos .ctr-passo span{font-size:10.5px}
+.rh-emerg{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px}
+.rh-ev li span:last-child{text-align:right}
 .ctr-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .ctr-etapa input[type=text],.ctr-etapa input[type=date],.ctr-etapa select,.ctr-etapa textarea,.mbd textarea,.mbd input[type=text],.mbd input[type=date]{font-size:16px;width:100%;box-sizing:border-box}
 .ctr-fim{padding:10px 12px;border-radius:10px;background:#eef6f7;color:var(--pri);font-weight:700;min-height:22px}
@@ -1873,7 +1887,7 @@ const C = window.Core;
 const TEXTO_IMPORTANTE = 'É extremamente importante ressaltar que a escala de folga não é fixa nem permanente, ela poderá sofrer alterações a qualquer momento ( no dia anterior a folga ) o horário também poderá ser alterado ( no mesmo dia ) de acordo com a necessidade da Fazenda.\nQualquer duvida, podem procurar a gerencia!';
 const CONFIG_PADRAO = { nomeHotel: 'Hotel Fazenda Oasis', tituloFolha: 'ESCALA DE FOLGA', textoImportante: TEXTO_IMPORTANTE };
 const PALETA = ['#A9D08E', '#B4C6E7', '#FFE699', '#F8CBAD', '#D9C3E9', '#C9C9C9', '#9BC2E6', '#FFD966', '#C6E0B4', '#F4B183', '#BDD7EE', '#E2EFDA'];
-const S = { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
+const S = { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, rh: {}, rh_docs: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO), modo: null, pronto: false, somenteLeitura: false, carregados: {} };
 const UI = { rota: 'painel', semana: C.inicioSemana(C.hojeISO()), mes: C.hojeISO().slice(0, 7), filtroSetor: '', setoresSel: [], filtroFunc: '', busca: '', situacao: 'ativos', histTab: 'escalas', expEscopo: 'completa', expSetor: '', expFunc: '', expPeriodo: 'semana', vtMes: C.hojeISO().slice(0, 7), vtTab: 'controle', vtPer: 'mes' };
 let DB = null, DL = null;
 const LS_KEY = 'escalas_hotel_v1';
@@ -1992,6 +2006,7 @@ const Store = {
     else if (col === 'config') { if (id === 'geral') S.config = Object.assign({}, CONFIG_PADRAO, limpo); }
     else if (col === 'vt') S.vt[id] = limpo;
     else if (col === 'servicos') S.servicos[id] = limpo;
+    else if (col === 'rh' || col === 'rh_docs') (S[col] = S[col] || {})[id] = limpo;
     else if (col === 'auditoria') { const i = S.auditoria.findIndex(x => x.id === id); const o = Object.assign({ id }, limpo); if (i >= 0) S.auditoria[i] = o; else S.auditoria.unshift(o); }
     else { const arr = S[col]; const i = arr.findIndex(x => x.id === id); const obj = Object.assign({ id }, limpo); if (i >= 0) arr[i] = obj; else arr.push(obj); }
   },
@@ -2000,6 +2015,7 @@ const Store = {
     else if (col === 'config') S.config = Object.assign({}, CONFIG_PADRAO);
     else if (col === 'vt') delete S.vt[id];
     else if (col === 'servicos') delete S.servicos[id];
+    else if (col === 'rh' || col === 'rh_docs') { if (S[col]) delete S[col][id]; }
     else S[col] = S[col].filter(x => x.id !== id);
   },
   async set(col, id, data) {
@@ -2067,7 +2083,7 @@ const Nuvem = {
   async carregarTudo() {
     const r = await this.rpc('esc_ler', { p_desde: null });
     if (r.perfil) aplicarPerfil(r.perfil); else await this.carregarPapel();
-    Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, rh: {}, rh_docs: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true; S.sincAt = new Date();
     // a tela aberta tem de ser uma que este perfil pode ver
@@ -2256,7 +2272,7 @@ document.addEventListener('submit', async ev => {
   if (err) falha(err);
 });
 async function log(tipo, texto, semana) {
-  const e = { ts: agoraISO(), tipo, texto, semana: semana || null };
+  const e = { ts: agoraISO(), tipo, texto, semana: semana || null, por: S.usuarioNome || (S.papel === 'admin' ? 'Administrador' : '') };
   if (S.modo === 'db' || S.modo === 'nuvem') { try { await Store.set('auditoria', uid('log'), e); } catch (x) { } }
   else { S.auditoria.unshift(Object.assign({ id: uid('log') }, e)); Store.salvarLocal(); }
 }
@@ -3093,7 +3109,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '18/11 03:30';
+const VERSAO_APP = '18/11 13:30';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -3258,7 +3274,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: window.vRH || vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -5404,7 +5420,7 @@ document.addEventListener('change', async (ev) => {
 document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
-const ACOES_SO_ADMIN = ['aprovar', 'aprovarMes', 'reabrir', 'excluirEscala', 'editarAprovada', 'escDevolver', 'novoFunc', 'importarFunc', 'editFunc', 'transfFunc', 'delFunc', 'novoSetor', 'editSetor', 'setorMover', 'delSetor', 'addSug', 'delAntigas', 'ferAdd', 'ferDel', 'ferNac', 'trocarSenha', 'listarBk', 'baixarBk', 'backup', 'salvarCfg', 'removerAssinatura', 'vtValor', 'expPDF', 'expPrint', 'expXLS', 'baixarSetor', 'enviarSetor'];
+const ACOES_SO_ADMIN = ['rhNovo', 'rhEditar', 'rhDesligar', 'rhReativar', 'rhTransferir', 'rhFeriasAdd', 'rhFeriasDel', 'rhOcorr', 'rhDocVer', 'aprovar', 'aprovarMes', 'reabrir', 'excluirEscala', 'editarAprovada', 'escDevolver', 'novoFunc', 'importarFunc', 'editFunc', 'transfFunc', 'delFunc', 'novoSetor', 'editSetor', 'setorMover', 'delSetor', 'addSug', 'delAntigas', 'ferAdd', 'ferDel', 'ferNac', 'trocarSenha', 'listarBk', 'baixarBk', 'backup', 'salvarCfg', 'removerAssinatura', 'vtValor', 'expPDF', 'expPrint', 'expXLS', 'baixarSetor', 'enviarSetor'];
 const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
@@ -5415,6 +5431,7 @@ document.addEventListener('click', async ev => {
     if (ACOES_SERVICOS_COMPLETO.includes(act) && !pode('servicos')) return toast('Seu acesso não inclui esta função.');
   }
   if (act && act.startsWith('orc') && window.orcAcao) return window.orcAcao(el, ev);
+  if (act && act.startsWith('rh') && window.rhAcao) return window.rhAcao(el, ev);
   if (act && act.startsWith('ats') && window.atsAcao) return window.atsAcao(el, ev);
   const sem = UI.semana;
   switch (act) {
@@ -5718,5 +5735,6 @@ Store.init();
 <script src="orcamentos.js?v=1811b"></script>
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1811a"></script>
+<script src="rh.js?v=1811c"></script>
 </body>
 </html>
