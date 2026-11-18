@@ -79,9 +79,11 @@
     if (!(rec.emergencia || []).length) falta.push('contato de emergência');
     return falta;
   }
+  /* Bloco extra nunca pode derrubar a lista de funcionários */
+  function seguro(fn) { try { return fn() || ''; } catch (e) { console.error('[RH]', e); return ''; } }
   function pendenciasHtml() {
     const lista = S.funcionarios.filter(f => f.ativo).map(f => ({ f, falta: faltantes(f) })).filter(x => x.falta.length)
-      .sort((a, b) => b.falta.length - a.falta.length || a.f.nome.localeCompare(b.f.nome));
+      .sort((a, b) => b.falta.length - a.falta.length || String(a.f.nome || '').localeCompare(String(b.f.nome || '')));
     if (!lista.length) return '';
     return `<div class="card mb rh-pend"><h3 style="margin:0 0 2px">Cadastro incompleto (${lista.length})</h3>
       <p class="small muted" style="margin:0 0 8px">Quem ainda falta algum dado pessoal. Toque na pessoa para abrir a ficha e mandar o link.</p>` + lista.map(x =>
@@ -96,7 +98,7 @@
     todos.forEach(f => { const x = situacao(f); cont[x]++; });
     const ativos = todos.filter(f => f.ativo).length;
     const ind = (k, n, l, cls) => `<button class="ctr-ind${s.filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-act="rhFiltro" data-f="${k}"><b>${n}</b><span>${l}</span></button>`;
-    let h = (window.CAD ? CAD.barra() : '') + anivHtml() + pendenciasHtml() + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
+    let h = seguro(() => (window.CAD ? CAD.barra() : '')) + seguro(anivHtml) + seguro(pendenciasHtml) + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
       ${soLer() ? '' : '<button class="btn pri orc-novo" data-act="rhNovo">+ Novo funcionário</button>'}</div>
       <div class="ctr-inds">${ind('todos', cont.total, 'Cadastrados')}${ind('', ativos, 'Ativos')}${ind('afastado', cont.afastado, 'Afastados', cont.afastado ? 'alerta' : '')}${ind('ferias', cont.ferias, 'De férias')}${ind('suspenso', cont.suspenso, 'Suspensos', cont.suspenso ? 'perigo' : '')}${ind('desligado', cont.desligado, 'Desligados')}</div>
       <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função ou CPF" value="${esc(s.busca)}" autocomplete="off">
