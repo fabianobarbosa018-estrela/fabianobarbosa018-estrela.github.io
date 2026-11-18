@@ -46,6 +46,25 @@
   }
 
   /* ---------- tela principal ---------- */
+  /* Próximos aniversários (a partir da data de nascimento da ficha, só funcionários ativos) */
+  function aniversarios(dias) {
+    const hj = new Date(), base = new Date(hj.getFullYear(), hj.getMonth(), hj.getDate());
+    return S.funcionarios.filter(f => f.ativo).map(f => {
+      const n = (rhDe(f.id).pessoais || {}).nascimento; if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(n)) return null;
+      const [y, m, d] = n.split('-').map(Number);
+      let prox = new Date(base.getFullYear(), m - 1, d); if (prox < base) prox = new Date(base.getFullYear() + 1, m - 1, d);
+      return { f, prox, falta: Math.round((prox - base) / 86400000), idade: prox.getFullYear() - y };
+    }).filter(x => x && x.falta <= dias).sort((a, b) => a.falta - b.falta);
+  }
+  function anivHtml() {
+    const lista = aniversarios(30);
+    if (!lista.length) return '';
+    const quando = x => x.falta === 0 ? '<b>hoje</b>' : x.falta === 1 ? 'amanhã' : 'em ' + x.falta + ' dias';
+    return `<div class="card mb rh-aniv"><h3 style="margin:0 0 8px">Aniversários nos próximos 30 dias</h3>` + lista.map(x =>
+      `<div class="rh-aniv-linha" data-act="rhFicha" data-id="${x.f.id}" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer">
+        <span><b>${esc(x.f.nome)}</b> <span class="small muted">· ${esc(nomeSetor(x.f.setorId))}</span></span>
+        <span class="small">${br(x.prox.toISOString().slice(0, 10))} · ${quando(x)} · ${x.idade} anos</span></div>`).join('') + '</div>';
+  }
   function vRH() {
     const s = st();
     if (s.ficha) { const f = funcPorId(s.ficha); if (f) return ficha(f); s.ficha = null; }
@@ -53,7 +72,7 @@
     todos.forEach(f => { const x = situacao(f); cont[x]++; });
     const ativos = todos.filter(f => f.ativo).length;
     const ind = (k, n, l, cls) => `<button class="ctr-ind${s.filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-act="rhFiltro" data-f="${k}"><b>${n}</b><span>${l}</span></button>`;
-    let h = `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
+    let h = (window.CAD ? CAD.barra() : '') + anivHtml() + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
       ${soLer() ? '' : '<button class="btn pri orc-novo" data-act="rhNovo">+ Novo funcionário</button>'}</div>
       <div class="ctr-inds">${ind('todos', cont.total, 'Cadastrados')}${ind('', ativos, 'Ativos')}${ind('afastado', cont.afastado, 'Afastados', cont.afastado ? 'alerta' : '')}${ind('ferias', cont.ferias, 'De férias')}${ind('suspenso', cont.suspenso, 'Suspensos', cont.suspenso ? 'perigo' : '')}${ind('desligado', cont.desligado, 'Desligados')}</div>
       <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função ou CPF" value="${esc(s.busca)}" autocomplete="off">
@@ -86,7 +105,7 @@
   const ABAS = [['dados', 'Dados'], ['historico', 'Histórico'], ['afast', 'Afastamentos'], ['ferias', 'Férias'], ['ocorr', 'Advertências e suspensões'], ['docs', 'Documentos'], ['pag', 'Pagamentos']];
   function ficha(f) {
     const s = st(), r = rhDe(f.id), ro = soLer();
-    let h = `<div class="orc-topo"><button class="btn" data-act="rhVoltar">← Funcionários</button>${ro ? '' : `<div class="row" style="gap:6px"><button class="btn" data-act="rhEditar" data-id="${f.id}">Editar</button></div>`}</div>
+    let h = `<div class="orc-topo"><button class="btn" data-act="rhVoltar">← Funcionários</button>${ro ? '' : `<div class="row" style="gap:6px"><button class="btn" data-act="rhLink" data-id="${f.id}">Link de cadastro</button><button class="btn" data-act="rhEditar" data-id="${f.id}">Editar</button></div>`}</div>
       <div class="card mb rh-cab"><span class="rh-av g">${esc(iniciais(f.nome))}</span><div style="flex:1;min-width:0"><h2 style="margin:0">${esc(f.nome)}</h2><div class="small muted">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}${f.dataEntrada ? ' · desde ' + br(f.dataEntrada) : ''}</div></div>${badge(f)}</div>`;
     if (!f.ativo && r.desligamento) h += `<div class="alert e"><span class="ic">!</span><div><b>Desligado em ${br(r.desligamento.data)}</b> · ${esc((TIPOS_DESL.find(t => t[0] === r.desligamento.tipo) || [0, ''])[1])}${r.desligamento.motivo ? ' · ' + esc(r.desligamento.motivo) : ''}<div class="small">Registrado por ${esc(r.desligamento.por || '—')} em ${dtHora(r.desligamento.em)}</div></div></div>`;
     h += '<div class="orc-chips rh-abas">' + ABAS.map(a => `<button class="orc-chip${s.aba === a[0] ? ' on' : ''}" data-act="rhAba" data-a="${a[0]}">${a[1]}</button>`).join('') + '</div>';
@@ -396,6 +415,8 @@
       case 'rhFiltro': s.filtro = el.dataset.f || ''; return render();
       case 'rhNovo': if (!S.setores.length) return modalMsg('Cadastre um setor', '<p>Antes de cadastrar funcionários, crie pelo menos um setor.</p>'); return abrirCadastro(null);
       case 'rhEditar': return abrirCadastro(funcPorId(id), +el.dataset.e || 1);
+      case 'rhLink': return CAD.gerarLink(id);
+      case 'rhCadRevisar': return CAD.revisar();
       case 'rhFicha': s.ficha = id; s.aba = 'dados'; render(); window.scrollTo(0, 0); return;
       case 'rhVoltar': s.ficha = null; render(); window.scrollTo(0, 0); return;
       case 'rhAba': s.aba = el.dataset.a; return render();

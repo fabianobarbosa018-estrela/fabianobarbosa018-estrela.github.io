@@ -724,6 +724,19 @@ table.list tr:hover td{background:#f8fbfc}
 .chip-dia{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer;font-weight:600}
 .chip-dia input{width:auto;margin:0}
 @media (max-width:480px){.set-grid{grid-template-columns:1fr}.set-nome{font-size:16px}}
+/* ---- Cadastro pelo funcionário (página pública do link) ---- */
+body.cad-pub{background:#eef4f5;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111827}
+.cad-main{min-height:100vh;padding:14px 12px 40px;box-sizing:border-box}
+.cad-wrap{max-width:560px;margin:0 auto}
+.cad-topo{display:flex;flex-direction:column;gap:2px;padding:4px 4px 12px}
+.cad-topo b{font-size:15px;color:#0f4c5c}.cad-topo span{font-size:12px;color:#4b5563}
+.cad-wrap .card{background:#fff;border-radius:14px;padding:18px 16px;box-shadow:0 2px 12px rgba(15,76,92,.08)}
+.cad-wrap input,.cad-wrap select,.cad-wrap textarea{font-size:16px;width:100%;box-sizing:border-box}
+.cad-linha{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.cad-linha input{margin-top:4px;width:auto}
+.cad-linha.mudou .cad-novo{color:#0f4c5c}
+.cad-atual{font-size:13px;color:#4b5563;overflow-wrap:anywhere}.cad-novo{font-size:13px;overflow-wrap:anywhere}
+.cad-item{padding:12px}
 </style>
 </head>
 <body>
@@ -1053,6 +1066,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
 </div>
 <div id="modals"></div>
 <script>window.NUVEM = {"url": "https://cxddpwyqxfpjqrbcffhk.supabase.co", "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZGRwd3lxeGZwanFyYmNmZmhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTM1MjksImV4cCI6MjEwOTcyOTUyOX0.3e71_a8CQWfrRShr56pBAtt8aD4rg2U2J0JOS4b2OK8"};</script>
+<script src="cadastro.js?v=1811a"></script>
 <script>
 /* =====================================================================
    NÚCLEO DO SISTEMA DE ESCALAS — funções puras (sem interface)
@@ -2065,6 +2079,7 @@ const Nuvem = {
     return j;
   },
   async iniciar() {
+    if (window.CAD && CAD.ehPublico()) return CAD.publico(); // link de cadastro do funcionário: sem login
     if (!this.token()) { S.precisaLogin = true; S.pronto = true; render(); atualizarStatus(); verConvite(); return; }
     try { await this.carregarTudo(); }
     catch (e) {
@@ -5735,6 +5750,6 @@ Store.init();
 <script src="orcamentos.js?v=1811b"></script>
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1811a"></script>
-<script src="rh.js?v=1811c"></script>
+<script src="rh.js?v=1811e"></script>
 </body>
 </html>
