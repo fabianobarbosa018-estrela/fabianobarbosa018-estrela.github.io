@@ -37,7 +37,7 @@ def run():
         assert page.locator('nav >> text=Orçamentos').count() >= 1, 'item de menu ausente'
 
         # --- painel vazio
-        assert page.locator('.kpi').count() == 6, 'painel precisa de 6 indicadores'
+        assert page.locator('.orc-res').count() == 4, 'painel precisa do resumo com 4 indicadores'
 
         # --- novo orçamento
         page.click('button[data-act="orcNovo"]')
@@ -104,16 +104,14 @@ def run():
         print('gravado:', o['numero'], o['servico'])
 
         # --- recarrega a página: dado persiste
-        page.reload(); page.wait_for_selector('button[data-act="orcTela"][data-t="lista"]', timeout=20000); page.wait_for_timeout(800)
-        page.click('button[data-act="orcTela"][data-t="lista"]')
-        page.wait_for_timeout(300)
+        page.reload(); page.wait_for_selector('button[data-act="orcTela"][data-t="painel"]', timeout=20000); page.wait_for_timeout(800)
         assert page.locator('text=Limpeza de quartos').count() >= 1, 'não persistiu após atualizar'
         assert page.locator('svg.orc-ico').count() >= 1, 'ícone do tipo de serviço não apareceu na lista'
 
         # --- detalhe, status, duplicar, PDF
         page.click('button[data-act="orcVer"]')
-        page.wait_for_selector('text=Gerar PDF')
-        page.select_option('[data-orc-status]', 'aprovado')
+        page.wait_for_selector('button[data-act="orcPdf"]')
+        page.click('button[data-act="orcAprovar"]')
         page.wait_for_timeout(600)
         assert store and [d for (c, i), d in store.items() if c == 'orcamentos'][0]['status'] == 'aprovado'
         page.click('button[data-act="orcDuplicar"]')
@@ -123,15 +121,16 @@ def run():
         assert len(copias) == 2 and any(d['numero'] == 'ORC-' + o['data'][:4] + '-0002' for d in copias), 'duplicação falhou'
 
         # --- aprovados
+        page.click('button[data-act="orcVoltar"]'); page.wait_for_timeout(300)
         page.click('button[data-act="orcTela"][data-t="aprovados"]')
         page.wait_for_timeout(300)
         assert page.locator('text=Total').count() >= 1
 
         # --- PDF
-        page.click('button[data-act="orcTela"][data-t="lista"]')
+        page.click('button[data-act="orcTela"][data-t="painel"]')
         page.wait_for_timeout(300)
         page.click('button[data-act="orcVer"] >> nth=0')
-        page.wait_for_selector('text=Gerar PDF')
+        page.wait_for_selector('button[data-act="orcPdf"]')
         page.click('button[data-act="orcPdf"]')
         page.wait_for_selector('.mf [data-a="salvar"]', timeout=20000)  # pré-visualização padrão do sistema
         page.wait_for_timeout(1200)
@@ -142,7 +141,7 @@ def run():
         print('PDF salvo em /tmp/orc/orcamento.pdf')
 
         # --- catálogo: sugestões ao digitar, preço aprendido e preenchimento automático
-        page.click('button[data-act="orcTela"][data-t="painel"]'); page.wait_for_timeout(300)
+        page.click('button[data-act="orcVoltar"]'); page.wait_for_timeout(300)
         page.click('button[data-act="orcNovo"]')
         page.wait_for_selector('#orcForm')
         page.fill('[data-orc-campo="servico"]', 'Recarga de gás do split')
@@ -166,7 +165,7 @@ def run():
         assert any(d.get('precos') and d['precos'][0]['valor'] == 150 and d['precos'][0]['fornecedor'] == 'Rapaz do ar' for d in cats), 'preço não foi aprendido pelo catálogo'
 
         # segundo orçamento: sugestão já mostra o último preço e preenche o item
-        page.click('button[data-act="orcTela"][data-t="painel"]'); page.wait_for_timeout(300)
+        page.click('button[data-act="orcVoltar"]'); page.wait_for_timeout(300)
         page.click('button[data-act="orcNovo"]')
         page.wait_for_selector('#orcForm')
         page.locator('[data-orc-item]').nth(0).locator('[data-orc-f="nome"]').fill('gás')
@@ -185,8 +184,8 @@ def run():
         assert page.locator('svg.orc-ico').count() >= 5, 'ícones do catálogo ausentes'
 
         # --- contratos: a partir do orçamento aprovado e avulso de 30 dias
-        page.click('button[data-act="orcTela"][data-t="lista"]'); page.wait_for_timeout(400)
-        linhas = page.locator('tr').filter(has_text='Limpeza de quartos')
+        page.click('button[data-act="orcTela"][data-t="painel"]'); page.wait_for_timeout(400)
+        linhas = page.locator('.orc-card').filter(has_text='Limpeza de quartos')
         alvo = None
         for i in range(linhas.count()):
             if 'cópia' not in linhas.nth(i).inner_text():
@@ -230,9 +229,8 @@ def run():
         page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(300)
         assert page.locator('tr').filter(has_text='João Pintor').count() == 1, 'contrato não aparece na aba Contratos'
         page.reload(); page.wait_for_selector('button[data-act="orcNovo"]', timeout=20000); page.wait_for_timeout(500)
-        page.goto(BASE + '#orcamentos'); page.wait_for_selector('button[data-act="orcTela"][data-t="lista"]', timeout=20000); page.wait_for_timeout(500)
-        page.click('button[data-act="orcTela"][data-t="lista"]'); page.wait_for_timeout(400)
-        assert page.locator('tr').filter(has_text='João Pintor').count() == 0, 'contrato apareceu na lista de orçamentos'
+        page.goto(BASE + '#orcamentos'); page.wait_for_selector('button[data-act="orcTela"][data-t="painel"]', timeout=20000); page.wait_for_timeout(500)
+        assert page.locator('.orc-card').filter(has_text='João Pintor').count() == 0, 'contrato apareceu na lista de orçamentos'
 
         # --- somente leitura não altera
         b.close()

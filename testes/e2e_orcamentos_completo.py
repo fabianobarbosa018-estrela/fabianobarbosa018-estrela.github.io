@@ -38,6 +38,8 @@ def orcs():
     return {d['servico']: d for (c, i), d in store.items() if c == 'orcamentos' and d.get('tipoRegistro') != 'contrato'}
 
 def ir(page, tela):
+    if page.locator('button[data-act="orcVoltar"]').count():
+        page.click('button[data-act="orcVoltar"]'); page.wait_for_timeout(300)
     page.click('button[data-act="orcTela"][data-t="%s"]' % tela)
     page.wait_for_timeout(350)
 
@@ -67,16 +69,24 @@ def novo(page, servico, tipo, itens):
     page.wait_for_timeout(700)
 
 def abrir_na_lista(page, texto):
-    ir(page, 'lista')
-    page.locator('tbody tr').filter(has_text=texto).first.locator('button[data-act="orcVer"]').click()
+    ir(page, 'painel')
+    if page.locator('#orcBusca').input_value() or page.locator('.orc-chip.on[data-g=""]').count() == 0:
+        page.click('.orc-chip[data-g=""]'); page.fill('#orcBusca', ''); page.wait_for_timeout(450)
+    page.locator('.orc-card').filter(has_text=texto).first.locator('button[data-act="orcVer"]').click()
     page.wait_for_timeout(350)
 
-def status(page, valor):
-    page.select_option('[data-orc-status]', valor)
-    page.wait_for_timeout(600)
+def status(page, valor, obs=''):
+    if obs or valor == 'recusado':
+        page.fill('#orcObsDecisao', obs or 'Fora do orçamento previsto')
+    page.click({'aguardando': 'button[data-act="orcEnviarAprov"]', 'aprovado': 'button[data-act="orcAprovar"]', 'recusado': 'button[data-act="orcRecusar"]'}[valor])
+    page.wait_for_timeout(700)
 
 def kpi(page, rotulo):
-    return norm(page.locator('.kpi', has_text=rotulo).locator('.n').inner_text())
+    if rotulo.startswith('Valor total'):
+        t = norm(page.locator('.orc-valores').inner_text())
+        return t.split('aprovado')[0] if 'orçado' in rotulo else t.split('aprovado')[1]
+    lab = {'Orçamentos realizados': 'Realizados', 'Aguardando aprovação': 'Aguardando'}.get(rotulo, rotulo)
+    return norm(page.locator('.orc-res', has_text=lab).locator('b').inner_text())
 
 def run():
     with sync_playwright() as p:
@@ -94,7 +104,8 @@ def run():
 
         # 1. painel vazio
         check(kpi(page, 'Orçamentos realizados') == '0', 'painel vazio: total 0')
-        check(page.locator('.kpi').count() == 6, 'painel: 6 indicadores')
+        check(page.locator('.orc-res').count() == 4, 'painel: resumo compacto com 4 indicadores')
+        check(page.locator('.orc-chip').count() == 5, 'filtros: Todos, Em elaboração, Aguardando, Aprovados, Recusados')
 
         # 2. criação de três orçamentos com valores e situações diferentes
         novo(page, 'Ar condicionado – Sala', 'ar_condicionado', [('Split 12000 BTU', 'material', 'quarto', '1', '1250,50')])
@@ -109,9 +120,25 @@ def run():
         abrir_na_lista(page, 'Pintura externa'); status(page, 'aprovado')
         abrir_na_lista(page, 'Ventilador'); status(page, 'recusado')
         d = orcs()
+        check(d['Pintura externa – Fachada'].get('aprovacao', {}).get('decisao') == 'aprovado' and d['Pintura externa – Fachada']['aprovacao'].get('em'), 'aprovação registrada com data')
+        check(d['Ventilador – Piscina'].get('aprovacao', {}).get('obs') == 'Fora do orçamento previsto', 'recusa registra a observação')
+        check(any(h.get('acao') == 'Recusado' for h in d['Ventilador – Piscina'].get('historico', [])), 'histórico guarda a recusa')
+        check('Recusado' in page.locator('.orc-aprov').inner_text() and 'Fora do orçamento previsto' in page.locator('.orc-aprov').inner_text(), 'tela mostra a decisão e a observação')
         check(d['Ar condicionado – Sala']['status'] == 'aguardando', 'status gravado: aguardando')
         check(d['Pintura externa – Fachada']['status'] == 'aprovado', 'status gravado: aprovado')
         check(d['Ventilador – Piscina']['status'] == 'recusado', 'status gravado: recusado')
+
+        # 3b. visualizar mostra itens, quantidades, valores e totais; reabrir guarda histórico
+        abrir_na_lista(page, 'Ar condicionado')
+        det = norm(page.locator('#view').inner_text())
+        check('Split 12000 BTU' in det and '1 quarto × R$ 1.250,50' in det, 'visualizar: item, quantidade e valor unitário')
+        check(all(x in det for x in ['Mão de obra', 'Materiais', 'Desconto', 'Valor final']), 'visualizar: mão de obra, materiais, desconto e total')
+        abrir_na_lista(page, 'Pintura externa')
+        page.click('button[data-act="orcReabrir"]'); page.wait_for_timeout(700)
+        check(orcs()['Pintura externa – Fachada']['status'] == 'aguardando', 'reabrir volta para aguardando')
+        status(page, 'aprovado', 'Pode executar')
+        hist = [h['acao'] for h in orcs()['Pintura externa – Fachada'].get('historico', [])]
+        check(hist[-3:] == ['Aprovado', 'Reaberto para nova análise', 'Aprovado'], 'histórico completo: %s' % hist)
 
         # 4. indicadores do painel (1250,50 + 1000 + 300 = 2550,50 ; aprovado = 1000,00)
         ir(page, 'painel')
@@ -121,26 +148,40 @@ def run():
         check(kpi(page, 'Recusados') == '1', 'painel: 1 recusado')
         check('2.550,50' in kpi(page, 'Valor total orçado'), 'painel: valor orçado 2.550,50 (%s)' % kpi(page, 'Valor total orçado'))
         check('1.000,00' in kpi(page, 'Valor total aprovado'), 'painel: valor aprovado 1.000,00 (%s)' % kpi(page, 'Valor total aprovado'))
-        check(page.locator('tbody tr').count() == 3, 'painel: últimos orçamentos listam 3')
+        cards = lambda: page.locator('.orc-card')
+        check(cards().count() == 3, 'painel: últimos orçamentos em 3 cartões')
+        c0 = cards().filter(has_text='Pintura externa').inner_text()
+        check('ORC-' in c0 and '16/11/2026' in c0 and '1.000,00' in norm(c0) and 'Aprovado' in c0, 'cartão mostra número, data, valor e situação')
+        check(page.locator('table').count() == 0, 'sem tabela na tela principal')
 
-        # 5. lista: busca, filtros e limpeza
-        ir(page, 'lista')
-        page.fill('#fTexto', 'Fachada'); page.click('button[data-act="orcBuscar"]'); page.wait_for_timeout(300)
-        check(page.locator('tbody tr').count() == 1 and 'Pintura externa' in page.locator('tbody').inner_text(), 'busca por texto')
-        page.click('button[data-act="orcLimpar"]'); page.wait_for_timeout(300)
-        check(page.locator('tbody tr').count() == 3, 'limpar filtros mostra todos')
-        page.select_option('#fStatus', 'recusado'); page.click('button[data-act="orcBuscar"]'); page.wait_for_timeout(300)
-        check(page.locator('tbody tr').count() == 1 and 'Ventilador' in page.locator('tbody').inner_text(), 'filtro por situação')
-        page.click('button[data-act="orcLimpar"]'); page.wait_for_timeout(300)
+        # 5. pesquisa e filtros rápidos
+        page.fill('#orcBusca', 'Fachada'); page.wait_for_timeout(500)
+        check(cards().count() == 1 and 'Pintura externa' in cards().first.inner_text(), 'pesquisa por serviço')
+        check(page.evaluate("document.activeElement && document.activeElement.id") == 'orcBusca', 'pesquisa mantém o cursor no campo')
+        num = orcs()['Ventilador – Piscina']['numero']
+        page.fill('#orcBusca', num); page.wait_for_timeout(500)
+        check(cards().count() == 1 and 'Ventilador' in cards().first.inner_text(), 'pesquisa por número')
+        page.fill('#orcBusca', ''); page.wait_for_timeout(500)
+        check(cards().count() == 3, 'pesquisa vazia mostra todos')
+        page.click('.orc-chip[data-g="recusados"]'); page.wait_for_timeout(300)
+        check(cards().count() == 1 and 'Ventilador' in cards().first.inner_text(), 'filtro Recusados')
+        page.click('.orc-chip[data-g="aprovados"]'); page.wait_for_timeout(300)
+        check(cards().count() == 1 and 'Pintura externa' in cards().first.inner_text(), 'filtro Aprovados')
+        page.click('.orc-chip[data-g="aguardando"]'); page.wait_for_timeout(300)
+        check(cards().count() == 1 and 'Ar condicionado' in cards().first.inner_text(), 'filtro Aguardando aprovação')
+        page.click('.orc-chip[data-g="em_elaboracao"]'); page.wait_for_timeout(300)
+        check(cards().count() == 0, 'filtro Em elaboração (nenhum)')
+        page.click('.orc-res', has_text='Recusados') if False else page.locator('.orc-res', has_text='Recusados').click(); page.wait_for_timeout(300)
+        check(cards().count() == 1 and page.locator('.orc-chip.on').inner_text().startswith('Recusados'), 'tocar no resumo filtra')
+        page.click('.orc-chip[data-g=""]'); page.wait_for_timeout(300)
+        page.click('.orc-mais summary')
         page.select_option('#fTipo', 'ar_condicionado'); page.click('button[data-act="orcBuscar"]'); page.wait_for_timeout(300)
-        check(page.locator('tbody tr').count() == 1 and 'Ar condicionado' in page.locator('tbody').inner_text(), 'filtro por tipo de serviço')
+        check(cards().count() == 1 and 'Ar condicionado' in cards().first.inner_text(), 'mais filtros: tipo de serviço')
         page.click('button[data-act="orcLimpar"]'); page.wait_for_timeout(300)
-        page.fill('#fVmin', '1.000'); page.click('button[data-act="orcBuscar"]'); page.wait_for_timeout(300)
-        check(page.locator('tbody tr').count() == 2, 'filtro valor mínimo 1.000 (2 resultados: %d)' % (page.locator('tbody tr').count()))
+        page.click('.orc-mais summary'); page.fill('#fVmin', '1.000'); page.click('button[data-act="orcBuscar"]'); page.wait_for_timeout(300)
+        check(cards().count() == 2, 'mais filtros: valor mínimo 1.000 (%d)' % cards().count())
         page.click('button[data-act="orcLimpar"]'); page.wait_for_timeout(300)
-        page.fill('#fVmax', '400'); page.click('button[data-act="orcBuscar"]'); page.wait_for_timeout(300)
-        check(page.locator('tbody tr').count() == 1 and 'Ventilador' in page.locator('tbody').inner_text(), 'filtro valor máximo 400')
-        page.click('button[data-act="orcLimpar"]'); page.wait_for_timeout(300)
+        check(cards().count() == 3, 'limpar filtros mostra todos')
 
         # 6. aprovados
         ir(page, 'aprovados')
@@ -213,9 +254,7 @@ def run():
         over = lambda: mp.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
         check(over() <= 4, 'celular painel sem rolagem horizontal (%spx)' % over())
         mp.screenshot(path='/tmp/orc/mobile_painel.png', full_page=True)
-        mp.click('button[data-act="orcTela"][data-t="lista"]'); mp.wait_for_timeout(400)
-        check(over() <= 4, 'celular lista sem rolagem horizontal (%spx)' % over())
-        mp.locator('tbody tr').first.locator('button[data-act="orcVer"]').click(); mp.wait_for_timeout(400)
+        mp.locator('.orc-card').first.locator('button[data-act="orcVer"]').click(); mp.wait_for_timeout(400)
         check(over() <= 4, 'celular detalhe sem rolagem horizontal (%spx)' % over())
         mp.screenshot(path='/tmp/orc/mobile_detalhe.png', full_page=True)
         m.close()

@@ -127,6 +127,7 @@
         if (alvo.indexOf(texto) < 0) return false;
       }
       if (f.status && o.status !== f.status) return false;
+      if (f.grupo && grupoStatus(o.status) !== f.grupo) return false;
       if (f.tipo && o.tipo !== f.tipo) return false;
       if (f.de && (o.data || '') < f.de) return false;
       if (f.ate && (o.data || '') > f.ate) return false;
@@ -137,10 +138,15 @@
     }).sort(function (a, b) { return (b.data || '').localeCompare(a.data || '') || (b.criadoEm || '').localeCompare(a.criadoEm || ''); });
   }
 
+  // grupos usados nos filtros e no resumo: aprovados inclui "em execução" e "concluído"
+  function grupoStatus(s) { return STATUS_APROVADOS.indexOf(s) >= 0 ? 'aprovados' : s === 'recusado' ? 'recusados' : s === 'aguardando' ? 'aguardando' : 'em_elaboracao'; }
+  // um orçamento conta uma vez só, mesmo que apareça repetido na lista
+  function semRepetidos(lista) { var vistos = {}; return (lista || []).filter(function (o) { if (!o) return false; var k = o.id || o.numero; if (k && vistos[k]) return false; if (k) vistos[k] = 1; return true; }); }
   function resumo(lista) {
-    var r = { total: 0, aguardando: 0, aprovados: 0, recusados: 0, valorOrcado: 0, valorAprovado: 0 };
+    var r = { total: 0, emElaboracao: 0, aguardando: 0, aprovados: 0, recusados: 0, valorOrcado: 0, valorAprovado: 0 };
     var cent = 0, centAp = 0;
-    (lista || []).forEach(function (o) {
+    semRepetidos(lista).forEach(function (o) {
+      if (grupoStatus(o.status) === 'em_elaboracao') r.emElaboracao++;
       var t = totais(o);
       r.total++;
       if (o.status === 'aguardando') r.aguardando++;
@@ -354,7 +360,7 @@
     contratoDeOrcamento: contratoDeOrcamento, contratoAvulso30: contratoAvulso30, validarContrato: validarContrato, clausulasContrato: clausulasContrato,
     BASE_CATALOGO: BASE_CATALOGO, normaliza: normaliza, catalogoMesclado: catalogoMesclado, buscarCatalogo: buscarCatalogo, precosDoOrcamento: precosDoOrcamento,
     STATUS: STATUS, STATUS_APROVADOS: STATUS_APROVADOS, CATEGORIAS: CATEGORIAS, UNIDADES: UNIDADES, TIPOS: TIPOS, tipoIcone: tipoIcone, tipoRotulo: tipoRotulo,
-    num: num, r2: r2, totalItem: totalItem, totais: totais, proximoNumero: proximoNumero,
+    num: num, r2: r2, totalItem: totalItem, totais: totais, proximoNumero: proximoNumero, grupoStatus: grupoStatus, semRepetidos: semRepetidos,
     validar: validar, filtrar: filtrar, resumo: resumo, rotuloStatus: rotuloStatus, classeStatus: classeStatus, rotuloCategoria: rotuloCategoria
   };
   root.OrcCalc = OrcCalc;
@@ -369,6 +375,9 @@
     id: null,            // orçamento aberto
     rasc: null,          // rascunho do formulário (fonte da verdade enquanto edita)
     filtros: {},
+    grupo: '',       // filtro rápido: '' | em_elaboracao | aguardando | aprovados | recusados
+    busca: '',
+    limite: 20,
     salvoEm: null,
     timer: null,
     sug: null,       // sugestões abertas: { item, termo }
@@ -382,7 +391,7 @@
   var brl = function (v) { return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' '); };
   var dataBR = function (iso) { if (!iso) return '—'; var p = String(iso).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso; };
   var hojeISO = function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-  var lista = function () { return (S.orcamentos || []).filter(function (o) { return o.tipoRegistro !== 'contrato'; }); };
+  var lista = function () { return OrcCalc.semRepetidos((S.orcamentos || []).filter(function (o) { return o.tipoRegistro !== 'contrato'; })); };
   var contratos = function () { return (S.orcamentos || []).filter(function (o) { return o.tipoRegistro === 'contrato'; }).sort(function (a, b) { return (b.numero || '').localeCompare(a.numero || ''); }); };
   var porId = function (id) { return lista().find(function (o) { return o.id === id; }); };
   var eh = function (s) { return esc(s); };
@@ -473,7 +482,7 @@
     return '<div class="row mb" style="justify-content:space-between;align-items:flex-start"><div><h2 style="margin:0">' + eh(titulo) + '</h2></div><div class="row">' + (acoes || '') + '</div></div>';
   }
   function nav() {
-    var abas = [['painel', 'Painel'], ['lista', 'Histórico e pesquisa'], ['aprovados', 'Serviços aprovados'], ['catalogo', 'Catálogo de preços']];
+    var abas = [['painel', 'Orçamentos'], ['aprovados', 'Custos aprovados'], ['catalogo', 'Catálogo de preços']];
     return '<div class="tabs">' + abas.map(function (a) {
       return '<button class="' + (ORC.tela === a[0] ? 'on' : '') + '" data-act="orcTela" data-t="' + a[0] + '">' + a[1] + '</button>';
     }).join('') + '</div>';
@@ -482,28 +491,45 @@
   function vOrcamentos() {
     if (ORC.tela === 'form') return telaForm();
     if (ORC.tela === 'detalhe') return telaDetalhe();
-    if (ORC.tela === 'lista') return telaLista();
+    if (ORC.tela === 'lista') { ORC.tela = 'painel'; return telaPainel(); }
     if (ORC.tela === 'aprovados') return telaAprovados();
     if (ORC.tela === 'catalogo') return telaCatalogo();
     return telaPainel();
   }
 
+  var GRUPOS = [['', 'Todos'], ['em_elaboracao', 'Em elaboração'], ['aguardando', 'Aguardando aprovação'], ['aprovados', 'Aprovados'], ['recusados', 'Recusados']];
+  function filtrosAtuais() { return Object.assign({}, ORC.filtros, { texto: ORC.busca, grupo: ORC.grupo, status: '' }); }
   function telaPainel() {
-    var r = OrcCalc.resumo(lista());
-    var kpi = function (n, l, x) { return '<div class="card kpi"><div class="n">' + n + '</div><div class="l">' + l + '</div>' + (x ? '<div class="x">' + x + '</div>' : '') + '</div>'; };
-    var recentes = OrcCalc.filtrar(lista(), {}).slice(0, 8);
-    return cabecalho('Orçamentos', (S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcNovo">+ Novo orçamento</button>')) + nav() +
-      '<div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:16px">' +
-      kpi(r.total, 'Orçamentos realizados') +
-      kpi(r.aguardando, 'Aguardando aprovação') +
-      kpi(r.aprovados, 'Aprovados', 'inclui em execução e concluídos') +
-      kpi(r.recusados, 'Recusados') +
-      kpi(brl(r.valorOrcado), 'Valor total orçado') +
-      kpi(brl(r.valorAprovado), 'Valor total aprovado') +
-      '</div>' +
-      '<div class="card"><div class="row" style="justify-content:space-between"><b>Últimos orçamentos</b></div>' +
-      (recentes.length ? tabelaOrcamentos(recentes) : '<p class="muted">Nenhum orçamento ainda. Clique em “Novo orçamento” para começar.</p>') +
-      '</div>';
+    var todos = lista(), r = OrcCalc.resumo(todos);
+    var rows = OrcCalc.filtrar(todos, filtrosAtuais());
+    var mais = ORC.filtros || {}, temMais = !!(mais.tipo || mais.de || mais.ate || mais.vmin || mais.vmax);
+    var tile = function (g, n, l) { return '<button class="orc-res' + (ORC.grupo === g ? ' on' : '') + '" data-act="orcGrupo" data-g="' + g + '"><b>' + n + '</b><span>' + l + '</span></button>'; };
+    var contagem = { '': r.total, em_elaboracao: r.emElaboracao, aguardando: r.aguardando, aprovados: r.aprovados, recusados: r.recusados };
+    var h = '<div class="orc-topo"><h2>Orçamentos</h2>' + (S.somenteLeitura ? '' : '<button class="btn pri orc-novo" data-act="orcNovo">+ Novo orçamento</button>') + '</div>' + nav() +
+      '<div class="orc-resumo">' + tile('', r.total, 'Realizados') + tile('aguardando', r.aguardando, 'Aguardando') + tile('aprovados', r.aprovados, 'Aprovados') + tile('recusados', r.recusados, 'Recusados') + '</div>' +
+      (r.total ? '<div class="small muted orc-valores">Total orçado <b>' + brl(r.valorOrcado) + '</b> · aprovado <b>' + brl(r.valorAprovado) + '</b></div>' : '') +
+      '<div class="orc-busca"><input type="search" id="orcBusca" placeholder="Pesquisar por número, serviço ou descrição" value="' + eh(ORC.busca) + '" autocomplete="off"></div>' +
+      '<div class="orc-chips">' + GRUPOS.map(function (g) { return '<button class="orc-chip' + (ORC.grupo === g[0] ? ' on' : '') + '" data-act="orcGrupo" data-g="' + g[0] + '">' + g[1] + ' <span>' + contagem[g[0]] + '</span></button>'; }).join('') + '</div>' +
+      '<details class="orc-mais"' + (temMais ? ' open' : '') + '><summary>Mais filtros' + (temMais ? ' (ativos)' : '') + '</summary><div class="orc-mais-g">' +
+      '<div class="fld"><label class="f">Tipo de serviço</label><select id="fTipo"><option value="">Todos</option>' + TIPOS.map(function (t) { return '<option value="' + t[0] + '"' + (mais.tipo === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="fld"><label class="f">Data de</label><input type="date" id="fDe" value="' + eh(mais.de || '') + '"></div>' +
+      '<div class="fld"><label class="f">Data até</label><input type="date" id="fAte" value="' + eh(mais.ate || '') + '"></div>' +
+      '<div class="fld"><label class="f">Valor mínimo (R$)</label><input type="text" inputmode="decimal" id="fVmin" value="' + eh(mais.vmin || '') + '"></div>' +
+      '<div class="fld"><label class="f">Valor máximo (R$)</label><input type="text" inputmode="decimal" id="fVmax" value="' + eh(mais.vmax || '') + '"></div>' +
+      '</div><div class="row"><button class="btn sm pri" data-act="orcBuscar">Aplicar</button><button class="btn sm" data-act="orcLimpar">Limpar</button></div></details>' +
+      '<div class="orc-lista-h"><b>' + (ORC.grupo || ORC.busca || temMais ? 'Resultado' : 'Últimos orçamentos') + '</b><span class="small muted">' + rows.length + ' orçamento(s)</span></div>';
+    if (!todos.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum orçamento ainda. Toque em “+ Novo orçamento” para começar.</p></div>';
+    if (!rows.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum orçamento encontrado. <a href="#" data-act="orcLimpar">Limpar filtros</a></p></div>';
+    h += '<div class="orc-lista">' + rows.slice(0, ORC.limite).map(cartaoOrc).join('') + '</div>';
+    if (rows.length > ORC.limite) h += '<div class="row" style="justify-content:center"><button class="btn" data-act="orcMaisItens">Mostrar mais (' + (rows.length - ORC.limite) + ')</button></div>';
+    return h;
+  }
+  function cartaoOrc(o) {
+    var t = OrcCalc.totais(o);
+    return '<div class="orc-card" data-orc-card="' + eh(o.id) + '"><div class="orc-card-l1"><span class="orc-num">' + eh(o.numero || '—') + ' · ' + dataBR(o.data) + '</span><span class="badge ' + classeStatus(o.status) + '">' + eh(rotuloStatus(o.status)) + '</span></div>' +
+      '<div class="orc-card-l2">' + iconeTipo(o.tipo, 18) + '<b>' + eh(o.servico || '(sem nome)') + '</b><span class="orc-val">' + brl(t.final) + '</span></div>' +
+      (o.descricao ? '<div class="orc-desc">' + eh(o.descricao) + '</div>' : '') +
+      '<div class="orc-card-bt"><button class="btn sm" data-act="orcVer" data-id="' + eh(o.id) + '">Visualizar</button>' + (S.somenteLeitura ? '' : '<button class="btn sm" data-act="orcEditar" data-id="' + eh(o.id) + '">Editar</button>') + '</div></div>';
   }
 
   function tabelaOrcamentos(rows) {
@@ -712,27 +738,50 @@
 
   function telaDetalhe() {
     var o = porId(ORC.id);
-    if (!o) return '<p class="muted">Orçamento não encontrado.</p>' + '<button class="btn" data-act="orcTela" data-t="lista">Voltar</button>';
-    var t = OrcCalc.totais(o);
-    var statusSel = '<select data-orc-status="' + eh(o.id) + '"' + (S.somenteLeitura ? ' disabled' : '') + '>' + STATUS.map(function (s) { return '<option value="' + s[0] + '"' + (o.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select>';
-    var linhas = (o.itens || []).map(function (it, i) {
-      return '<tr style="border-top:1px solid var(--line)"><td>' + (i + 1) + '</td><td><b>' + eh(it.nome) + '</b>' + (it.descricao ? '<div class="small muted">' + eh(it.descricao) + '</div>' : '') + '</td>' +
-        '<td>' + eh(rotuloCategoria(it.categoria)) + '</td><td style="text-align:right">' + eh(OrcCalc.num(it.qtd)) + ' ' + eh(it.unidade) + '</td>' +
-        '<td style="text-align:right">' + brl(OrcCalc.num(it.vu)) + '</td><td style="text-align:right">' + brl(OrcCalc.totalItem(it)) + '</td></tr>';
+    if (!o) return '<p class="muted">Orçamento não encontrado.</p><button class="btn" data-act="orcTela" data-t="painel">Voltar</button>';
+    var t = OrcCalc.totais(o), ro = S.somenteLeitura;
+    var itens = (o.itens || []).map(function (it) {
+      return '<div class="orc-it"><div class="orc-it-n"><b>' + eh(it.nome || '—') + '</b>' + (it.descricao ? '<div class="small muted">' + eh(it.descricao) + '</div>' : '') +
+        '<div class="small muted">' + eh(rotuloCategoria(it.categoria)) + ' · ' + eh(String(OrcCalc.num(it.qtd)).replace('.', ',')) + ' ' + eh(it.unidade) + ' × ' + brl(OrcCalc.num(it.vu)) + (it.fornecedor ? ' · ' + eh(it.fornecedor) : '') + '</div></div>' +
+        '<div class="orc-it-v">' + brl(OrcCalc.totalItem(it)) + '</div></div>';
     }).join('');
-    var acoesEdicao = S.somenteLeitura ? '' : '<button class="btn" data-act="orcEditar" data-id="' + eh(o.id) + '">Editar</button><button class="btn" data-act="orcDuplicar" data-id="' + eh(o.id) + '">Duplicar</button><button class="btn danger" data-act="orcExcluir" data-id="' + eh(o.id) + '">Excluir</button>';
-    return cabecalho('Orçamento ' + (o.numero || ''), '<button class="btn" data-act="orcVoltar">Voltar</button>' + acoesEdicao + (STATUS_APROVADOS.indexOf(o.status) >= 0 ? '<button class="btn" data-act="orcGerarContrato" data-id="' + eh(o.id) + '">Gerar contrato</button>' : '') + '<button class="btn pri" data-act="orcPdf" data-id="' + eh(o.id) + '">Gerar PDF</button>') + nav() +
-      '<div class="card mb"><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">' +
-      '<div><div class="small muted">Serviço</div><div class="row" style="gap:0">' + iconeTipo(o.tipo, 26) + '<b>' + eh(o.servico) + '</b></div><div class="small muted">' + eh(tipoRot(o.tipo)) + '</div></div>' +
-      '<div><div class="small muted">Data</div>' + dataBR(o.data) + '</div>' +
-      '<div><div class="small muted">Local</div>' + eh(o.local || '—') + '</div>' +
-      '<div><div class="small muted">Responsável</div>' + eh(o.responsavel || '—') + '</div>' +
-      '<div><div class="small muted">Prazo</div>' + eh(o.prazo || '—') + '</div>' +
-      '<div><div class="small muted">Situação</div>' + statusSel + '</div></div>' +
-      (o.descricao ? '<p style="margin-top:12px;white-space:pre-line">' + eh(o.descricao) + '</p>' : '') + '</div>' +
-      '<div class="card mb"><div class="tw" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;color:var(--ink2);font-size:13px"><th>#</th><th>Item</th><th>Categoria</th><th style="text-align:right">Quantidade</th><th style="text-align:right">Valor unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>' + linhas + '</tbody></table></div></div>' +
-      '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px"><div class="card">' + blocoTotais(t, o.descontoTipo) + '</div>' +
-      '<div class="card"><h3 style="margin-top:0">Observações</h3><p style="white-space:pre-line" class="muted">' + eh(o.observacoes || 'Nenhuma observação.') + '</p></div></div>';
+    var info = function (l, v) { return v ? '<div><span class="small muted">' + l + '</span><div>' + eh(v) + '</div></div>' : ''; };
+    return '<div class="orc-topo"><button class="btn" data-act="orcVoltar">← Voltar</button><div class="row" style="gap:8px">' + (ro ? '' : '<button class="btn" data-act="orcEditar" data-id="' + eh(o.id) + '">Editar</button>') + '<button class="btn pri" data-act="orcPdf" data-id="' + eh(o.id) + '">PDF</button></div></div>' +
+      '<div class="card mb orc-det-h"><div class="orc-card-l1"><span class="orc-num">' + eh(o.numero || '—') + ' · ' + dataBR(o.data) + '</span><span class="badge ' + classeStatus(o.status) + '">' + eh(rotuloStatus(o.status)) + '</span></div>' +
+      '<h2 style="margin:6px 0 2px">' + iconeTipo(o.tipo, 24) + eh(o.servico || '(sem nome)') + '</h2><div class="small muted">' + eh(tipoRot(o.tipo)) + '</div>' +
+      (o.descricao ? '<p style="white-space:pre-line;margin:10px 0 0">' + eh(o.descricao) + '</p>' : '') +
+      '<div class="orc-info">' + info('Local', o.local) + info('Responsável', o.responsavel) + info('Prazo', o.prazo) + '</div></div>' +
+      '<div class="card mb"><h3 style="margin:0 0 6px">Itens (' + (o.itens || []).length + ')</h3>' + (itens || '<p class="muted">Sem itens.</p>') + '</div>' +
+      '<div class="card mb"><h3 style="margin:0 0 6px">Valores</h3>' + blocoTotais(t, o.descontoTipo) + '</div>' +
+      blocoAprovacao(o) +
+      (o.observacoes ? '<div class="card mb"><h3 style="margin:0 0 6px">Observações</h3><p style="white-space:pre-line;margin:0" class="muted">' + eh(o.observacoes) + '</p></div>' : '') +
+      blocoHistorico(o) +
+      (ro ? '' : '<div class="row orc-acoes-fim">' + (STATUS_APROVADOS.indexOf(o.status) >= 0 ? '<button class="btn sm" data-act="orcGerarContrato" data-id="' + eh(o.id) + '">Gerar contrato</button>' : '') +
+        '<button class="btn sm" data-act="orcDuplicar" data-id="' + eh(o.id) + '">Duplicar</button><button class="btn sm danger" data-act="orcExcluir" data-id="' + eh(o.id) + '">Excluir</button></div>');
+  }
+  function blocoAprovacao(o) {
+    var g = OrcCalc.grupoStatus(o.status), ro = S.somenteLeitura, a = o.aprovacao;
+    var h = '<div class="card mb orc-aprov"><h3 style="margin:0 0 8px">Aprovação</h3>';
+    if (g === 'aprovados' || g === 'recusados') {
+      h += '<div class="alert ' + (g === 'aprovados' ? 's' : 'e') + '" style="margin:0 0 10px"><span class="ic">' + (g === 'aprovados' ? '✓' : '✕') + '</span><div><b>' + (g === 'aprovados' ? 'Aprovado' : 'Recusado') + '</b>' +
+        (a && a.em ? '<div class="small">' + (a.por ? 'por ' + eh(a.por) + ' · ' : '') + dtHoraBR(a.em) + '</div>' : '') + (a && a.obs ? '<div class="small" style="white-space:pre-line;margin-top:4px">' + eh(a.obs) + '</div>' : '') + '</div></div>';
+      if (g === 'aprovados' && !ro) h += '<div class="fld"><label class="f">Andamento do serviço</label><select data-orc-status="' + eh(o.id) + '">' + STATUS.filter(function (x) { return STATUS_APROVADOS.indexOf(x[0]) >= 0; }).map(function (x) { return '<option value="' + x[0] + '"' + (o.status === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>';
+      if (!ro) h += '<button class="btn sm" data-act="orcReabrir" data-id="' + eh(o.id) + '">Reabrir para nova análise</button>';
+      return h + '</div>';
+    }
+    if (ro) return h + '<p class="small muted" style="margin:0">' + (g === 'aguardando' ? 'Aguardando a decisão.' : 'Em elaboração.') + '</p></div>';
+    h += (g === 'em_elaboracao' ? '<p class="small muted" style="margin:0 0 8px">Ainda em elaboração. Você pode enviar para aprovação ou decidir direto.</p>' : '<p class="small muted" style="margin:0 0 8px">Aguardando aprovação.</p>') +
+      '<div class="fld"><label class="f">Observações da decisão (opcional)</label><textarea id="orcObsDecisao" rows="2" placeholder="Ex.: aprovado com início na próxima semana"></textarea></div>' +
+      '<div class="row orc-aprov-bt">' + (g === 'em_elaboracao' ? '<button class="btn" data-act="orcEnviarAprov" data-id="' + eh(o.id) + '">Enviar para aprovação</button>' : '') +
+      '<button class="btn danger" data-act="orcRecusar" data-id="' + eh(o.id) + '">Recusar</button><button class="btn ok" data-act="orcAprovar" data-id="' + eh(o.id) + '">✓ Aprovar</button></div></div>';
+    return h;
+  }
+  function blocoHistorico(o) {
+    var hs = (o.historico || []).slice().reverse();
+    var linhas = hs.map(function (x) { return '<li><b>' + eh(x.acao) + '</b> <span class="small muted">' + dtHoraBR(x.em) + (x.por ? ' · ' + eh(x.por) : '') + '</span>' + (x.obs ? '<div class="small" style="white-space:pre-line">' + eh(x.obs) + '</div>' : '') + '</li>'; }).join('');
+    var criado = o.criadoEm && !(o.historico || []).some(function (x) { return x.acao === 'Criado'; }) ? '<li><b>Criado</b> <span class="small muted">' + dtHoraBR(o.criadoEm) + '</span></li>' : '';
+    if (!linhas && !criado) return '';
+    return '<details class="card mb orc-hist"><summary><b>Histórico</b> <span class="small muted">(' + (hs.length + (criado ? 1 : 0)) + ')</span></summary><ul>' + linhas + criado + '</ul></details>';
   }
 
   /* ---------------- Ações ---------------- */
@@ -758,8 +807,16 @@
       return;
     }
     clearTimeout(ORC.timer);
+    var antes = c.id ? porId(c.id) : null;
     garantirId(c);
     ORC.id = c.id;
+    if (antes && antes.status !== c.status) registrar(c, 'Situação: ' + rotuloStatus(antes.status) + ' → ' + rotuloStatus(c.status));
+    else {
+      var hs = c.historico || [], ult = hs[hs.length - 1];
+      if (!hs.some(function (x) { return x.acao === 'Criado'; })) registrar(c, 'Criado');
+      else if (!ult || ult.acao !== 'Editado' || Date.now() - new Date(ult.em) > 600000) registrar(c, 'Editado'); // edições seguidas contam uma vez
+    }
+    if (antes && antes.status !== c.status && (c.status === 'aprovado' || c.status === 'recusado')) c.aprovacao = { decisao: c.status, em: new Date().toISOString(), por: quemSou(), obs: '' };
     if (await gravar(c)) {
       ORC.sug = null;
       await atualizarCatalogoComOrcamento(c);
@@ -767,14 +824,28 @@
     }
   }
 
-  async function mudarStatus(id, status) {
+  function quemSou() { return S.usuarioNome || (S.papel === 'admin' ? 'Administrador' : ''); }
+  function registrar(o, acao, obs) {
+    o.historico = (o.historico || []).concat([{ em: new Date().toISOString(), acao: acao, por: quemSou(), obs: obs || '' }]);
+  }
+  async function mudarStatus(id, status, obs, acao) {
     if (!exigeEscrita()) return;
     var o = copiaProfunda(porId(id) || {});
-    if (!o.id) return;
+    if (!o.id || o.status === status) return;
+    var antes = o.status;
     o.status = status;
-    await gravar(o, true);
-    toast('Situação atualizada: ' + rotuloStatus(status));
+    registrar(o, acao || ('Situação: ' + rotuloStatus(antes) + ' → ' + rotuloStatus(status)), obs);
+    if (status === 'aprovado' || status === 'recusado') o.aprovacao = { decisao: status, em: new Date().toISOString(), por: quemSou(), obs: obs || '' };
+    if (status === 'aguardando' && OrcCalc.grupoStatus(antes) !== 'em_elaboracao') o.aprovacao = null;
+    if (await gravar(o, true)) toast(acao || ('Situação atualizada: ' + rotuloStatus(status)));
     render();
+  }
+  function decidir(id, status, el) {
+    var obs = ((document.getElementById('orcObsDecisao') || {}).value || '').trim(), o = porId(id);
+    if (!o) return;
+    if (status === 'recusado' && !obs && !window.confirm('Recusar sem escrever o motivo?')) return;
+    if (el) el.disabled = true;
+    return mudarStatus(id, status, obs, status === 'aprovado' ? 'Aprovado' : status === 'recusado' ? 'Recusado' : 'Enviado para aprovação');
   }
 
   async function duplicar(id) {
@@ -783,7 +854,7 @@
     if (!o) return;
     var novo = Object.assign({}, o, {
       id: uid('orc'), numero: OrcCalc.proximoNumero(lista(), hojeISO().slice(0, 4)), servico: o.servico + ' (cópia)',
-      data: hojeISO(), status: 'em_elaboracao', criadoEm: new Date().toISOString(), itens: (o.itens || []).map(function (i) { return Object.assign({}, i, { id: uid('it') }); })
+      data: hojeISO(), status: 'em_elaboracao', aprovacao: null, historico: [{ em: new Date().toISOString(), acao: 'Criado como cópia de ' + (o.numero || ''), por: quemSou(), obs: '' }], criadoEm: new Date().toISOString(), itens: (o.itens || []).map(function (i) { return Object.assign({}, i, { id: uid('it') }); })
     });
     await gravar(novo, true);
     ORC.id = novo.id; ORC.tela = 'detalhe'; toast('Orçamento duplicado: ' + novo.numero);
@@ -795,13 +866,14 @@
     var o = porId(id); if (!o) return;
     if (!window.confirm('Excluir o orçamento ' + (o.numero || '') + ' (' + (o.servico || '') + ')? Esta ação não pode ser desfeita.')) return;
     try { await Store.del('orcamentos', id); } catch (e) { return; }
-    ORC.id = null; ORC.tela = 'lista'; toast('Orçamento excluído');
+    ORC.id = null; ORC.tela = 'painel'; toast('Orçamento excluído');
     render();
   }
 
   function lerFiltros() {
     var g = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
-    ORC.filtros = { texto: g('fTexto'), tipo: g('fTipo'), status: g('fStatus'), de: g('fDe'), ate: g('fAte'), vmin: g('fVmin'), vmax: g('fVmax') };
+    ORC.filtros = { tipo: g('fTipo'), de: g('fDe'), ate: g('fAte'), vmin: g('fVmin'), vmax: g('fVmax') };
+    var b = document.getElementById('orcBusca'); if (b) ORC.busca = b.value;
   }
 
   /* ---------------- Contratos (telas) ---------------- */
@@ -1063,7 +1135,13 @@
     var act = el.dataset.act, id = el.dataset.id;
     switch (act) {
       case 'orcTela': ORC.tela = el.dataset.t; ORC.id = null; render(); window.scrollTo(0, 0); return;
-      case 'orcVoltar': ORC.tela = 'lista'; render(); return;
+      case 'orcVoltar': ORC.tela = 'painel'; render(); window.scrollTo(0, 0); return;
+      case 'orcGrupo': ORC.grupo = el.dataset.g || ''; ORC.limite = 20; render(); return;
+      case 'orcMaisItens': ORC.limite += 20; render(); return;
+      case 'orcAprovar': return decidir(id, 'aprovado', el);
+      case 'orcRecusar': return decidir(id, 'recusado', el);
+      case 'orcEnviarAprov': return decidir(id, 'aguardando', el);
+      case 'orcReabrir': if (!window.confirm('Reabrir este orçamento para nova análise? A decisão anterior fica no histórico.')) return; return mudarStatus(id, 'aguardando', '', 'Reaberto para nova análise');
       case 'orcNovo': return abrirForm(null);
       case 'orcVer': ORC.id = id; ORC.tela = 'detalhe'; render(); window.scrollTo(0, 0); return;
       case 'orcEditar': if (!exigeEscrita()) return; return abrirForm(porId(id));
@@ -1092,11 +1170,22 @@
       case 'orcCatBuscar': ORC.catFiltro = (document.getElementById('catBusca') || { value: '' }).value.trim(); render(); return;
       case 'orcCatLimpar': ORC.catFiltro = ''; render(); return;
       case 'orcBuscar': lerFiltros(); render(); return;
-      case 'orcLimpar': ORC.filtros = {}; render(); return;
+      case 'orcLimpar': if (ev) ev.preventDefault(); ORC.filtros = {}; ORC.busca = ''; ORC.grupo = ''; render(); return;
     }
   };
 
+  // pesquisa ao digitar: só a lista é redesenhada, o campo continua com o foco
+  var buscaT = null;
   document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'orcBusca') {
+      ORC.busca = ev.target.value; window.__svcT = Date.now(); clearTimeout(buscaT);
+      buscaT = setTimeout(function () {
+        var el = document.getElementById('orcBusca'), pos = el ? el.selectionStart : null;
+        ORC.limite = 20; render();
+        var n = document.getElementById('orcBusca'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } }
+      }, 250);
+      return;
+    }
     if (ev.target.matches && ev.target.matches('[data-orc-f="nome"]')) mostrarSugestoes(ev.target);
     var f = ev.target.closest && ev.target.closest('#orcForm');
     if (!f) return;
