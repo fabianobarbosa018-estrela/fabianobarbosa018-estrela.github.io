@@ -997,7 +997,7 @@
     try { JsPDF = await carregarPdfLibs(); } catch (e) { toast('Não foi possível carregar o gerador de PDF. Verifique a conexão.'); return; }
     var doc = new JsPDF({ unit: 'mm', format: 'a4' });
     var W = doc.internal.pageSize.getWidth(), M = 18, larg = W - 2 * M;
-    var logo = await carregarLogo();
+    var logo = await carregarLogo(); instalarMarcaDagua(doc, logo);
     var y = cabecalhoPdf(doc, logo, W, M, 'CONTRATO', c.numero);
     var limite = function (h) { if (y + h > 280) { doc.addPage(); y = 22; } };
     var feita = assinaturaFeita(c), dS = feita && feita.documento;
@@ -1155,14 +1155,26 @@
   }
 
   // logo clarinha no centro de cada página (atrás do texto, com transparência)
-  function aplicarMarcaDagua(doc, logo) {
+  // marca d'água desenhada no INÍCIO de cada página, por baixo do texto: bem visível sem atrapalhar a leitura
+  function instalarMarcaDagua(doc, logo) {
     if (!logo) return;
+    var desenhar = function () {
+      var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+      var w = 130, h = w * logo.h / logo.w;
+      try { doc.setGState(new doc.GState({ opacity: 0.22 })); doc.addImage(logo.dataUrl, 'PNG', (W - w) / 2, (H - h) / 2, w, h); doc.setGState(new doc.GState({ opacity: 1 })); } catch (e) { }
+    };
+    var add = doc.addPage.bind(doc);
+    doc.addPage = function () { var r = add.apply(null, arguments); desenhar(); return r; };
+    desenhar(); doc.__marcaDagua = true;
+  }
+  function aplicarMarcaDagua(doc, logo) {
+    if (!logo || doc.__marcaDagua) return;
     var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
     var w = 120, h = w * logo.h / logo.w, x = (W - w) / 2, y = (H - h) / 2;
     var paginas = doc.internal.getNumberOfPages();
     for (var p = 1; p <= paginas; p++) {
       doc.setPage(p);
-      try { doc.setGState(new doc.GState({ opacity: 0.08 })); } catch (e) { return; }
+      try { doc.setGState(new doc.GState({ opacity: 0.2 })); } catch (e) { return; }
       doc.addImage(logo.dataUrl, 'PNG', x, y, w, h);
       doc.setGState(new doc.GState({ opacity: 1 }));
     }
@@ -1177,7 +1189,7 @@
     var W = doc.internal.pageSize.getWidth();
     var cor = [15, 76, 92];
     var m = function (v) { return brl(v); };
-    var logo = await carregarLogo();
+    var logo = await carregarLogo(); instalarMarcaDagua(doc, logo);
     // cabeçalho: logo, nome e CNPJ
     var y = cabecalhoPdf(doc, logo, W, 14, 'ORÇAMENTO', o.numero);
     // identificação

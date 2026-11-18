@@ -106,36 +106,45 @@ input.erro{border-color:var(--err);background:#fff5f5}
   }
 
   function iniciarPad(cv) {
-    var ctx, tracos = 0, pontos = 0, desenhando = false, ult = null, dpr = Math.max(1, window.devicePixelRatio || 1), largAtual = 0;
-    function ajustar() {
-      var r = cv.getBoundingClientRect();
-      // no celular a barra do navegador some/aparece e dispara "resize": só refaz o quadro se a largura mudou de verdade
-      if (Math.abs(r.width - largAtual) < 2) return;
-      largAtual = r.width;
-      // guarda o que já foi desenhado numa cópia e devolve na hora (sem espera), para a assinatura nunca se perder
-      var copia = null;
-      if (tracos && cv.width && cv.height) { copia = document.createElement('canvas'); copia.width = cv.width; copia.height = cv.height; copia.getContext('2d').drawImage(cv, 0, 0); }
-      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-      ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0b1f4d'; ctx.lineWidth = 2.6;
-      if (copia) ctx.drawImage(copia, 0, 0, r.width, r.height);
+    // a assinatura é guardada como traços (pontos); o quadro e a imagem final são redesenhados a partir deles,
+    // então nada se perde se a tela girar, rolar ou mudar de tamanho
+    var tracos = [], atual = null, ctx, dpr = Math.max(1, window.devicePixelRatio || 1), COR = '#0b1f4d', ESP = 2.6;
+    function desenhar(c, t, esp) {
+      c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = COR; c.fillStyle = COR; c.lineWidth = esp;
+      t.forEach(function (tr) {
+        if (tr.length === 1) { c.beginPath(); c.arc(tr[0].x, tr[0].y, esp / 2, 0, 7); c.fill(); return; }
+        c.beginPath(); c.moveTo(tr[0].x, tr[0].y); for (var i = 1; i < tr.length; i++) c.lineTo(tr[i].x, tr[i].y); c.stroke();
+      });
     }
-    ajustar(); window.addEventListener('resize', function () { if (!desenhando) ajustar(); });
+    function ajustar() {
+      var r = cv.getBoundingClientRect(); if (!r.width) return;
+      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+      ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); desenhar(ctx, tracos, ESP);
+    }
+    ajustar(); window.addEventListener('resize', ajustar);
     function pos(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-    cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); desenhando = true; ult = pos(e); tracos++; document.getElementById('dica').style.display = 'none'; ctx.beginPath(); ctx.arc(ult.x, ult.y, 1.2, 0, 7); ctx.fillStyle = '#0b1f4d'; ctx.fill(); });
-    cv.addEventListener('pointermove', function (e) { if (!desenhando) return; e.preventDefault(); var p = pos(e); ctx.beginPath(); ctx.moveTo(ult.x, ult.y); ctx.lineTo(p.x, p.y); ctx.stroke(); ult = p; pontos++; });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { cv.addEventListener(t, function () { desenhando = false; }); });
+    cv.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (x) { }
+      if (!ctx || cv.width !== Math.round(cv.getBoundingClientRect().width * dpr)) ajustar();
+      atual = [pos(e)]; tracos.push(atual); document.getElementById('dica').style.display = 'none'; desenhar(ctx, [atual], ESP);
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!atual) return; e.preventDefault(); var p = pos(e), u = atual[atual.length - 1];
+      atual.push(p); ctx.lineCap = 'round'; ctx.strokeStyle = COR; ctx.lineWidth = ESP; ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { cv.addEventListener(t, function () { atual = null; }); });
+    var total = function () { return tracos.reduce(function (n, t) { return n + t.length; }, 0); };
     return {
-      vazio: function () { return pontos < 12; },
-      limpar: function () { tracos = 0; pontos = 0; ctx.clearRect(0, 0, cv.width, cv.height); },
-      // recorta só a área desenhada, para a assinatura sair do tamanho certo no contrato
+      vazio: function () { return total() < 12; },
+      limpar: function () { tracos = []; atual = null; ajustar(); },
+      // imagem só da área assinada, redesenhada dos traços em boa resolução
       imagem: function () {
-        var w = cv.width, h = cv.height, dt = cv.getContext('2d').getImageData(0, 0, w, h).data, x0 = w, y0 = h, x1 = 0, y1 = 0;
-        for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) if (dt[(y * w + x) * 4 + 3] > 10) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-        if (x1 <= x0 || y1 <= y0) return null;
-        var m = 6 * dpr; x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(w - 1, x1 + m); y1 = Math.min(h - 1, y1 + m);
-        var esc = Math.min(1, 700 / (x1 - x0)), o = document.createElement('canvas');
-        o.width = Math.round((x1 - x0) * esc); o.height = Math.round((y1 - y0) * esc);
-        o.getContext('2d').drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, o.width, o.height);
+        if (!tracos.length) return null;
+        var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        tracos.forEach(function (t) { t.forEach(function (p) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }); });
+        var m = 6, w = x1 - x0 + 2 * m, h = y1 - y0 + 2 * m, k = Math.min(3, 700 / w);
+        var o = document.createElement('canvas'); o.width = Math.max(1, Math.round(w * k)); o.height = Math.max(1, Math.round(h * k));
+        var c = o.getContext('2d'); c.setTransform(k, 0, 0, k, (m - x0) * k, (m - y0) * k); desenhar(c, tracos, ESP);
         return o.toDataURL('image/png');
       }
     };
