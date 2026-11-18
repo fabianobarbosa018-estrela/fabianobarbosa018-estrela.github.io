@@ -139,7 +139,7 @@
   /* ---------------- administrador ---------------- */
   let pendentes = null, carregando = false;
   function contagem() {
-    if (pendentes === null && !carregando && window.Nuvem && S.modo === 'nuvem') carregarLista(true);
+    if (pendentes === null && !carregando && typeof Nuvem !== 'undefined' && S.modo === 'nuvem') carregarLista(true);
     return pendentes;
   }
   async function carregarLista(silencioso) {
@@ -149,7 +149,7 @@
       const lista = await Nuvem.rpc('rh_cadastros_listar', {});
       carregando = false;
       pendentes = (lista || []).filter(x => x.status === 'enviado').length;
-      if (root.UI && UI.rota === 'funcionarios' && typeof render === 'function') render();
+      if (typeof UI !== 'undefined' && UI.rota === 'funcionarios' && typeof render === 'function') render();
       return lista || [];
     } catch (e) {
       carregando = false;
