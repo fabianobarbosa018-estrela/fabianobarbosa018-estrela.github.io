@@ -237,11 +237,14 @@ def run():
         check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'contratos: botão de contrato de prestação')
         page.click('button[data-act="orcCtrNovo30"]'); page.wait_for_selector('#ctrForm')
         page.locator('[data-ctr-campo="contratadoNome"]').fill('Diarista Teste')
+        page.click('[data-act="orcCtrEtapa"][data-e="3"]'); page.wait_for_timeout(250)
         page.locator('[data-ctr-campo="dias"]').fill('1')
+        page.click('[data-act="orcCtrEtapa"][data-e="5"]'); page.wait_for_timeout(250)
         page.click('button[data-act="orcCtrSalvar"]'); page.wait_for_timeout(800)
         from datetime import date
         d1 = [d for (c, i), d in store.items() if c == 'orcamentos' and d.get('contratadoNome') == 'Diarista Teste']
         check(len(d1) == 1 and (date.fromisoformat(d1[0]['fim']) - date.fromisoformat(d1[0]['inicio'])).days == 1, 'contrato de 1 dia: vigência de 1 dia')
+        page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(300)
         check(page.locator('button[data-act="orcCtrNovo30"]').count() == 1, 'botão contrato de 30 dias presente')
 
         # 12. celular

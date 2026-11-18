@@ -254,7 +254,80 @@
 
   /* ---------------- Contratos ---------------- */
   // Contratos ficam na mesma coleção dos orçamentos, marcados com tipoRegistro = 'contrato'.
-  var STATUS_CONTRATO = [['rascunho', 'Rascunho', 'b-draft'], ['aguardando', 'Aguardando assinatura', 'b-blue'], ['assinado', 'Assinado', 'b-ok'], ['encerrado', 'Encerrado', 'b-off']];
+  var STATUS_CONTRATO = [['rascunho', 'Rascunho', 'b-draft'], ['aguardando', 'Aguardando assinatura', 'b-blue'], ['assinado', 'Assinado', 'b-ok'], ['encerrado', 'Encerrado', 'b-off'], ['cancelado', 'Cancelado', 'b-off']];
+  var DIAS_ALERTA_CONTRATO = 5;
+  // situação do contrato no dia de hoje (calculada, não gravada): elaboracao | aguardando | ativo | vencendo | vencido | encerrado | cancelado
+  var SITUACOES_CONTRATO = {
+    elaboracao: ['Em elaboração', 'b-draft'], aguardando: ['Aguardando assinatura', 'b-blue'], ativo: ['Ativo', 'b-ok'],
+    vencendo: ['Vence em breve', 'b-warn'], vencido: ['Vencido', 'b-err'], encerrado: ['Encerrado', 'b-off'], cancelado: ['Cancelado', 'b-off']
+  };
+  function diasEntre(a, b) { var pa = String(a).split('-'), pb = String(b).split('-'); return Math.round((Date.UTC(+pb[0], +pb[1] - 1, +pb[2]) - Date.UTC(+pa[0], +pa[1] - 1, +pa[2])) / 864e5); }
+  function fimContrato(c) {
+    if (c.fim) return c.fim;
+    var d = Math.round(num(c.dias));
+    return c.inicio && d > 0 ? addDias(c.inicio, d) : '';
+  }
+  function situacaoContrato(c, hoje) {
+    if (c.status === 'cancelado') return 'cancelado';
+    if (c.status === 'encerrado') return 'encerrado';
+    if (c.status === 'rascunho' || !c.status) return 'elaboracao';
+    var fim = fimContrato(c);
+    if (fim && hoje && fim < hoje) return 'vencido';
+    if (c.status === 'aguardando') return 'aguardando';
+    if (fim && hoje && diasEntre(hoje, fim) <= DIAS_ALERTA_CONTRATO) return 'vencendo';
+    return 'ativo';
+  }
+  function resumoContratos(lista, hoje) {
+    var r = { total: 0, ativos: 0, elaboracao: 0, aguardando: 0, vencendo: 0, vencidos: 0, encerrados: 0, cancelados: 0, valorAtivos: 0 }, cent = 0, vistos = {};
+    (lista || []).forEach(function (c) {
+      if (!c || (c.id && vistos[c.id])) return; if (c.id) vistos[c.id] = 1;
+      var s = situacaoContrato(c, hoje);
+      if (s === 'cancelado') { r.cancelados++; return; } // cancelados não entram no total
+      r.total++;
+      if (s === 'ativo' || s === 'vencendo') { r.ativos++; cent += Math.round(num(c.valor) * 100); }
+      if (s === 'vencendo') r.vencendo++;
+      if (s === 'elaboracao') r.elaboracao++;
+      if (s === 'aguardando') { r.aguardando++; r.elaboracao++; }
+      if (s === 'vencido') r.vencidos++;
+      if (s === 'encerrado') r.encerrados++;
+    });
+    r.valorAtivos = cent / 100;
+    return r;
+  }
+  // filtro: { texto (nome, CPF/CNPJ ou número), situacao ('ativos' inclui os que vencem em breve), de, ate (período de vigência) }
+  function filtrarContratos(lista, f, hoje) {
+    f = f || {};
+    var t = normaliza(f.texto || ''), dig = String(f.texto || '').replace(/\D/g, '');
+    return (lista || []).filter(function (c) {
+      var s = situacaoContrato(c, hoje);
+      if (f.situacao) {
+        if (f.situacao === 'ativos' ? !(s === 'ativo' || s === 'vencendo') : f.situacao === 'elaboracao' ? !(s === 'elaboracao' || s === 'aguardando') : s !== f.situacao) return false;
+      } else if (s === 'cancelado') return false;
+      if (t) {
+        var alvo = normaliza([c.contratadoNome, c.numero, c.contratadoDoc, c.servico].join(' '));
+        var docDig = String(c.contratadoDoc || '').replace(/\D/g, '');
+        if (alvo.indexOf(t) < 0 && !(dig.length >= 3 && docDig.indexOf(dig) >= 0)) return false;
+      }
+      var fim = fimContrato(c) || c.inicio || '';
+      if (f.de && fim && fim < f.de) return false;
+      if (f.ate && c.inicio && c.inicio > f.ate) return false;
+      return true;
+    }).sort(function (a, b) { return (b.numero || '').localeCompare(a.numero || ''); });
+  }
+  // o que mudou entre duas versões do contrato (para o histórico)
+  var CAMPOS_CONTRATO = [['contratadoNome', 'Nome do contratado'], ['contratadoDoc', 'CPF/CNPJ'], ['contratadoTelefone', 'Telefone'], ['contratadoEndereco', 'Endereço'],
+    ['servico', 'Serviço'], ['setorId', 'Setor'], ['local', 'Local'], ['descricao', 'Descrição'], ['atividades', 'Atividades'], ['inicio', 'Início'], ['dias', 'Duração'], ['fim', 'Término'],
+    ['prazo', 'Prazo de execução'], ['valor', 'Valor'], ['formaPagamento', 'Forma de pagamento'], ['condicoesPagamento', 'Condições de pagamento'], ['diasAviso', 'Aviso prévio'],
+    ['responsabilidades', 'Responsabilidades'], ['clausulasExtras', 'Cláusulas adicionais'], ['observacoes', 'Observações'], ['status', 'Situação']];
+  function diffContrato(a, b) {
+    a = a || {}; b = b || {};
+    var norm = function (v) { return v == null ? '' : String(v).trim(); };
+    return CAMPOS_CONTRATO.filter(function (x) {
+      var k = x[0];
+      if (k === 'valor' || k === 'dias' || k === 'diasAviso') return num(a[k]) !== num(b[k]);
+      return norm(a[k]) !== norm(b[k]);
+    }).map(function (x) { return x[1]; });
+  }
   var TIPOS_CONTRATO = [['orcamento', 'Contrato de serviço (orçamento aprovado)'], ['servico30', 'Contrato de serviço prestado (prazo em dias)']];
 
   function rotuloTipoContrato(t) { var x = TIPOS_CONTRATO.find(function (y) { return y[0] === t; }); return x ? x[1] : t; }
@@ -329,22 +402,27 @@
   function clausulasContrato(c, nomeHotel, cnpjHotel) {
     var inicio = formataData(c.inicio);
     var avulso = c.tipoContrato === 'servico30';
-    var prazoTxt = avulso
+    if (!avulso && num(c.dias) > 0 && c.inicio) avulso = false;
+    var prazoTxt = (avulso || (num(c.dias) > 0 && c.fim))
       ? 'pelo prazo de ' + diasTxt(c.dias) + ', de ' + inicio + ' a ' + formataData(c.fim)
       : 'com início em ' + inicio + (c.prazo ? ', prazo previsto de execução: ' + c.prazo : '');
     var objeto = c.tipoContrato === 'orcamento'
       ? 'Execução do serviço “' + (c.servico || '—') + '”' + (c.orcamentoNumero ? ', conforme o orçamento nº ' + c.orcamentoNumero : '') + '.' + (c.descricao ? ' Descrição: ' + c.descricao : '') + (c.local ? ' Local: ' + c.local + '.' : '')
       : (c.servico ? 'Prestação do serviço: ' + c.servico + '.' + (c.descricao ? ' ' + c.descricao : '') : 'Prestação de serviços pela CONTRATADA, conforme combinado entre as partes.');
+    if (c.atividades && String(c.atividades).trim()) objeto += ' Atividades contratadas: ' + String(c.atividades).trim().replace(/\s*\n+\s*/g, '; ') + '.';
+    if (c.setorNome) objeto += ' Setor: ' + c.setorNome + '.';
+    if (avulso && c.local && objeto.indexOf('Local:') < 0) objeto += ' Local: ' + c.local + '.';
     var itens = [
       { titulo: 'Do objeto', texto: objeto },
       { titulo: 'Do prazo', texto: 'O presente contrato vigorará ' + prazoTxt + '.' },
-      { titulo: 'Do valor e do pagamento', texto: 'Pelos serviços, a CONTRATANTE pagará à CONTRATADA o valor total de ' + fmtBRL(c.valor) + (c.formaPagamento ? ', na forma: ' + c.formaPagamento : ', na forma a ser combinada entre as partes') + '.' },
-      { titulo: 'Das obrigações da CONTRATADA', texto: 'Executar o serviço com qualidade e dentro do prazo, observar as normas de segurança e as regras internas do hotel e responder pelos danos causados por seus funcionários ou por ela na execução do serviço.' },
+      { titulo: 'Do valor e do pagamento', texto: 'Pelos serviços, a CONTRATANTE pagará à CONTRATADA o valor total de ' + fmtBRL(c.valor) + (c.formaPagamento ? ', na forma: ' + c.formaPagamento : ', na forma a ser combinada entre as partes') + '.' + (c.condicoesPagamento && String(c.condicoesPagamento).trim() ? ' Condições: ' + String(c.condicoesPagamento).trim() + (/[.!]$/.test(String(c.condicoesPagamento).trim()) ? '' : '.') : '') },
+      { titulo: 'Das obrigações da CONTRATADA', texto: 'Executar o serviço com qualidade e dentro do prazo, observar as normas de segurança e as regras internas do hotel e responder pelos danos causados por seus funcionários ou por ela na execução do serviço.' + (c.responsabilidades && String(c.responsabilidades).trim() ? ' Também são responsabilidades da CONTRATADA: ' + String(c.responsabilidades).trim().replace(/\s*\n+\s*/g, '; ') + (/[.!]$/.test(String(c.responsabilidades).trim()) ? '' : '.') : '') },
       { titulo: 'Das obrigações da CONTRATANTE', texto: 'Efetuar o pagamento nas condições acordadas e permitir o acesso da CONTRATADA ao local da prestação do serviço.' },
       { titulo: 'Da rescisão', texto: 'Qualquer das partes poderá rescindir este contrato mediante aviso prévio por escrito de ' + (num(c.diasAviso) || 0) + ' dias, pagando-se os serviços já executados.' },
       { titulo: 'Da natureza da prestação (sem vínculo trabalhista)', texto: 'A CONTRATADA presta o serviço com autonomia, por conta própria, sem subordinação, sem horário fixo imposto pela CONTRATANTE e sem exclusividade. Não há vínculo empregatício, trabalhista ou previdenciário entre as partes. A CONTRATADA responde integralmente pelos seus encargos fiscais, previdenciários e tributários, e não tem direito a férias, 13º salário, FGTS ou demais verbas trabalhistas. A CONTRATADA não será considerada funcionária da CONTRATANTE para nenhum efeito.' },
       { titulo: 'Da ciência e concordância', texto: 'A CONTRATADA declara ter lido, compreendido e concordado com todas as cláusulas deste contrato, inclusive as cláusulas sobre a natureza da prestação e a rescisão, e que recebeu cópia deste instrumento antes da assinatura.' }
     ];
+    if (c.clausulasExtras && String(c.clausulasExtras).trim()) itens.splice(itens.length - 1, 0, { titulo: 'Das condições adicionais', texto: String(c.clausulasExtras).trim() });
     if (avulso) {
       itens.splice(itens.length - 1, 0, { titulo: 'Da multa por não comparecimento', texto: 'Se a CONTRATADA não comparecer para a prestação do serviço, sem justo motivo comprovado, ou desistir da prestação após o início do prazo, pagará à CONTRATANTE multa de 100% (cem por cento) do valor total deste contrato, sem prejuízo da indenização por perdas e danos excedentes.' });
     }
@@ -357,6 +435,8 @@
   var OrcCalc = {
     STATUS_CONTRATO: STATUS_CONTRATO, TIPOS_CONTRATO: TIPOS_CONTRATO, rotuloTipoContrato: rotuloTipoContrato, rotuloStatusContrato: rotuloStatusContrato,
     addDias: addDias, formataData: formataData, fmtBRL: fmtBRL, proximoNumeroContrato: proximoNumeroContrato,
+    situacaoContrato: situacaoContrato, resumoContratos: resumoContratos, filtrarContratos: filtrarContratos, diffContrato: diffContrato, fimContrato: fimContrato,
+    SITUACOES_CONTRATO: SITUACOES_CONTRATO, DIAS_ALERTA_CONTRATO: DIAS_ALERTA_CONTRATO, diasEntre: diasEntre,
     contratoDeOrcamento: contratoDeOrcamento, contratoAvulso30: contratoAvulso30, validarContrato: validarContrato, clausulasContrato: clausulasContrato,
     BASE_CATALOGO: BASE_CATALOGO, normaliza: normaliza, catalogoMesclado: catalogoMesclado, buscarCatalogo: buscarCatalogo, precosDoOrcamento: precosDoOrcamento,
     STATUS: STATUS, STATUS_APROVADOS: STATUS_APROVADOS, CATEGORIAS: CATEGORIAS, UNIDADES: UNIDADES, TIPOS: TIPOS, tipoIcone: tipoIcone, tipoRotulo: tipoRotulo,
@@ -877,46 +957,148 @@
   }
 
   /* ---------------- Contratos (telas) ---------------- */
+  var SIT_CTR = OrcCalc.SITUACOES_CONTRATO;
+  var hojeCtr = function () { return hojeISO(); };
+  var sitCtr = function (c) { return OrcCalc.situacaoContrato(c, hojeCtr()); };
+  var badgeCtr = function (c) { var s = sitCtr(c), x = SIT_CTR[s]; return '<span class="badge ' + x[1] + '">' + x[0] + '</span>'; };
+  var nomeSetorCtr = function (id) { var st = (S.setores || []).find(function (x) { return x.id === id; }); return st ? st.nome : ''; };
+  var vigenciaTxt = function (c) { var f = OrcCalc.fimContrato(c); return dataBR(c.inicio) + (f ? ' a ' + dataBR(f) : (c.prazo ? ' · ' + c.prazo : '')); };
+  var avisoVenc = function (c) {
+    var s = sitCtr(c), f = OrcCalc.fimContrato(c), d = f ? OrcCalc.diasEntre(hojeCtr(), f) : null;
+    if (s === 'vencendo') return d === 0 ? 'Vence hoje' : 'Vence em ' + d + ' dia' + (d > 1 ? 's' : '');
+    if (s === 'vencido') return 'Venceu há ' + (-d) + ' dia' + (-d > 1 ? 's' : '');
+    return '';
+  };
+  ORC.ctrFiltro = ORC.ctrFiltro || { texto: '', situacao: '', de: '', ate: '' };
+
   function telaContratos() {
-    var lst = contratos();
-    var linhas = lst.map(function (c) {
-      return '<tr style="border-top:1px solid var(--line)"><td>' + eh(c.numero) + '</td><td><b>' + eh(c.contratadoNome || '(sem nome)') + '</b><div class="small muted">' + eh(rotuloTipoContrato(c.tipoContrato)) + (c.servico ? ' · ' + eh(c.servico) : '') + '</div></td>' +
-        '<td>' + dataBR(c.inicio) + (c.tipoContrato === 'servico30' ? ' a ' + dataBR(c.fim) : '') + '</td>' +
-        '<td style="text-align:right">' + (OrcCalc.num(c.valor) > 0 ? brl(OrcCalc.num(c.valor)) : '—') + '</td>' +
-        '<td><span class="badge ' + classeStatusContrato(c.status) + '">' + eh(rotuloStatusContrato(c.status)) + '</span></td>' +
-        '<td style="text-align:right"><button class="btn sm" data-act="orcCtrVer" data-id="' + eh(c.id) + '">Abrir</button></td></tr>';
-    }).join('');
-    return cabecalho('Contratos', S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrNovo30">+ Contrato de prestação de serviço</button>') +
-      '<div class="card mb small muted">Revise as cláusulas com seu advogado antes de usar.</div>' +
-      '<div class="card">' + (lst.length ? '<div class="tw" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;color:var(--ink2);font-size:13px"><th>Nº</th><th>Contratada</th><th>Vigência</th><th style="text-align:right">Valor</th><th>Situação</th><th></th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="muted">Nenhum contrato ainda.</p>') + '</div>';
+    if (ORC.ctrTela === 'ver') return telaContratoVer();
+    var todos = contratos(), r = OrcCalc.resumoContratos(todos, hojeCtr()), f = ORC.ctrFiltro;
+    var rows = OrcCalc.filtrarContratos(todos, f, hojeCtr());
+    var ind = function (sit, n, l, cls) { return '<button class="ctr-ind' + (f.situacao === sit ? ' on' : '') + (cls ? ' ' + cls : '') + '" data-act="orcCtrFiltro" data-s="' + sit + '"><b>' + n + '</b><span>' + l + '</span></button>'; };
+    var chips = [['', 'Todos'], ['ativos', 'Ativos'], ['elaboracao', 'Em elaboração'], ['vencendo', 'Vencem em breve'], ['vencido', 'Vencidos'], ['encerrado', 'Encerrados'], ['cancelado', 'Cancelados']];
+    var temPeriodo = !!(f.de || f.ate);
+    var h = '<div class="orc-topo"><h2>Contratos</h2>' + (S.somenteLeitura ? '' : '<button class="btn pri orc-novo" data-act="orcCtrNovo30">+ Novo contrato</button>') + '</div>' +
+      '<div class="ctr-inds">' + ind('', r.total, 'Total') + ind('ativos', r.ativos, 'Ativos') + ind('elaboracao', r.elaboracao, 'Em elaboração') +
+        ind('vencendo', r.vencendo, 'Vencem em 5 dias', r.vencendo ? 'alerta' : '') + ind('vencido', r.vencidos, 'Vencidos', r.vencidos ? 'perigo' : '') + ind('encerrado', r.encerrados, 'Encerrados') + '</div>' +
+      '<div class="ctr-valor"><span>Valor dos contratos ativos</span><b>' + brl(r.valorAtivos) + '</b></div>';
+    var alertas = todos.filter(function (c) { var s = sitCtr(c); return s === 'vencendo' || s === 'vencido'; });
+    if (alertas.length && !f.situacao) h += '<div class="alert w ctr-alerta"><span class="ic">!</span><div>' + alertas.slice(0, 4).map(function (c) { return '<div><b>' + eh(c.numero) + '</b> · ' + eh(c.contratadoNome || '') + ' — ' + avisoVenc(c) + ' <a href="#" data-act="orcCtrVer" data-id="' + eh(c.id) + '">abrir</a></div>'; }).join('') + (alertas.length > 4 ? '<div class="small">e mais ' + (alertas.length - 4) + '</div>' : '') + '</div></div>';
+    h += '<div class="orc-busca"><input type="search" id="ctrBusca" placeholder="Pesquisar por nome, CPF ou número" value="' + eh(f.texto) + '" autocomplete="off"></div>' +
+      '<div class="orc-chips">' + chips.map(function (c) { return '<button class="orc-chip' + (f.situacao === c[0] ? ' on' : '') + '" data-act="orcCtrFiltro" data-s="' + c[0] + '">' + c[1] + '</button>'; }).join('') + '</div>' +
+      '<details class="orc-mais"' + (temPeriodo ? ' open' : '') + '><summary>Período' + (temPeriodo ? ' (ativo)' : '') + '</summary><div class="orc-mais-g">' +
+      '<div class="fld"><label class="f">Vigente de</label><input type="date" id="ctrDe" value="' + eh(f.de) + '"></div><div class="fld"><label class="f">até</label><input type="date" id="ctrAte" value="' + eh(f.ate) + '"></div></div>' +
+      '<div class="row"><button class="btn sm pri" data-act="orcCtrPeriodo">Aplicar</button><button class="btn sm" data-act="orcCtrLimpar">Limpar</button></div></details>' +
+      '<div class="orc-lista-h"><b>' + (f.texto || f.situacao || temPeriodo ? 'Resultado' : 'Contratos') + '</b><span class="small muted">' + rows.length + ' contrato(s)</span></div>';
+    if (!todos.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum contrato ainda. Toque em “+ Novo contrato”.</p></div>';
+    if (!rows.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum contrato encontrado. <a href="#" data-act="orcCtrLimpar">Limpar filtros</a></p></div>';
+    return h + '<div class="orc-lista">' + rows.map(cartaoCtr).join('') + '</div><p class="small muted">Os modelos de contrato devem passar por revisão jurídica antes de serem usados.</p>';
+  }
+  function cartaoCtr(c) {
+    var setor = nomeSetorCtr(c.setorId), av = avisoVenc(c);
+    return '<div class="orc-card ctr-card" data-ctr-card="' + eh(c.id) + '"><div class="orc-card-l1"><span class="orc-num">' + eh(c.numero || '—') + '</span>' + badgeCtr(c) + '</div>' +
+      '<div class="orc-card-l2"><b>' + eh(c.contratadoNome || '(sem nome)') + '</b><span class="orc-val">' + (OrcCalc.num(c.valor) > 0 ? brl(OrcCalc.num(c.valor)) : '—') + '</span></div>' +
+      '<div class="orc-desc">' + eh(c.servico || rotuloTipoContrato(c.tipoContrato)) + (setor ? ' · ' + eh(setor) : '') + '</div>' +
+      '<div class="ctr-vig">' + vigenciaTxt(c) + (av ? ' · <b class="' + (sitCtr(c) === 'vencido' ? 'txt-err' : 'txt-warn') + '">' + av + '</b>' : '') + '</div>' +
+      '<div class="orc-card-bt"><button class="btn sm" data-act="orcCtrVer" data-id="' + eh(c.id) + '">Abrir</button>' + (S.somenteLeitura || sitCtr(c) === 'cancelado' || sitCtr(c) === 'encerrado' ? '' : '<button class="btn sm" data-act="orcCtrEditar" data-id="' + eh(c.id) + '">Editar</button>') + '</div></div>';
   }
 
+  // ---------- contrato aberto ----------
+  function telaContratoVer() {
+    var c = contratos().find(function (x) { return x.id === ORC.ctrId; });
+    if (!c) { ORC.ctrTela = 'lista'; return telaContratos(); }
+    var s = sitCtr(c), ro = S.somenteLeitura, av = avisoVenc(c), setor = nomeSetorCtr(c.setorId);
+    var info = function (l, v) { return v ? '<div><span class="small muted">' + l + '</span><div>' + eh(v) + '</div></div>' : ''; };
+    var acoes = [];
+    if (!ro && s !== 'cancelado' && s !== 'encerrado') acoes.push('<button class="btn" data-act="orcCtrEditar" data-id="' + eh(c.id) + '">Editar</button>');
+    if (!ro && (c.status === 'rascunho' || c.status === 'aguardando')) acoes.push('<button class="btn" data-act="orcCtrMarcarAssinado" data-id="' + eh(c.id) + '">Assinado em papel</button>');
+    if (!ro && (c.status === 'assinado' || c.status === 'encerrado') && !c.renovadoPara) acoes.push('<button class="btn" data-act="orcCtrRenovar" data-id="' + eh(c.id) + '">Renovar</button>');
+    if (!ro && c.status === 'assinado') acoes.push('<button class="btn" data-act="orcCtrEncerrar" data-id="' + eh(c.id) + '">Encerrar</button>');
+    if (!ro && (c.status === 'rascunho' || c.status === 'aguardando')) acoes.push('<button class="btn danger" data-act="orcCtrCancelar" data-id="' + eh(c.id) + '">Cancelar contrato</button>');
+    var ligacoes = (c.renovadoDe ? '<div class="small">Renovação do contrato <a href="#" data-act="orcCtrVer" data-id="' + eh(c.renovadoDe) + '">' + eh(c.renovadoDeNumero || 'anterior') + '</a></div>' : '') +
+      (c.renovadoPara ? '<div class="small">Renovado pelo contrato <a href="#" data-act="orcCtrVer" data-id="' + eh(c.renovadoPara) + '">' + eh(c.renovadoParaNumero || 'novo') + '</a></div>' : '') +
+      (c.orcamentoNumero ? '<div class="small">Gerado do orçamento ' + eh(c.orcamentoNumero) + '</div>' : '');
+    return '<div class="orc-topo"><button class="btn" data-act="orcCtrVoltar">← Contratos</button><div class="row" style="gap:8px"><button class="btn pri" data-act="orcCtrPdfVer" data-id="' + eh(c.id) + '">PDF / Imprimir</button></div></div>' +
+      '<div class="card mb"><div class="orc-card-l1"><span class="orc-num">' + eh(c.numero) + ' · ' + eh(rotuloTipoContrato(c.tipoContrato)) + '</span>' + badgeCtr(c) + '</div>' +
+      '<h2 style="margin:6px 0 2px">' + eh(c.contratadoNome || '(sem nome)') + '</h2><div class="small muted">' + eh(c.servico || '') + (setor ? ' · ' + eh(setor) : '') + '</div>' +
+      (av ? '<div class="alert ' + (s === 'vencido' ? 'e' : 'w') + '" style="margin:10px 0 0"><span class="ic">!</span><div><b>' + av + '</b> (término ' + dataBR(OrcCalc.fimContrato(c)) + ').' + (!ro && !c.renovadoPara ? ' Você pode <a href="#" data-act="orcCtrRenovar" data-id="' + eh(c.id) + '">renovar</a>' + (c.status === 'assinado' ? ' ou <a href="#" data-act="orcCtrEncerrar" data-id="' + eh(c.id) + '">encerrar</a>' : '') + '.' : '') + '</div></div>' : '') +
+      '<div class="orc-info">' + info('Vigência', vigenciaTxt(c)) + info('Valor', OrcCalc.num(c.valor) > 0 ? brl(OrcCalc.num(c.valor)) : '') + info('Pagamento', c.formaPagamento) +
+        info('CPF/CNPJ', c.contratadoDoc) + info('Telefone', c.contratadoTelefone) + info('Local', c.local) + '</div>' +
+      (c.status === 'encerrado' || c.status === 'cancelado' ? '<div class="small" style="margin-top:10px"><b>' + (c.status === 'encerrado' ? 'Encerrado' : 'Cancelado') + '</b> em ' + dataBR(c.encerradoEm || '') + (c.encerradoPor ? ' por ' + eh(c.encerradoPor) : '') + (c.motivoEncerramento ? ' · motivo: ' + eh(c.motivoEncerramento) : '') + '</div>' : '') +
+      (ligacoes ? '<div style="margin-top:8px">' + ligacoes + '</div>' : '') +
+      (acoes.length ? '<div class="row ctr-acoes">' + acoes.join('') + '</div>' : '') + '</div>' +
+      (s === 'cancelado' ? '' : cardAssinatura(c)) + blocoDocumentosCtr(c) + blocoHistoricoCtr(c);
+  }
+  function blocoDocumentosCtr(c) {
+    var vs = (c.documentos || []).slice().reverse(), feita = assinaturaFeita(c);
+    if (!vs.length && !feita) return '';
+    var h = '<div class="card mb"><h3 style="margin:0 0 6px">Documentos</h3>';
+    if (feita) h += '<div class="ctr-doc"><div><b>Contrato assinado</b><div class="small muted">' + eh(feita.nome) + ' · ' + dtHoraBR(feita.assinado_em) + '</div></div><button class="btn sm" data-act="orcCtrPdfVer" data-id="' + eh(c.id) + '">Abrir</button></div>';
+    h += vs.map(function (v, k) {
+      var idx = (c.documentos.length - 1 - k);
+      return '<div class="ctr-doc"><div><b>Versão ' + (idx + 1) + '</b><div class="small muted">Gerada em ' + dtHoraBR(v.em) + (v.por ? ' · ' + eh(v.por) : '') + (v.motivo ? ' · ' + eh(v.motivo) : '') + '</div></div><button class="btn sm" data-act="orcCtrPdfVersao" data-id="' + eh(c.id) + '" data-v="' + idx + '">Abrir</button></div>';
+    }).join('');
+    return h + '</div>';
+  }
+  function blocoHistoricoCtr(c) {
+    var hs = (c.historico || []).slice().reverse();
+    var criado = !(c.historico || []).some(function (x) { return x.acao === 'Criado'; }) && c.criadoEm ? '<li><b>Criado</b> <span class="small muted">' + dtHoraBR(c.criadoEm) + (c.criadoPor ? ' · ' + eh(c.criadoPor) : '') + '</span></li>' : '';
+    if (!hs.length && !criado) return '';
+    return '<details class="card mb orc-hist"><summary><b>Histórico</b> <span class="small muted">(' + (hs.length + (criado ? 1 : 0)) + ')</span></summary><ul>' +
+      hs.map(function (x) { return '<li><b>' + eh(x.acao) + '</b> <span class="small muted">' + dtHoraBR(x.em) + (x.por ? ' · ' + eh(x.por) : '') + '</span>' + (x.obs ? '<div class="small" style="white-space:pre-line">' + eh(x.obs) + '</div>' : '') + '</li>'; }).join('') + criado + '</ul></details>';
+  }
+
+  // ---------- cadastro em etapas ----------
+  var ETAPAS_CTR = [[1, 'Contratado'], [2, 'Serviço'], [3, 'Prazo e pagamento'], [4, 'Condições'], [5, 'Revisão']];
+  var FORMAS_PAG = ['PIX', 'Transferência bancária', 'Dinheiro', '40% no dia 20 e 60% no dia 5', 'Pagamento único ao final do serviço', 'Semanal', 'Quinzenal', 'Mensal'];
   function telaContratoForm() {
     var c = ORC.ctr;
     if (!c) return '<p class="muted">Abra um contrato.</p>';
-    var ehOrc = c.tipoContrato === 'orcamento';
-    var statusOpts = STATUS_CONTRATO.map(function (s) { return '<option value="' + s[0] + '"' + (c.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('');
-    var campo = function (label, id, val) { return '<div class="fld"><label class="f">' + label + '</label><input type="text" data-ctr-campo="' + id + '" value="' + eh(val) + '"></div>'; };
-    var grade = 'grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px';
-    var vigencia = ehOrc ? '' : '<p class="small muted" style="margin:6px 0 0">Vigência: ' + diasTxt(c.dias) + ', de ' + dataBR(c.inicio) + ' até ' + dataBR(OrcCalc.addDias(c.inicio, Math.max(1, Math.round(OrcCalc.num(c.dias) || 30)))) + '.</p>';
-    var acoes = '<button class="btn" data-act="orcCtrVoltar">Voltar</button>' +
-      (S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrSalvar">Salvar contrato</button>') +
-      '<button class="btn" data-act="orcCtrPdf">Gerar PDF</button>' +
-      (!S.somenteLeitura && ehAdmin() && !assinaturaFeita(c) ? '<button class="btn ok" data-act="orcAssinEnviar">✍ Enviar para assinatura</button>' : '') +
-      (c.id && !S.somenteLeitura ? '<button class="btn danger" data-act="orcCtrExcluir" data-id="' + eh(c.id) + '">Excluir</button>' : '');
-    return cabecalho((c.id ? 'Contrato ' : 'Novo contrato ') + (c.numero || ''), acoes) +
-      '<div id="ctrForm">' +
-      '<div class="card mb"><div class="small muted">Tipo</div><b>' + eh(rotuloTipoContrato(c.tipoContrato)) + '</b>' + (ehOrc && c.orcamentoNumero ? ' · orçamento ' + eh(c.orcamentoNumero) : '') + vigencia + '</div>' +
-      '<div class="card mb"><h3 style="margin-top:0">Contratada (prestador)</h3><div class="grid" style="' + grade + '">' + campo('Nome do prestador', 'contratadoNome', c.contratadoNome) + campo('CPF ou CNPJ', 'contratadoDoc', c.contratadoDoc) + '</div></div>' +
-      '<div class="card mb"><h3 style="margin-top:0">Serviço</h3><div class="grid" style="' + grade + '">' + campo('Serviço', 'servico', c.servico) + campo('Local', 'local', c.local) +
-        (ehOrc ? campo('Prazo previsto de execução', 'prazo', c.prazo) : campo('Duração (dias)', 'dias', c.dias || 30)) +
-        '<div class="fld"><label class="f">Data de início</label><input type="date" data-ctr-campo="inicio" value="' + eh(c.inicio) + '"></div></div>' +
-        '<div class="fld"><label class="f">Descrição</label><textarea rows="3" data-ctr-campo="descricao">' + eh(c.descricao) + '</textarea></div></div>' +
-      '<div class="card mb"><h3 style="margin-top:0">Valor e pagamento</h3><div class="grid" style="' + grade + '">' + campo('Valor total (R$)', 'valor', ehOrc ? String(OrcCalc.num(c.valor)).replace('.', ',') : (c.valor || '')) + campo('Forma de pagamento', 'formaPagamento', c.formaPagamento) + '</div></div>' +
-      '<div class="card mb"><h3 style="margin-top:0">Condições</h3><div class="grid" style="' + grade + '">' + campo('Aviso prévio para rescisão (dias)', 'diasAviso', c.diasAviso) +
-        '<div class="fld"><label class="f">Situação</label><select data-ctr-campo="status">' + statusOpts + '</select></div></div>' +
-        '<div class="fld"><label class="f">Observações</label><textarea rows="2" data-ctr-campo="observacoes">' + eh(c.observacoes) + '</textarea></div></div>' +
-      '</div>' + cardAssinatura(c);
+    var e = ORC.ctrEtapa || 1, ehOrc = c.tipoContrato === 'orcamento';
+    var campo = function (label, id, val, extra) { return '<div class="fld"><label class="f">' + label + '</label><input type="text" data-ctr-campo="' + id + '" value="' + eh(val == null ? '' : val) + '"' + (extra || '') + '></div>'; };
+    var area = function (label, id, val, ph, rows) { return '<div class="fld"><label class="f">' + label + '</label><textarea rows="' + (rows || 3) + '" data-ctr-campo="' + id + '" placeholder="' + eh(ph || '') + '">' + eh(val || '') + '</textarea></div>'; };
+    var grade = '<div class="ctr-grade">';
+    var corpo = '';
+    if (e === 1) corpo = '<h3>Dados do contratado</h3>' + grade + campo('Nome completo *', 'contratadoNome', c.contratadoNome, ' autocomplete="name"') + campo('CPF ou CNPJ', 'contratadoDoc', c.contratadoDoc, ' inputmode="numeric"') +
+      campo('Telefone', 'contratadoTelefone', c.contratadoTelefone, ' inputmode="tel"') + '</div>' + area('Endereço', 'contratadoEndereco', c.contratadoEndereco, 'Rua, número, bairro, cidade', 2) +
+      '<p class="small muted">O CPF pode ficar em branco se o contrato for assinado pelo link: o contratado informa na hora de assinar.</p>';
+    if (e === 2) corpo = '<h3>Serviço</h3>' + grade + campo('Serviço contratado', 'servico', c.servico) +
+      '<div class="fld"><label class="f">Setor</label><select data-ctr-campo="setorId"><option value="">—</option>' + (S.setores || []).slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome)); }).map(function (st) { return '<option value="' + eh(st.id) + '"' + (c.setorId === st.id ? ' selected' : '') + '>' + eh(st.nome) + '</option>'; }).join('') + '</select></div>' +
+      campo('Local', 'local', c.local) + '</div>' + area('Descrição do serviço', 'descricao', c.descricao) + area('Atividades contratadas (uma por linha)', 'atividades', c.atividades, 'Ex.:\nLimpeza da piscina\nOrganização do redário', 4);
+    if (e === 3) {
+      var fim = OrcCalc.fimContrato(prepararContrato(Object.assign({}, c)));
+      corpo = '<h3>Prazo e pagamento</h3>' + grade +
+        '<div class="fld"><label class="f">Data de início *</label><input type="date" data-ctr-campo="inicio" value="' + eh(c.inicio) + '"></div>' +
+        campo('Duração (dias)' + (ehOrc ? ' — opcional' : ''), 'dias', c.dias || (ehOrc ? '' : 30), ' inputmode="numeric"') +
+        '<div class="fld"><label class="f">Data final (automática)</label><div class="ctr-fim" id="ctrFim">' + (fim ? dataBR(fim) : '—') + '</div></div>' +
+        (ehOrc ? campo('Prazo previsto de execução (texto)', 'prazo', c.prazo) : '') +
+        campo('Valor total (R$)' + (ehOrc ? ' *' : ''), 'valor', OrcCalc.num(c.valor) ? String(OrcCalc.num(c.valor)).replace('.', ',') : '', ' inputmode="decimal"') +
+        '<div class="fld"><label class="f">Forma de pagamento</label><input type="text" list="ctrFormas" data-ctr-campo="formaPagamento" value="' + eh(c.formaPagamento || '') + '"><datalist id="ctrFormas">' + FORMAS_PAG.map(function (x) { return '<option value="' + eh(x) + '">'; }).join('') + '</datalist></div>' +
+        '</div>' + area('Condições de pagamento', 'condicoesPagamento', c.condicoesPagamento, 'Ex.: pagamento mediante nota/recibo; descontos por faltas', 2);
+    }
+    if (e === 4) corpo = '<h3>Condições contratuais</h3>' + grade + campo('Aviso prévio para rescisão (dias)', 'diasAviso', c.diasAviso, ' inputmode="numeric"') + '</div>' +
+      area('Responsabilidades do contratado (uma por linha)', 'responsabilidades', c.responsabilidades, 'Ex.:\nUsar os equipamentos de proteção\nZelar pelos materiais do hotel', 4) +
+      area('Cláusulas adicionais', 'clausulasExtras', c.clausulasExtras, 'Texto que entra como cláusula extra do contrato', 3) +
+      area('Observações internas (não saem no contrato)', 'observacoes', c.observacoes, '', 2) +
+      '<details class="ctr-modelo"><summary>Ver as cláusulas do modelo padrão</summary><ol>' + OrcCalc.clausulasContrato(prepararContrato(Object.assign({}, c)), nomeHotel(), HOTEL_CNPJ).map(function (cl) { return '<li>' + eh(cl.titulo.replace(/^Cláusula \S+ — /, '')) + '</li>'; }).join('') + '</ol><p class="small muted">Modelo padrão. Revise com seu advogado antes de usar.</p></details>';
+    if (e === 5) {
+      var cc = prepararContrato(Object.assign({}, c)), erros = OrcCalc.validarContrato(cc), d = documentoContrato(cc);
+      corpo = '<h3>Revisão</h3>' + (erros.length ? '<div class="alert e"><span class="ic">!</span><div><b>Antes de salvar:</b><ul style="margin:4px 0 0;padding-left:18px">' + erros.map(function (x) { return '<li>' + eh(x) + '</li>'; }).join('') + '</ul></div></div>' : '<div class="alert s"><span class="ic">✓</span><div>Tudo preenchido. Confira o texto abaixo, salve e gere o documento.</div></div>') +
+        '<div class="ctr-previa"><div class="ctr-previa-t">' + eh(d.titulo) + '</div><div class="small muted" style="text-align:center">Contrato ' + eh(d.numero) + '</div>' +
+        '<p><b>CONTRATANTE:</b> ' + eh(d.hotel) + ', CNPJ ' + eh(d.cnpj) + ', neste ato representado por seu responsável legal.</p>' +
+        '<p><b>CONTRATADA:</b> ' + eh(cc.contratadoNome || '______') + (cc.contratadoDoc ? ', CPF/CNPJ ' + eh(cc.contratadoDoc) : ', CPF/CNPJ ______') + (cc.contratadoEndereco ? ', endereço: ' + eh(cc.contratadoEndereco) : '') + '.</p>' +
+        d.clausulas.map(function (cl) { return '<p><b>' + eh(cl.titulo) + '</b><br>' + eh(cl.texto) + '</p>'; }).join('') +
+        '<div class="ctr-previa-ass"><div>CONTRATANTE<br><span class="small muted">' + eh(nomeHotel()) + '</span></div><div>CONTRATADA<br><span class="small muted">' + eh(cc.contratadoNome || '') + '</span></div></div></div>' +
+        '<p class="small muted">Modelo de contrato para revisão jurídica antes do uso.</p>';
+    }
+    var passos = '<div class="ctr-passos">' + ETAPAS_CTR.map(function (x) { return '<button class="ctr-passo' + (x[0] === e ? ' on' : x[0] < e ? ' feito' : '') + '" data-act="orcCtrEtapa" data-e="' + x[0] + '"><i>' + x[0] + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>';
+    var salvo = '<span class="small muted" id="ctrSalvo">' + (ORC.ctrSalvoEm ? 'Rascunho salvo às ' + ORC.ctrSalvoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : (c.status === 'rascunho' || !c.id ? 'Rascunho salvo automaticamente' : 'Toque em Salvar para registrar as alterações')) + '</span>';
+    var rodape = '<div class="ctr-rodape">' + (e > 1 ? '<button class="btn" data-act="orcCtrEtapa" data-e="' + (e - 1) + '">← Voltar</button>' : '<button class="btn" data-act="orcCtrSair">Cancelar</button>') +
+      (e < 5 ? '<button class="btn pri" data-act="orcCtrEtapa" data-e="' + (e + 1) + '">Próximo →</button>' :
+        (S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrSalvar">Salvar contrato</button>')) + '</div>' +
+      (e === 5 ? '<div class="row ctr-acoes" style="justify-content:center"><button class="btn sm" data-act="orcCtrPdf">Visualizar PDF / imprimir</button>' + (!S.somenteLeitura && ehAdmin() && !assinaturaFeita(c) ? '<button class="btn sm ok" data-act="orcAssinEnviar">✍ Enviar para assinatura</button>' : '') + '</div>' : '');
+    return '<div class="orc-topo"><h2 style="font-size:19px">' + (c.id ? 'Editar contrato ' : 'Novo contrato ') + eh(c.numero || '') + '</h2>' + salvo + '</div>' + passos +
+      '<div id="ctrForm" class="card mb ctr-etapa">' + corpo + '</div>' + rodape;
   }
 
   /* ---------------- Assinatura eletrônica a distância ---------------- */
@@ -964,7 +1146,7 @@
   function documentoContrato(c) {
     return {
       numero: c.numero || '', titulo: tituloContrato(c), hotel: nomeHotel(), cnpj: HOTEL_CNPJ, contratante: nomeHotel() + ' · Fabiano, gerente operacional',
-      contratada: { nome: c.contratadoNome || '', doc: c.contratadoDoc || '' },
+      contratada: { nome: c.contratadoNome || '', doc: c.contratadoDoc || '', endereco: c.contratadoEndereco || '', telefone: c.contratadoTelefone || '' },
       servico: c.servico || '', valor: OrcCalc.num(c.valor) || 0, inicio: c.inicio || '', fim: c.fim || '',
       clausulas: OrcCalc.clausulasContrato(c, nomeHotel(), HOTEL_CNPJ), emitidoEm: new Date().toISOString()
     };
@@ -972,14 +1154,17 @@
   function tituloContrato(c) { return c.tipoContrato === 'servico30' ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS (' + diasTxt(c.dias).toUpperCase() + ')' : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS'; }
   async function enviarAssinatura(btn) {
     if (!exigeEscrita()) return;
-    lerCtrForm();
+    if (!ORC.ctr) { var base = contratos().find(function (x) { return x.id === ORC.ctrId; }); if (!base) return; ORC.ctr = copiaProfunda(base); var deVer = true; }
+    else lerCtrForm();
     var c = prepararContrato(ORC.ctr), erros = OrcCalc.validarContrato(c);
+    if (deVer) ORC.ctr = null;
     if (erros.length) return modalMsg('Confira o contrato', '<div class="alert e"><span class="ic">!</span><div><ul style="margin:0;padding-left:18px">' + erros.map(function (e) { return '<li>' + eh(e) + '</li>'; }).join('') + '</ul></div></div>');
     if (assinaturaFeita(c) && !window.confirm('Este contrato já foi assinado. Gerar um novo link para assinar de novo?')) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Gerando…'; }
     try {
       // grava o contrato antes, para o link sair com o texto atual
       if (c.status === 'rascunho' || !c.status) c.status = 'aguardando';
+      marcarCriacao(c); registrarCtr(c, 'Enviado para assinatura', c.contratadoNome || '');
       if (!c.id) c.id = uid('ctr');
       var d = Object.assign({}, c); delete d.id; d.atualizadoEm = new Date().toISOString(); if (!d.criadoEm) d.criadoEm = d.atualizadoEm;
       await Store.set('orcamentos', c.id, d);
@@ -1008,16 +1193,37 @@
     if (c.tipoContrato === 'servico30') {
       c.dias = Math.max(1, Math.round(OrcCalc.num(c.dias) || 30));
       c.fim = OrcCalc.addDias(c.inicio, c.dias);
+    } else {
+      var d = Math.round(OrcCalc.num(c.dias));
+      c.dias = d > 0 ? d : null;
+      c.fim = d > 0 && c.inicio ? OrcCalc.addDias(c.inicio, d) : '';
     }
+    c.setorNome = nomeSetorCtr(c.setorId) || '';
     return c;
+  }
+  function registrarCtr(c, acao, obs) { c.historico = (c.historico || []).concat([{ em: new Date().toISOString(), acao: acao, por: quemSou(), obs: obs || '' }]); }
+  async function gravarCtr(c, silencioso) {
+    if (!c.id) c.id = uid('ctr');
+    var d = Object.assign({}, c); delete d.id;
+    d.atualizadoEm = new Date().toISOString(); if (!d.criadoEm) d.criadoEm = d.atualizadoEm;
+    try { await Store.set('orcamentos', c.id, d); if (!silencioso) toast('Contrato salvo'); return true; } catch (e) { return false; }
   }
 
   function abrirContrato(id) {
     var c = contratos().find(function (x) { return x.id === id; });
     if (!c) return;
-    ORC.ctr = copiaProfunda(c);
-    ORC.ctrTela = 'form'; UI.rota = 'contratos';
+    ORC.ctr = null; ORC.ctrId = id;
+    ORC.ctrTela = 'ver'; UI.rota = 'contratos';
     if (ehAdmin()) carregarAssinaturas(c.id, true);
+    render(); window.scrollTo(0, 0);
+  }
+  function editarContrato(id, etapa) {
+    if (!exigeEscrita()) return;
+    var c = contratos().find(function (x) { return x.id === id; });
+    if (!c) return;
+    ORC.ctr = copiaProfunda(c); ORC.ctrId = id; ORC.ctrEtapa = etapa || 1; ORC.ctrSalvoEm = null;
+    ORC.ctrTela = 'form'; UI.rota = 'contratos';
+    if (ehAdmin()) carregarAssinaturas(c.id);
     render(); window.scrollTo(0, 0);
   }
 
@@ -1032,6 +1238,7 @@
     } else {
       ORC.ctr = OrcCalc.contratoAvulso30(numero, hojeISO());
     }
+    ORC.ctrEtapa = 1; ORC.ctrSalvoEm = null; ORC.ctrId = null;
     ORC.ctrTela = 'form'; UI.rota = 'contratos';
     render(); window.scrollTo(0, 0);
   }
@@ -1045,26 +1252,114 @@
       modalMsg('Confira o contrato', '<div class="alert e"><span class="ic">!</span><div><ul style="margin:0;padding-left:18px">' + erros.map(function (e) { return '<li>' + eh(e) + '</li>'; }).join('') + '</ul></div></div>');
       return;
     }
-    if (!c.id) c.id = uid('ctr');
-    var d = Object.assign({}, c);
-    delete d.id;
-    d.atualizadoEm = new Date().toISOString();
-    if (!d.criadoEm) d.criadoEm = d.atualizadoEm;
-    try {
-      await Store.set('orcamentos', c.id, d);
-      toast('Contrato salvo');
-      ORC.ctr = null; ORC.ctrTela = 'lista'; UI.rota = 'contratos'; render(); window.scrollTo(0, 0);
-    } catch (e) { /* aviso já mostrado pelo sistema */ }
+    clearTimeout(ORC.ctrTimer);
+    var antes = c.id ? contratos().find(function (x) { return x.id === c.id; }) : null;
+    marcarCriacao(c);
+    var mud = antes ? OrcCalc.diffContrato(antes, c) : [];
+    if (antes && mud.length) registrarCtr(c, 'Editado', 'Alterado: ' + mud.join(', '));
+    if (await gravarCtr(c)) {
+      ORC.ctrId = c.id; ORC.ctr = null; ORC.ctrTela = 'ver'; UI.rota = 'contratos'; render(); window.scrollTo(0, 0);
+    }
   }
-
-  async function excluirContrato(id) {
+  function marcarCriacao(c) {
+    if ((c.historico || []).some(function (x) { return x.acao === 'Criado'; })) return;
+    if (c.id && contratos().some(function (x) { return x.id === c.id; }) && !c.criadoPor && c.criadoEm) return; // contrato antigo: não inventa autor
+    c.criadoPor = c.criadoPor || quemSou();
+    registrarCtr(c, 'Criado', c.renovadoDeNumero ? 'Renovação do contrato ' + c.renovadoDeNumero : '');
+  }
+  // salvamento automático do rascunho enquanto digita (contratos já assinados só salvam pelo botão)
+  function agendarCtrRascunho() {
+    window.__svcT = Date.now();
+    clearTimeout(ORC.ctrTimer);
+    ORC.ctrTimer = setTimeout(async function () {
+      var c = ORC.ctr; if (!c || S.somenteLeitura || ORC.ctrTela !== 'form') return;
+      lerCtrForm();
+      if ((c.status && c.status !== 'rascunho') || !String(c.contratadoNome || '').trim()) return;
+      prepararContrato(c); marcarCriacao(c);
+      if (await gravarCtr(c, true)) { ORC.ctrSalvoEm = new Date(); var m = document.getElementById('ctrSalvo'); if (m) m.textContent = 'Rascunho salvo às ' + ORC.ctrSalvoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+    }, 1000);
+  }
+  function irEtapa(n) {
+    lerCtrForm();
+    ORC.ctrEtapa = Math.min(5, Math.max(1, n));
+    render(); window.scrollTo(0, 0);
+    if (ORC.ctr && ORC.ctr.status === 'rascunho') agendarCtrRascunho();
+  }
+  // encerrar / cancelar: sempre com motivo, nada é apagado
+  function encerrarContrato(id, tipo) {
     if (!exigeEscrita()) return;
-    var c = contratos().find(function (x) { return x.id === id; });
-    if (!c || !window.confirm('Excluir o contrato ' + (c.numero || '') + '? Esta ação não pode ser desfeita.')) return;
-    try { await Store.del('orcamentos', id); toast('Contrato excluído'); ORC.ctr = null; ORC.ctrTela = 'lista'; render(); } catch (e) { /* aviso já mostrado */ }
+    var c = contratos().find(function (x) { return x.id === id; }); if (!c) return;
+    var canc = tipo === 'cancelar';
+    var w = abrirModal('<div class="mh">' + (canc ? 'Cancelar' : 'Encerrar') + ' contrato ' + eh(c.numero) + '</div><div class="mbd">' +
+      (canc ? '' : '<div class="fld"><label class="f">Data de encerramento</label><input type="date" id="ctrEncData" value="' + hojeISO() + '"></div>') +
+      '<div class="fld"><label class="f">Motivo *</label><textarea id="ctrEncMotivo" rows="3" placeholder="' + (canc ? 'Ex.: contratado desistiu' : 'Ex.: serviço concluído') + '"></textarea></div>' +
+      '<p class="small muted">O contrato não é apagado: fica no histórico como ' + (canc ? 'cancelado' : 'encerrado') + '.</p></div>' +
+      '<div class="mf"><button class="btn" data-a="nao">Voltar</button><button class="btn ' + (canc ? 'danger' : 'pri') + '" data-a="sim">' + (canc ? 'Cancelar contrato' : 'Encerrar') + '</button></div>');
+    w.addEventListener('click', async function (ev) {
+      var a = ev.target.closest('[data-a]'); if (!a) return;
+      if (a.dataset.a === 'nao') return fecharModal(w);
+      var mot = (w.querySelector('#ctrEncMotivo').value || '').trim();
+      if (!mot) { w.querySelector('#ctrEncMotivo').focus(); return toast('Escreva o motivo.'); }
+      var d = copiaProfunda(c), dt = canc ? hojeISO() : (w.querySelector('#ctrEncData').value || hojeISO());
+      Object.assign(d, { status: canc ? 'cancelado' : 'encerrado', encerradoEm: dt, encerradoPor: quemSou(), motivoEncerramento: mot });
+      registrarCtr(d, canc ? 'Cancelado' : 'Encerrado', 'Data: ' + dataBR(dt) + ' · Motivo: ' + mot);
+      a.disabled = true;
+      if (await gravarCtr(d, true)) { fecharModal(w); toast(canc ? 'Contrato cancelado' : 'Contrato encerrado'); render(); }
+      else a.disabled = false;
+    });
+  }
+  function marcarAssinado(id) {
+    if (!exigeEscrita()) return;
+    var c = contratos().find(function (x) { return x.id === id; }); if (!c) return;
+    confirmar('Contrato assinado em papel?', '<p>Marque somente se o contrato ' + eh(c.numero) + ' já foi assinado pelas duas partes no papel.</p>', 'Marcar como assinado').then(async function (ok) {
+      if (!ok) return;
+      var d = copiaProfunda(c); d.status = 'assinado'; d.assinadoEm = new Date().toISOString(); registrarCtr(d, 'Marcado como assinado (em papel)');
+      if (await gravarCtr(d, true)) { toast('Contrato marcado como assinado'); render(); }
+    });
+  }
+  // renovar: cria um novo contrato a partir deste; o anterior fica no histórico, ligado ao novo
+  function renovarContrato(id) {
+    if (!exigeEscrita()) return;
+    var c = contratos().find(function (x) { return x.id === id; }); if (!c) return;
+    var fimAnt = OrcCalc.fimContrato(c), ini = fimAnt && fimAnt >= hojeISO() ? fimAnt : hojeISO();
+    var w = abrirModal('<div class="mh">Renovar contrato ' + eh(c.numero) + '</div><div class="mbd"><p class="small muted">Será criado um novo contrato com os mesmos dados. O atual fica guardado e ligado ao novo.</p>' +
+      '<div class="ctr-grade"><div class="fld"><label class="f">Início do novo contrato</label><input type="date" id="renIni" value="' + ini + '"></div>' +
+      '<div class="fld"><label class="f">Duração (dias)</label><input type="text" inputmode="numeric" id="renDias" value="' + eh(c.dias || 30) + '"></div>' +
+      '<div class="fld"><label class="f">Valor (R$)</label><input type="text" inputmode="decimal" id="renValor" value="' + eh(String(OrcCalc.num(c.valor)).replace('.', ',')) + '"></div></div></div>' +
+      '<div class="mf"><button class="btn" data-a="nao">Voltar</button><button class="btn pri" data-a="sim">Criar renovação</button></div>');
+    w.addEventListener('click', async function (ev) {
+      var a = ev.target.closest('[data-a]'); if (!a) return;
+      if (a.dataset.a === 'nao') return fecharModal(w);
+      var dias = Math.round(OrcCalc.num(w.querySelector('#renDias').value)), inicio = w.querySelector('#renIni').value;
+      if (!inicio || !(dias > 0)) return toast('Informe o início e a duração.');
+      a.disabled = true;
+      var novo = copiaProfunda(c);
+      ['id', 'historico', 'documentos', 'criadoEm', 'criadoPor', 'atualizadoEm', 'assinadoEm', 'encerradoEm', 'encerradoPor', 'motivoEncerramento', 'renovadoPara', 'renovadoParaNumero'].forEach(function (k) { delete novo[k]; });
+      Object.assign(novo, { numero: OrcCalc.proximoNumeroContrato(contratos(), inicio.slice(0, 4) < hojeISO().slice(0, 4) ? hojeISO().slice(0, 4) : hojeISO().slice(0, 4)), status: 'rascunho', inicio: inicio, dias: dias,
+        valor: OrcCalc.num(w.querySelector('#renValor').value), renovadoDe: c.id, renovadoDeNumero: c.numero });
+      if (novo.tipoContrato !== 'servico30' && novo.tipoContrato !== 'orcamento') novo.tipoContrato = 'servico30';
+      prepararContrato(novo); marcarCriacao(novo);
+      if (!(await gravarCtr(novo, true))) { a.disabled = false; return; }
+      var ant = copiaProfunda(c); ant.renovadoPara = novo.id; ant.renovadoParaNumero = novo.numero;
+      registrarCtr(ant, 'Renovado', 'Novo contrato ' + novo.numero + ' a partir de ' + dataBR(inicio));
+      await gravarCtr(ant, true);
+      fecharModal(w); toast('Renovação criada: ' + novo.numero);
+      editarContrato(novo.id, 5);
+    });
+  }
+  // cada documento gerado fica guardado no contrato (quando o texto mudou desde o último)
+  async function guardarVersao(c, motivo) {
+    if (!c.id || S.somenteLeitura || !contratos().some(function (x) { return x.id === c.id; })) return;
+    var doc = documentoContrato(c), chave = JSON.stringify([doc.titulo, doc.contratada, doc.clausulas]);
+    var vs = c.documentos || [], ult = vs[vs.length - 1];
+    if (ult && JSON.stringify([ult.doc.titulo, ult.doc.contratada, ult.doc.clausulas]) === chave) return;
+    var atual = copiaProfunda(contratos().find(function (x) { return x.id === c.id; }));
+    atual.documentos = (atual.documentos || []).concat([{ em: new Date().toISOString(), por: quemSou(), motivo: motivo || '', doc: doc }]).slice(-30);
+    registrarCtr(atual, 'Documento gerado', 'Versão ' + atual.documentos.length);
+    await gravarCtr(atual, true);
   }
 
-  async function gerarContratoPdf(c) {
+  async function gerarContratoPdf(c, versao) {
     var JsPDF;
     try { JsPDF = await carregarPdfLibs(); } catch (e) { toast('Não foi possível carregar o gerador de PDF. Verifique a conexão.'); return; }
     var doc = new JsPDF({ unit: 'mm', format: 'a4' });
@@ -1072,14 +1367,15 @@
     var logo = await carregarLogo(); instalarMarcaDagua(doc, logo);
     var y = cabecalhoPdf(doc, logo, W, M, 'CONTRATO', c.numero);
     var limite = function (h) { if (y + h > 280) { doc.addPage(); y = 22; } };
-    var feita = assinaturaFeita(c), dS = feita && feita.documento;
+    var feita = versao ? null : assinaturaFeita(c), dS = versao || (feita && feita.documento);
     var titulo = dS ? dS.titulo : tituloContrato(c);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text(titulo, W / 2, y, { align: 'center' }); y += 7;
     y += 4;
     var partes = [
       'CONTRATANTE: ' + nomeHotel() + ', CNPJ ' + HOTEL_CNPJ + ', neste ato representado por seu responsável legal.',
       feita ? 'CONTRATADA: ' + feita.nome + ', CPF ' + feita.cpf + '.'
-        : 'CONTRATADA: ' + (c.contratadoNome || '__________________________') + (c.contratadoDoc ? ', CPF/CNPJ ' + c.contratadoDoc : ', CPF/CNPJ ______________________') + '.'
+        : versao ? 'CONTRATADA: ' + (versao.contratada.nome || '______') + (versao.contratada.doc ? ', CPF/CNPJ ' + versao.contratada.doc : ', CPF/CNPJ ______________________') + (versao.contratada.endereco ? ', endereço: ' + versao.contratada.endereco : '') + '.'
+        : 'CONTRATADA: ' + (c.contratadoNome || '__________________________') + (c.contratadoDoc ? ', CPF/CNPJ ' + c.contratadoDoc : ', CPF/CNPJ ______________________') + (c.contratadoEndereco ? ', endereço: ' + c.contratadoEndereco : '') + '.'
     ];
     partes.forEach(function (t) { var l = doc.splitTextToSize(t, larg); limite(l.length * 5 + 2); doc.text(l, M, y); y += l.length * 5 + 3; });
     y += 3;
@@ -1131,7 +1427,7 @@
     await salvarArquivo('Contrato_' + (c.numero || 'rascunho') + '.pdf', doc.output('blob'));
   }
 
-  root.orcAcao = function (el, ev) {
+  root.orcAcao = async function (el, ev) {
     var act = el.dataset.act, id = el.dataset.id;
     switch (act) {
       case 'orcTela': ORC.tela = el.dataset.t; ORC.id = null; render(); window.scrollTo(0, 0); return;
@@ -1155,16 +1451,28 @@
       case 'orcSugEscolher': return escolherSugestao(el.dataset.item, el.dataset.cat);
       case 'orcGerarContrato': return novoContrato('orcamento', porId(id));
       case 'orcCtrNovo30': return novoContrato('servico30', null);
-      case 'orcCtrVer': return abrirContrato(id);
+      case 'orcCtrVer': if (ev) ev.preventDefault(); return abrirContrato(id);
+      case 'orcCtrEditar': return editarContrato(id);
+      case 'orcCtrEtapa': return irEtapa(+el.dataset.e);
+      case 'orcCtrSair': lerCtrForm(); clearTimeout(ORC.ctrTimer); { var cs = ORC.ctr; ORC.ctr = null; if (cs && cs.id && contratos().some(function (x) { return x.id === cs.id; })) { ORC.ctrId = cs.id; ORC.ctrTela = 'ver'; } else ORC.ctrTela = 'lista'; } render(); return;
+      case 'orcCtrFiltro': ORC.ctrFiltro.situacao = el.dataset.s || ''; render(); return;
+      case 'orcCtrPeriodo': ORC.ctrFiltro.de = (document.getElementById('ctrDe') || {}).value || ''; ORC.ctrFiltro.ate = (document.getElementById('ctrAte') || {}).value || ''; render(); return;
+      case 'orcCtrLimpar': if (ev) ev.preventDefault(); ORC.ctrFiltro = { texto: '', situacao: '', de: '', ate: '' }; render(); return;
+      case 'orcCtrEncerrar': if (ev) ev.preventDefault(); return encerrarContrato(id, 'encerrar');
+      case 'orcCtrCancelar': return encerrarContrato(id, 'cancelar');
+      case 'orcCtrRenovar': if (ev) ev.preventDefault(); return renovarContrato(id);
+      case 'orcCtrMarcarAssinado': return marcarAssinado(id);
+      case 'orcCtrPdfVer': { var cv = contratos().find(function (x) { return x.id === id; }); if (!cv) return; await guardarVersao(cv); return gerarContratoPdf(contratos().find(function (x) { return x.id === id; }) || cv); }
+      case 'orcCtrPdfVersao': { var cx = contratos().find(function (x) { return x.id === id; }); var vv = cx && (cx.documentos || [])[+el.dataset.v]; if (vv) return gerarContratoPdf(cx, vv.doc); return; }
       case 'orcCtrSalvar': return salvarContrato();
-      case 'orcCtrPdf': lerCtrForm(); return gerarContratoPdf(prepararContrato(ORC.ctr));
-      case 'orcCtrExcluir': return excluirContrato(id);
+      case 'orcCtrPdf': lerCtrForm(); prepararContrato(ORC.ctr); if (ORC.ctr.id) await guardarVersao(ORC.ctr); return gerarContratoPdf(ORC.ctr);
+      case 'orcCtrExcluir': return encerrarContrato(id, 'cancelar'); // contratos não são apagados
       case 'orcAssinEnviar': return enviarAssinatura(el);
-      case 'orcAssinRecarregar': if (ev) ev.preventDefault(); if (ORC.ctr) carregarAssinaturas(ORC.ctr.id, true); return render();
+      case 'orcAssinRecarregar': if (ev) ev.preventDefault(); carregarAssinaturas(ORC.ctr ? ORC.ctr.id : ORC.ctrId, true); return render();
       case 'orcAssinCopiar': { var u = el.dataset.url; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function () { toast('Link copiado'); }, function () { window.prompt('Copie o link:', u); }); return; }
       case 'orcAssinCancelar': if (!window.confirm('Cancelar este link? O prestador não vai mais conseguir assinar por ele.')) return;
-        return Nuvem.rpc('esc_assinatura_cancelar', { p_id: +id }).then(function () { toast('Link cancelado'); if (ORC.ctr) carregarAssinaturas(ORC.ctr.id, true); }, function () { toast('Não deu para cancelar agora.'); });
-      case 'orcCtrVoltar': ORC.ctr = null; ORC.ctrTela = 'lista'; render(); return;
+        return Nuvem.rpc('esc_assinatura_cancelar', { p_id: +id }).then(function () { toast('Link cancelado'); carregarAssinaturas(ORC.ctr ? ORC.ctr.id : ORC.ctrId, true); }, function () { toast('Não deu para cancelar agora.'); });
+      case 'orcCtrVoltar': ORC.ctr = null; ORC.ctrTela = 'lista'; render(); window.scrollTo(0, 0); return;
       case 'orcCatSalvar': return salvarPrecoCatalogo();
       case 'orcCatOcultar': return ocultarCatalogo(id);
       case 'orcCatBuscar': ORC.catFiltro = (document.getElementById('catBusca') || { value: '' }).value.trim(); render(); return;
@@ -1176,7 +1484,18 @@
 
   // pesquisa ao digitar: só a lista é redesenhada, o campo continua com o foco
   var buscaT = null;
+  var ctrBuscaT = null;
+  function atualizarFimNaTela() {
+    var el = document.getElementById('ctrFim'); if (!el || !ORC.ctr) return;
+    var f = OrcCalc.fimContrato(prepararContrato(Object.assign({}, ORC.ctr))); el.textContent = f ? dataBR(f) : '—';
+  }
   document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'ctrBusca') {
+      ORC.ctrFiltro.texto = ev.target.value; window.__svcT = Date.now(); clearTimeout(ctrBuscaT);
+      ctrBuscaT = setTimeout(function () { var p = ev.target.selectionStart; render(); var n = document.getElementById('ctrBusca'); if (n) { n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } } }, 250);
+      return;
+    }
+    if (ev.target.closest && ev.target.closest('#ctrForm')) { lerCtrForm(); atualizarFimNaTela(); agendarCtrRascunho(); return; }
     if (ev.target.id === 'orcBusca') {
       ORC.busca = ev.target.value; window.__svcT = Date.now(); clearTimeout(buscaT);
       buscaT = setTimeout(function () {
@@ -1196,6 +1515,7 @@
     if (st) return mudarStatus(st.dataset.orcStatus, st.value);
     var f = ev.target.closest && ev.target.closest('#orcForm');
     if (f) { lerForm(); atualizarTotaisNaTela(); agendarRascunho(); }
+    if (ev.target.closest && ev.target.closest('#ctrForm')) { lerCtrForm(); atualizarFimNaTela(); agendarCtrRascunho(); }
   });
 
   /* ---------------- PDF ---------------- */

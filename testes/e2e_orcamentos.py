@@ -197,6 +197,7 @@ def run():
         page.wait_for_selector('#ctrForm')
         page.locator('[data-ctr-campo="contratadoNome"]').fill('João Pintor')
         page.locator('[data-ctr-campo="contratadoDoc"]').fill('123.456.789-00')
+        page.click('[data-act="orcCtrEtapa"][data-e="5"]'); page.wait_for_timeout(250)
         page.click('button[data-act="orcCtrSalvar"]')
         page.wait_for_selector('text=Contrato salvo', timeout=5000)
         page.wait_for_timeout(600)
@@ -206,9 +207,11 @@ def run():
         assert ctrs[0]['tipoContrato'] == 'orcamento' and ctrs[0]['numero'].startswith('CTR-')
 
         # contrato de 30 dias: só o nome do prestador
+        page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(300)
         page.click('button[data-act="orcCtrNovo30"]')
         page.wait_for_selector('#ctrForm')
         page.locator('[data-ctr-campo="contratadoNome"]').fill('Maria Ventiladores')
+        page.click('[data-act="orcCtrEtapa"][data-e="5"]'); page.wait_for_timeout(250)
         page.click('button[data-act="orcCtrSalvar"]')
         page.wait_for_selector('text=Contrato salvo', timeout=5000)
         page.wait_for_timeout(600)
@@ -219,15 +222,16 @@ def run():
         assert (date.fromisoformat(c30['fim']) - date.fromisoformat(c30['inicio'])).days == 30, c30
 
         # PDF do contrato abre na pré-visualização do sistema
+        page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(300)
         page.locator('button[data-act="orcCtrVer"]').first.click()
-        page.wait_for_selector('#ctrForm')
-        page.click('button[data-act="orcCtrPdf"]')
+        page.wait_for_selector('button[data-act="orcCtrPdfVer"]')
+        page.click('button[data-act="orcCtrPdfVer"]')
         page.wait_for_selector('.mf [data-a="salvar"]', timeout=20000)
         page.click('.mf [data-a="fechar"]')
         page.wait_for_timeout(300)
         # orçamentos não listam contratos
         page.click('button[data-act="orcCtrVoltar"]'); page.wait_for_timeout(300)
-        assert page.locator('tr').filter(has_text='João Pintor').count() == 1, 'contrato não aparece na aba Contratos'
+        assert page.locator('.ctr-card').filter(has_text='João Pintor').count() == 1, 'contrato não aparece na aba Contratos'
         page.reload(); page.wait_for_selector('button[data-act="orcNovo"]', timeout=20000); page.wait_for_timeout(500)
         page.goto(BASE + '#orcamentos'); page.wait_for_selector('button[data-act="orcTela"][data-t="painel"]', timeout=20000); page.wait_for_timeout(500)
         assert page.locator('.orc-card').filter(has_text='João Pintor').count() == 0, 'contrato apareceu na lista de orçamentos'

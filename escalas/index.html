@@ -890,6 +890,46 @@ input[type=date],input[type=month],input[type=time]{max-width:100%;min-width:0;b
 .orc-hist ul{margin:8px 0 0;padding-left:18px}
 .orc-hist li{margin:6px 0}
 .orc-acoes-fim{justify-content:flex-end;gap:6px;margin-bottom:16px}
+/* Contratos */
+.ctr-inds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:4px 0 8px}
+@media (min-width:760px){.ctr-inds{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.ctr-ind{appearance:none;background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:9px 6px;text-align:center;cursor:pointer;color:inherit;font:inherit;line-height:1.15}
+.ctr-ind b{display:block;font-size:21px;font-weight:800}
+.ctr-ind span{font-size:11.5px;color:var(--ink2)}
+.ctr-ind.on{border-color:var(--pri);box-shadow:0 0 0 2px rgba(15,76,92,.15)}
+.ctr-ind.alerta{border-color:#e7b65c;background:#fffaf0}
+.ctr-ind.perigo{border-color:#f0a3a3;background:#fff5f5}
+.ctr-valor{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#0f4c5c,#13677a);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:10px}
+.ctr-valor span{font-size:13px;opacity:.9}
+.ctr-valor b{font-size:18px;color:#f3d28b}
+.ctr-alerta{margin-bottom:10px}
+.ctr-alerta div div{margin:2px 0}
+.ctr-vig{font-size:13px;color:var(--ink2);margin-top:3px}
+.txt-warn{color:#a16207}.txt-err{color:#b91c1c}
+.badge.b-warn{background:#fff4d6;color:#a16207}
+.ctr-acoes{gap:8px;margin-top:12px;flex-wrap:wrap}
+.ctr-doc{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.ctr-doc:first-of-type{border-top:0}
+.ctr-passos{display:flex;gap:4px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none}
+.ctr-passos::-webkit-scrollbar{display:none}
+.ctr-passo{appearance:none;flex:1 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;padding:4px 2px;font:inherit;color:var(--ink2);cursor:pointer;min-width:58px}
+.ctr-passo i{font-style:normal;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #cfd6df;font-weight:700;font-size:13px;background:#fff}
+.ctr-passo span{font-size:11px;white-space:nowrap}
+.ctr-passo.on{color:var(--pri);font-weight:700}
+.ctr-passo.on i{background:var(--pri);border-color:var(--pri);color:#fff}
+.ctr-passo.feito i{border-color:var(--pri);color:var(--pri)}
+.ctr-etapa h3{margin:0 0 10px}
+.ctr-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.ctr-etapa input[type=text],.ctr-etapa input[type=date],.ctr-etapa select,.ctr-etapa textarea,.mbd textarea,.mbd input[type=text],.mbd input[type=date]{font-size:16px;width:100%;box-sizing:border-box}
+.ctr-fim{padding:10px 12px;border-radius:10px;background:#eef6f7;color:var(--pri);font-weight:700;min-height:22px}
+.ctr-rodape{display:flex;justify-content:space-between;gap:10px;margin:0 0 12px;position:sticky;bottom:0;background:var(--bg,#f3f5f8);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:5}
+.ctr-rodape .btn{flex:1;min-height:46px}
+.ctr-modelo summary{cursor:pointer;color:var(--pri);font-weight:600;font-size:14px}
+.ctr-modelo ol{margin:6px 0;padding-left:20px;font-size:14px}
+.ctr-previa{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14px;line-height:1.5;max-height:60vh;overflow:auto}
+.ctr-previa-t{text-align:center;font-weight:800;margin-bottom:2px}
+.ctr-previa-ass{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px;text-align:center}
+.ctr-previa-ass>div{border-top:1px solid #333;padding-top:4px;font-size:12px}
 /* Atestados */
 .faus{font-weight:800;color:#a16207}
 .ats-env{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -2990,7 +3030,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '18/11 00:30';
+const VERSAO_APP = '18/11 01:30';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -5475,7 +5515,7 @@ document.addEventListener('touchstart', ev => {
 irRota();
 Store.init();
 </script>
-<script src="orcamentos.js?v=1811a"></script>
+<script src="orcamentos.js?v=1811b"></script>
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1711c"></script>
 </body>

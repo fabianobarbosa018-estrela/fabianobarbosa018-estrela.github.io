@@ -45,8 +45,10 @@ with sync_playwright() as p:
     ck(pg.locator('#topTitle').inner_text().strip() == 'Serviços prestados', 'Abrir financeiro completo')
     painel(); pg.click('.pd-al a:has-text("Abrir")'); pg.wait_for_timeout(500)
     ck(pg.evaluate('location.hash') == '#mensal', 'link do alerta abre a escala')
-    painel(); pg.fill('#painelDia', '2026-11-18'); pg.dispatch_event('#painelDia', 'change'); pg.wait_for_timeout(400)
-    ck('Quarta, 18/11/2026' in pg.locator('.pd-top').inner_text() and pg.locator('[data-act="painelHoje"]').count() == 1, 'trocar o dia')
+    from datetime import date as _d, timedelta as _td
+    _out = _d.today() + _td(days=1)
+    painel(); pg.fill('#painelDia', _out.isoformat()); pg.dispatch_event('#painelDia', 'change'); pg.wait_for_timeout(400)
+    ck(_out.strftime('%d/%m/%Y') in pg.locator('.pd-top').inner_text() and pg.locator('[data-act="painelHoje"]').count() == 1, 'trocar o dia')
     pg.click('[data-act="painelHoje"]'); pg.wait_for_timeout(300)
     ck(pg.locator('[data-act="painelHoje"]').count() == 0, 'botão Hoje volta para hoje')
     # ver todos: 10 trabalhando

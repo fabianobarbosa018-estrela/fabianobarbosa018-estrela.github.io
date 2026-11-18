@@ -32,6 +32,7 @@ def imagens_do_pdf(com_assinatura):
         page.click('button[data-act="orcCtrNovo30"]')
         page.wait_for_timeout(400)
         page.locator('[data-ctr-campo="contratadoNome"]').fill('Diarista Teste')
+        page.click('[data-act="orcCtrEtapa"][data-e="5"]'); page.wait_for_timeout(300)
         page.click('button[data-act="orcCtrPdf"]')
         page.wait_for_timeout(2000)
         url = page.evaluate("""() => { const el = [...document.querySelectorAll('iframe,embed,object')].find(e => (e.src||e.data||'').startsWith('blob:')); return el ? (el.src||el.data) : null; }""")
