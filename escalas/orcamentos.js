@@ -1160,8 +1160,8 @@
     if (!logo) return;
     var desenhar = function () {
       var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-      var w = 130, h = w * logo.h / logo.w;
-      try { doc.setGState(new doc.GState({ opacity: 0.22 })); doc.addImage(logo.dataUrl, 'PNG', (W - w) / 2, (H - h) / 2, w, h); doc.setGState(new doc.GState({ opacity: 1 })); } catch (e) { }
+      var w = 150, h = w * logo.h / logo.w;
+      try { doc.setGState(new doc.GState({ opacity: 0.4 })); doc.addImage(logo.dataUrl, 'PNG', (W - w) / 2, (H - h) / 2, w, h); doc.setGState(new doc.GState({ opacity: 1 })); } catch (e) { }
     };
     var add = doc.addPage.bind(doc);
     doc.addPage = function () { var r = add.apply(null, arguments); desenhar(); return r; };
