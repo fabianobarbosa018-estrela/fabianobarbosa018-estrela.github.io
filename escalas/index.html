@@ -2105,7 +2105,7 @@ const Nuvem = {
     if (!rotaPermitida(UI.rota)) UI.rota = rotaInicial();
     const hh = (location.hash || '').replace('#', '');
     if (hh !== UI.rota && !(conviteDaUrl() && ehAdmin()) && (!ROTAS.some(x => x[0] === hh) || !rotaPermitida(hh))) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } }
-    this.guardarCopia(); render(); atualizarStatus();
+    this.guardarCopia(); render(); atualizarStatus(); carregarAnivMes();
   },
   async sincronizar() {
     if (!S.desde || S.precisaLogin || document.hidden) return;
@@ -3434,6 +3434,20 @@ function diaristasTrabalhando(dataISO) {
   return servPrestadores().filter(p => grupoDe(p) === 'diaria' && ((S.servicos[servKey(mes, p.id)] || {}).dias || {})[dd] > 0)
     .map(p => ({ id: 'prest:' + p.id, nome: _capNome(p.nome || ''), setorId: null, setor: 'Diarista' + (p.funcao ? ' · ' + p.funcao : ''), horario: '', diarista: true }));
 }
+// Aniversariantes do mês (só nome e dia, vindo do servidor para qualquer perfil)
+let ANIV_MES = null;
+async function carregarAnivMes() {
+  try { ANIV_MES = await Nuvem.rpc('esc_aniversariantes_mes', {}); }
+  catch (e) { ANIV_MES = null; return; }
+  if (UI.rota === 'painel') render();
+}
+function anivMesHtml(hoje) {
+  if (!Array.isArray(ANIV_MES) || !ANIV_MES.length) return '';
+  const mes = MESES[+hoje.slice(5, 7) - 1];
+  const cap = s => s.charAt(0) + s.slice(1).toLowerCase();
+  return `<section class="pd-card pd-aniv"><header><span>Aniversariantes de ${esc(cap(mes))}</span><b class="pd-n">${ANIV_MES.length}</b></header>
+    <ul class="pd-lista">` + ANIV_MES.map(a => `<li><span>${esc(a.nome || '')}</span><span class="small muted">dia ${a.dia}</span></li>`).join('') + '</ul></section>';
+}
 function vPainel() {
   const hoje = UI.painelDia || C.hojeISO(), sem = C.inicioSemana(hoje), mes = hoje.slice(0, 7);
   const ativos = S.funcionarios.filter(f => f.ativo);
@@ -3526,6 +3540,7 @@ function vPainel() {
     <div class="pd-dia"><input type="date" id="painelDia" value="${hoje}" aria-label="Escolher o dia">${souHoje ? '' : '<button class="pd-btn" data-act="painelHoje">Hoje</button>'}</div>
   </div>
   ${souHoje ? '' : `<div class="pd-aviso">Mostrando ${esc(dExt)}</div>`}
+  ${anivMesHtml(hoje)}
 
   <div class="pd-ks">
     ${kpi('k-at', ico.users, ativos.length, 'Ativos', inatTxt().replace(' · ', ''))}
