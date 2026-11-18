@@ -70,12 +70,10 @@
     const rec = rhDe(f.id), p = rec.pessoais || {}, pr = rec.profissionais || {}, falta = [];
     if (!(f.telefone || p.telefone)) falta.push('telefone');
     if (!p.cpf) falta.push('CPF');
-    if (!p.rg) falta.push('RG');
     if (!p.nascimento) falta.push('nascimento');
     if (!p.endereco) falta.push('endereço');
     if (!p.mae) falta.push('nome da mãe');
     if (!p.email) falta.push('e-mail');
-    if (!pr.pis) falta.push('PIS');
     if (!(rec.emergencia || []).length) falta.push('contato de emergência');
     return falta;
   }
