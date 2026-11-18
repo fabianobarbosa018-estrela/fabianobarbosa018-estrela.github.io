@@ -830,6 +830,7 @@
     var acoes = '<button class="btn" data-act="orcCtrVoltar">Voltar</button>' +
       (S.somenteLeitura ? '' : '<button class="btn pri" data-act="orcCtrSalvar">Salvar contrato</button>') +
       '<button class="btn" data-act="orcCtrPdf">Gerar PDF</button>' +
+      (!S.somenteLeitura && ehAdmin() && !assinaturaFeita(c) ? '<button class="btn ok" data-act="orcAssinEnviar">✍ Enviar para assinatura</button>' : '') +
       (c.id && !S.somenteLeitura ? '<button class="btn danger" data-act="orcCtrExcluir" data-id="' + eh(c.id) + '">Excluir</button>' : '');
     return cabecalho((c.id ? 'Contrato ' : 'Novo contrato ') + (c.numero || ''), acoes) +
       '<div id="ctrForm">' +
@@ -857,7 +858,7 @@
   function cardAssinatura(c) {
     if (!ehAdmin()) return '';
     var h = '<div class="card mb ctr-assin"><h3 style="margin-top:0">Assinatura do prestador (a distância)</h3>';
-    if (!c.id) return h + '<p class="small muted" style="margin:0">Salve o contrato para poder enviar o link de assinatura.</p></div>';
+    if (!c.id) return h + '<p class="small muted" style="margin:0 0 10px">Preencha o nome do prestador e o serviço. Ao tocar em "Enviar para assinatura" o contrato é salvo e o link é gerado para você mandar pelo WhatsApp. O CPF o prestador informa na hora de assinar.</p><button class="btn pri" data-act="orcAssinEnviar">✍ Enviar para assinatura</button></div>';
     var l = ORC.assin[c.id];
     if (l === undefined) { carregarAssinaturas(c.id); l = 'carregando'; }
     if (l === 'carregando') return h + '<p class="small muted" style="margin:0">Carregando…</p></div>';

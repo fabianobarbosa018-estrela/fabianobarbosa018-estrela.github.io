@@ -842,6 +842,9 @@ table.list tr:hover td{background:#f8fbfc}
 .pd-al .card{border:0;padding:0;box-shadow:none;background:none;margin:0}
 .pd-al .card>.row:first-child{display:none}
 @media (min-width:700px){.pd-ks{grid-template-columns:repeat(4,1fr)}}
+/* campos de data no iPhone não passam da largura do cartão */
+input[type=date],input[type=month],input[type=time]{max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none}
+.fld{min-width:0}
 /* Atestados */
 .faus{font-weight:800;color:#a16207}
 .ats-env{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -2942,7 +2945,7 @@ document.addEventListener('focusin', e => {
   t.blur();
   servDia(t.dataset.mes, t.dataset.pid, t.dataset.dd, p.valor).then(() => render()).catch(() => { });
 });
-const VERSAO_APP = '17/11 21:45';
+const VERSAO_APP = '17/11 22:00';
 let _atualizando = false;
 /* Botão "Atualizar": busca os dados mais novos no servidor e recarrega as telas na versão mais recente
    (útil no app instalado na tela inicial, que não tem botão de recarregar do navegador). */
@@ -5427,7 +5430,7 @@ document.addEventListener('touchstart', ev => {
 irRota();
 Store.init();
 </script>
-<script src="orcamentos.js?v=1711d"></script>
+<script src="orcamentos.js?v=1711e"></script>
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1711c"></script>
 </body>

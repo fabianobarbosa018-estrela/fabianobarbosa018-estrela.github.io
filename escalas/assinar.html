@@ -112,10 +112,12 @@ input.erro{border-color:var(--err);background:#fff5f5}
       // no celular a barra do navegador some/aparece e dispara "resize": só refaz o quadro se a largura mudou de verdade
       if (Math.abs(r.width - largAtual) < 2) return;
       largAtual = r.width;
-      var img = tracos ? cv.toDataURL() : null;
+      // guarda o que já foi desenhado numa cópia e devolve na hora (sem espera), para a assinatura nunca se perder
+      var copia = null;
+      if (tracos && cv.width && cv.height) { copia = document.createElement('canvas'); copia.width = cv.width; copia.height = cv.height; copia.getContext('2d').drawImage(cv, 0, 0); }
       cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
       ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0b1f4d'; ctx.lineWidth = 2.6;
-      if (img) { var i = new Image(); i.onload = function () { ctx.drawImage(i, 0, 0, r.width, r.height); }; i.src = img; }
+      if (copia) ctx.drawImage(copia, 0, 0, r.width, r.height);
     }
     ajustar(); window.addEventListener('resize', function () { if (!desenhando) ajustar(); });
     function pos(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
@@ -149,9 +151,11 @@ input.erro{border-color:var(--err);background:#fff5f5}
     cpf.classList.toggle('erro', !!document.getElementById('eCpf').textContent);
     set('eAss', pad.vazio() ? 'Faça a sua assinatura no quadro.' : '');
     set('eAce', !document.getElementById('aceite').checked ? 'Marque que leu e concorda com o contrato.' : '');
+    var img = ok ? pad.imagem() : null;
+    if (ok && !img) set('eAss', 'Faça a sua assinatura no quadro.');
     if (!ok) { var e = document.querySelector('.msg-err:not(:empty)'); if (e) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
     btn.disabled = true; btn.textContent = 'Enviando…';
-    rpc('esc_assinatura_assinar', { p_link: link, p_nome: n, p_cpf: cpf.value, p_assinatura: pad.imagem(), p_aceite: true, p_aparelho: navigator.userAgent })
+    rpc('esc_assinatura_assinar', { p_link: link, p_nome: n, p_cpf: cpf.value, p_assinatura: img, p_aceite: true, p_aparelho: navigator.userAgent })
       .then(function (r) {
         window.scrollTo(0, 0);
         msg('ok', 'Contrato assinado. Obrigado!', '<p style="margin:6px 0 0">Assinado por <b>' + esc(n) + '</b> em ' + dataHora(r.assinado_em) + '.</p><p class="small muted" style="margin:6px 0 0">Código de verificação: <span class="cod">' + esc(r.codigo) + '</span>. O ' + 'Hotel Fazenda Oasis já recebeu o contrato assinado. Você pode fechar esta página.</p>');
