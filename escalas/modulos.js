@@ -200,42 +200,6 @@
     return h;
   }
 
-  /* ======================= FÉRIAS ======================= */
-  function periodosDeFerias() {
-    var hoje = C.hojeISO(), out = [];
-    S.funcionarios.filter(function (f) { return f.ativo; }).forEach(function (f) {
-      (f.ferias || []).forEach(function (p) {
-        var st = p.fim < hoje ? 'concluida' : p.ini > hoje ? 'programada' : 'andamento';
-        out.push({ f: f, p: p, st: st, dias: diasEntre(p.ini, p.fim) });
-      });
-    });
-    return out.sort(function (a, b) { return a.p.ini < b.p.ini ? -1 : a.p.ini > b.p.ini ? 1 : 0; });
-  }
-  function vFerias() {
-    var m = mdl(); m.fer = m.fer || { sit: '', setor: '', busca: '' };
-    var f = m.fer, lista = periodosDeFerias()
-      .filter(function (x) { return !f.sit || x.st === f.sit; })
-      .filter(function (x) { return !f.setor || x.f.setorId === f.setor; })
-      .filter(function (x) { return !f.busca || norm(x.f.nome).indexOf(norm(f.busca)) >= 0; });
-    var andamento = periodosDeFerias().filter(function (x) { return x.st === 'andamento'; }).length;
-    var prog = periodosDeFerias().filter(function (x) { return x.st === 'programada'; }).length;
-    var h = '<div class="row mb"><div><h1>Férias</h1><p class="sub" style="margin:0">Períodos de férias de todos os funcionários ativos. Para lançar ou alterar, abra a ficha.</p></div></div>';
-    h += '<div class="row mb" style="flex-wrap:wrap;gap:10px">' + cardRes('Em andamento', String(andamento), 'agora') + cardRes('Programadas', String(prog), 'próximas') + '</div>';
-    h += '<div class="card mb"><div class="row" style="flex-wrap:wrap;gap:8px">' +
-      '<select data-mdl="ferSit">' + selectOpts([{ v: 'andamento', t: 'Em andamento' }, { v: 'programada', t: 'Programadas' }, { v: 'concluida', t: 'Concluídas' }], f.sit, 'Todas as situações') + '</select>' +
-      '<select data-mdl="ferSetor"><option value="">Todos os setores</option>' + setoresOrd().map(function (s) { return '<option value="' + s.id + '" ' + (f.setor === s.id ? 'selected' : '') + '>' + esc(s.nome) + '</option>'; }).join('') + '</select>' +
-      '<input type="search" id="mdl_ferBusca" data-mdl="ferBusca" placeholder="Buscar funcionário…" value="' + esc(f.busca) + '" style="flex:1;min-width:160px">' +
-      '</div></div>';
-    if (!lista.length) return h + '<div class="card empty"><b>Nenhum período de férias encontrado</b></div>';
-    var rot = { andamento: '<span class="badge b-ok">Em andamento</span>', programada: '<span class="badge" style="background:#dbeafe;color:#1e40af">Programada</span>', concluida: '<span class="badge" style="background:#e5e7eb;color:#374151">Concluída</span>' };
-    h += '<div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th class="hide-m">Setor</th><th>Início</th><th>Fim</th><th class="hide-m">Dias</th><th>Situação</th><th></th></tr></thead><tbody>' +
-      lista.map(function (x) {
-        return '<tr><td><b>' + esc(x.f.nome) + '</b></td><td class="hide-m">' + esc(nomeDoSetor(x.f.setorId)) + '</td><td style="white-space:nowrap">' + dataBR(x.p.ini) + '</td><td style="white-space:nowrap">' + dataBR(x.p.fim) + '</td><td class="hide-m">' + x.dias + '</td><td>' + rot[x.st] + '</td>' +
-          '<td><button class="btn sm" data-act="mdlIrFicha" data-id="' + x.f.id + '">Abrir ficha</button></td></tr>';
-      }).join('') + '</tbody></table></div>';
-    return h;
-  }
-
   /* ======================= PAGAMENTOS ======================= */
   function vPagamentos() {
     var m = mdl(); m.pag = m.pag || { mes: mesAtual() };
@@ -281,7 +245,6 @@
   /* ======================= AÇÕES E EVENTOS ======================= */
   root.vDespesas = vDespesas;
   root.vRelatorios = vRelatorios;
-  root.vFerias = vFerias;
   root.vPagamentos = vPagamentos;
   root.mdlAcao = function (el, ev) {
     var act = el.dataset.act;
@@ -291,15 +254,7 @@
     if (act === 'mdlDspCancelar') return dspCancelar(el);
     if (act === 'mdlFechar') return fecharModal(el.closest('.mbg'));
     if (act === 'mdlImprimir') return window.print();
-    if (act === 'mdlIrFicha') {
-      var f = S.funcionarios.find(function (x) { return x.id === el.dataset.id; });
-      if (!f) return toast('Funcionário não encontrado.');
-      UI.rota = 'funcionarios';
-      try { history.replaceState(null, '', '#funcionarios'); } catch (e) { }
-      if (typeof root.rhAcao === 'function') root.rhAcao({ dataset: { act: 'rhFicha', id: f.id } }, { preventDefault: function () { } });
-      return render();
-    }
-  };
+    };
   document.addEventListener('change', function (ev) {
     var t = ev.target, k = t && t.dataset && t.dataset.mdl; if (!k) return;
     var m = mdl();
@@ -308,8 +263,6 @@
     else if (k === 'dspCat') m.dsp.cat = t.value;
     else if (k === 'dspSit') m.dsp.sit = t.value;
     else if (k === 'relMes') m.rel.mes = t.value || mesAtual();
-    else if (k === 'ferSit') m.fer.sit = t.value;
-    else if (k === 'ferSetor') m.fer.setor = t.value;
     else if (k === 'pagMes') m.pag.mes = t.value || mesAtual();
     else return;
     render();
@@ -318,7 +271,6 @@
     var t = ev.target, k = t && t.dataset && t.dataset.mdl; if (!k) return;
     var m = mdl();
     if (k === 'dspBusca') m.dsp.busca = t.value;
-    else if (k === 'ferBusca') m.fer.busca = t.value;
     else return;
     UI._foco = 'mdl_' + k;
     render();
