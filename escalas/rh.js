@@ -14,7 +14,7 @@
   const docsDe = fid => Object.keys(S.rh_docs || {}).filter(k => k.indexOf(fid + '__') === 0).map(k => Object.assign({ id: k }, S.rh_docs[k])).sort((a, b) => (b.em || '').localeCompare(a.em || ''));
   const quem = () => (typeof ehAdmin === 'function' && ehAdmin()) ? 'Administrador' : (S.usuarioNome || '');
   const agora = () => new Date().toISOString();
-  const soLer = () => S.somenteLeitura || !(ehAdmin() || pode('funcionarios'));
+  const soLer = () => S.somenteLeitura || !(typeof ehAdmin === 'function' && ehAdmin());
   const VINCULOS = [['clt', 'CLT (carteira assinada)'], ['prestador', 'Prestador de serviço'], ['diarista', 'Diarista'], ['temporario', 'Temporário'], ['estagio', 'Estágio'], ['outro', 'Outro']];
   const TIPOS_DESL = [['pedido', 'Pedido de demissão'], ['dispensa', 'Dispensa'], ['fim_contrato', 'Fim de contrato'], ['justa_causa', 'Justa causa'], ['outro', 'Outro']];
   const OCORR = { advertencia: ['Advertência', 'b-warn'], suspensao: ['Suspensão', 'b-err'], elogio: ['Elogio', 'b-ok'], anotacao: ['Anotação', 'b-blue'] };
