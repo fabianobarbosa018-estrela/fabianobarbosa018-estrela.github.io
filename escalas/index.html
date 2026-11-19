@@ -2388,6 +2388,8 @@ const servMesVizinho = (mes, delta) => { let [y, m] = mes.split('-').map(Number)
 const servMeses = () => [...new Set(Object.keys(S.servicos).filter(k => !k.endsWith('__lotes')).map(servMesDe))].sort();
 const servPrestadores = () => S.prestadores.filter(p => p.ativo !== false).slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || ''));
 const r2 = v => Math.round((+v || 0) * 100) / 100;
+/* Só o primeiro nome, para as telas do dia a dia (o cadastro continua com o nome completo) */
+const nomeCurto = n => String(n || '').trim().split(/\s+/)[0] || '';
 const servMoeda = v => (+v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const servData = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '';
 const servMesNome = mes => { const [y, m] = mes.split('-').map(Number); return MESES[m - 1] + ' DE ' + y; };
@@ -2584,7 +2586,7 @@ function vServicos() {
   </div>
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
-    <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(x.nome)}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
+    <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(nomeCurto(x.nome))}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
     <select id="selGrupo" style="flex:1;min-width:220px">${gruposOk.map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
@@ -2607,7 +2609,7 @@ function vServicos() {
   if (semLote.length) h += `<div class="alert w mb"><span class="ic">i</span><div>Dias sem lote de pagamento (${servGrupoNome[grupo].toLowerCase()}): ${semLote.map(d => dd2(d)).join(', ')}. Eles não entram em nenhum pagamento. Ajuste em "Lotes do mês".</div></div>`;
 
   const dsem = dd => C.DIAS_CURTO[C.diaSemana(mes + '-' + dd2(dd))].toUpperCase();
-  const thead = `<thead><tr><th class="svc-dia" rowspan="2">DIA</th>${vis.map(p => `<th class="svc-p">${esc(_capNome(p.nome))}</th>`).join('')}</tr><tr>${vis.map(p => `<th class="svc-f">${esc(p.funcao || '—')}</th>`).join('')}</tr></thead>`;
+  const thead = `<thead><tr><th class="svc-dia" rowspan="2">DIA</th>${vis.map(p => `<th class="svc-p">${esc(_capNome(nomeCurto(p.nome)))}</th>`).join('')}</tr><tr>${vis.map(p => `<th class="svc-f">${esc(p.funcao || '—')}</th>`).join('')}</tr></thead>`;
   let corpo = '';
   for (let dd = 1; dd <= ult; dd++) {
     const fora = lote && (dd < lote.de || dd > lote.ate);
@@ -2674,7 +2676,7 @@ function servAjLinha(k, x) {
   x = x || {};
   const del = '<button class="btn sm" data-act="ajDel" title="Remover">✕</button>';
   const val = `<input data-f="valor" type="number" step="0.01" min="0" placeholder="Valor" value="${x.valor ?? ''}">`;
-  const opts = `<option value="">Automático (pela data)</option>` + _ajLotes.map(y => `<option value="${esc(y.id)}" ${x.lote === y.id ? 'selected' : ''}>${esc(y.nome)} · dias ${y.de} a ${y.ate}</option>`).join('');
+  const opts = `<option value="">Automático (pela data)</option>` + _ajLotes.map(y => `<option value="${esc(y.id)}" ${x.lote === y.id ? 'selected' : ''}>${esc(nomeCurto(y.nome))} · dias ${y.de} a ${y.ate}</option>`).join('');
   const lote = `<label class="small">Lote <select data-f="lote">${opts}</select></label>`;
   if (k === 'descontos') return `<div class="ajrow" data-k="${k}"><input data-f="desc" placeholder="Descrição" value="${esc(x.desc || '')}"><input data-f="data" type="date" value="${x.data || ''}">${lote}${val}${del}</div>`;
   if (k === 'adiant') return `<div class="ajrow" data-k="${k}"><input data-f="data" type="date" value="${x.data || ''}">${lote}${val}${del}</div>`;
@@ -2694,9 +2696,9 @@ function servAjustes(mes, pid) {
     : `<div class="small muted mt">${c.modal === 'diaria' ? 'Diária: o total vem da soma dos dias lançados, separado pelos lotes de cada dia.' : 'Serviços extras: o total vem só dos serviços listados abaixo.'}</div>`;
   const lotesBloco = c.pagos.map(x => {
     const campoPct = pct ? `<label class="small">% <input data-f="pct" type="number" min="0" max="100" step="0.01" value="${x.pct}" style="width:90px"></label>` : '<span class="small muted">diária</span>';
-    return `<div class="lote-aj" data-pg="${esc(x.id)}" style="margin-top:8px"><span><b>${esc(x.nome)}</b><br><span class="small muted">dias ${x.de} a ${x.ate} · R$ ${servMoeda(x.valor)}${x.pago ? ' · pago' : ''}</span></span>${campoPct}<label class="small">Data <input data-f="data" type="date" value="${x.data || ''}"></label></div>`;
+    return `<div class="lote-aj" data-pg="${esc(x.id)}" style="margin-top:8px"><span><b>${esc(nomeCurto(x.nome))}</b><br><span class="small muted">dias ${x.de} a ${x.ate} · R$ ${servMoeda(x.valor)}${x.pago ? ' · pago' : ''}</span></span>${campoPct}<label class="small">Data <input data-f="data" type="date" value="${x.data || ''}"></label></div>`;
   }).join('');
-  abrirModal(`<div class="mh">${esc(_capNome(p.nome))} — ${servMesNome(mes)}</div>
+  abrirModal(`<div class="mh">${esc(_capNome(nomeCurto(p.nome)))} — ${servMesNome(mes)}</div>
     <div class="mbd">${valorBloco}
       ${bloco('extras', 'Serviços extras', 'Adicionar serviço extra')}
       ${bloco('adiant', 'Adiantamentos', 'Adicionar adiantamento')}
@@ -2747,7 +2749,7 @@ async function servPagarDiferenca(mes, pid, loteId) {
   if (!(dif > 0.004)) return;
   const nome = _capNome((c.p || {}).nome || '');
   const ok = await modalMsg('Pagar diferença',
-    `<p>Pagar a diferença de <b>R$ ${servMoeda(dif)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${esc(x.nome)} (dias ${x.de} a ${x.ate}) · ${servMesNome(mes)}</p>`,
+    `<p>Pagar a diferença de <b>R$ ${servMoeda(dif)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${esc(nomeCurto(x.nome))} (dias ${x.de} a ${x.ate}) · ${servMesNome(mes)}</p>`,
     [{ t: 'Cancelar', v: false }, { t: 'Confirmar pagamento', c: 'pri', v: true }]);
   if (!ok) return;
   const novo = Object.assign({}, servPagosDoc(c.l));
@@ -2760,7 +2762,7 @@ async function servPagar(mes, pid, loteId) {
   if (!x) return;
   const desfazer = x.pago, nome = _capNome((c.p || {}).nome || '');
   const ok = await modalMsg(desfazer ? 'Desfazer pagamento' : 'Confirmar pagamento',
-    `<p>${desfazer ? 'Desfazer o pagamento de' : 'Marcar como pago'} <b>R$ ${servMoeda(desfazer && x.valorPago != null ? x.valorPago : x.valor)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${esc(x.nome)} (dias ${x.de} a ${x.ate}) · ${servMesNome(mes)}</p>`,
+    `<p>${desfazer ? 'Desfazer o pagamento de' : 'Marcar como pago'} <b>R$ ${servMoeda(desfazer && x.valorPago != null ? x.valorPago : x.valor)}</b> para <b>${esc(nome)}</b>?</p><p class="small muted">${esc(nomeCurto(x.nome))} (dias ${x.de} a ${x.ate}) · ${servMesNome(mes)}</p>`,
     [{ t: 'Cancelar', v: false }, { t: desfazer ? 'Desfazer' : 'Confirmar pagamento', c: 'pri', v: true }]);
   if (!ok) return;
   const novo = Object.assign({}, servPagosDoc(c.l));
@@ -2783,7 +2785,7 @@ async function servPagarGrupo(mes, loteId) {
   const total = r2(alvo.reduce((a, o) => a + o.x.valor, 0));
   const lista = alvo.map(o => `<li>${esc(_capNome(o.c.p.nome))}: R$ ${servMoeda(o.x.valor)}</li>`).join('');
   const ok = await modalMsg('Confirmar pagamentos',
-    `<p>Marcar como pagos <b>${alvo.length}</b> pagamento(s) de <b>${esc(lote.nome)}</b> (${servMesNome(mes)}), ${esc(servGrupoNome[UI.servGrupo || 'diaria'].toLowerCase())}, total <b>R$ ${servMoeda(total)}</b>?</p><ul>${lista}</ul>`,
+    `<p>Marcar como pagos <b>${alvo.length}</b> pagamento(s) de <b>${esc(nomeCurto(lote.nome))}</b> (${servMesNome(mes)}), ${esc(servGrupoNome[UI.servGrupo || 'diaria'].toLowerCase())}, total <b>R$ ${servMoeda(total)}</b>?</p><ul>${lista}</ul>`,
     [{ t: 'Cancelar', v: false }, { t: 'Confirmar pagamentos', c: 'pri', v: true }]);
   if (!ok) return;
   for (const o of alvo) {
@@ -3487,7 +3489,7 @@ function alertasHtml(hoje) {
   }
   if (!itens.length && !pagar) return '';
   return `<section class="pd-card pd-alertas"><header><span>Atenção</span><b class="pd-n">${itens.length + (pagar ? 1 : 0)}</b></header>
-    <ul class="pd-lista">` + itens.map(x => `<li style="${LI_ATENCAO}"><span style="flex:1;min-width:0"><b>${esc(x.n)}</b><br><span class="small muted">${esc(x.t)} · ${esc(x.d)}</span></span></li>`).join('') + pagar + '</ul></section>';
+    <ul class="pd-lista">` + itens.map(x => `<li style="${LI_ATENCAO}"><span style="flex:1;min-width:0"><b>${esc(nomeCurto(x.n))}</b><br><span class="small muted">${esc(x.t)} · ${esc(x.d)}</span></span></li>`).join('') + pagar + '</ul></section>';
 }
 function vPainel() {
   const hoje = UI.painelDia || C.hojeISO(), sem = C.inicioSemana(hoje), mes = hoje.slice(0, 7);
@@ -3522,9 +3524,9 @@ function vPainel() {
   const cobrindo = e ? (e.substituicoes || []).filter(s => s.data === hoje) : [];
   const aguardando = e && e.status !== 'aprovada' ? [sem] : [];
   const ocorr = [
-    ...faltas.map(p => `Falta: ${esc(p.nome)}`),
-    ...afast.map(p => `${esc(p.nome)} – ${esc(p.tipo)}`),
-    ...trocas.map(a => `Troca de folga: ${esc(a.nome)} (${esc(a.antes)} → ${esc(a.depois)})`),
+    ...faltas.map(p => `Falta: ${esc(nomeCurto(p.nome))}`),
+    ...afast.map(p => `${esc(nomeCurto(p.nome))} – ${esc(p.tipo)}`),
+    ...trocas.map(a => `Troca de folga: ${esc(nomeCurto(a.nome))} (${esc(a.antes)} → ${esc(a.depois)})`),
     ...cobrindo.map(s => `${esc(nomeId(s.cobertura))} cobre ${esc(nomeId(s.escalado))}`),
     ...aguardando.map(s => `Escala de ${esc(semanaLabel(s))} aguardando aprovação`)
   ];
@@ -3561,9 +3563,9 @@ function vPainel() {
   const diaCurto = cap(C.DIAS[C.diaSemana(hoje)].toLowerCase()) + ', ' + C.dataBR(hoje);
   const verTodos = (k, total, lim, rot) => total > lim ? `<button class="pd-more" data-act="painelMais" data-k="${k}">${mais[k] ? 'Ver menos' : (rot || 'Ver todos') + ' (' + total + ')'}</button>` : '';
   const kpi = (cls, ic, n, rot, sub) => `<div class="pd-k ${cls}"><span class="pd-ki">${ic}</span><div class="pd-kt"><b>${n}</b><span>${rot}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
-  const linhaTrab = p => `<li><span class="pd-dot"></span><span class="pd-nm">${esc(p.nome)}${p.diarista ? ' <em>diarista</em>' : ''}</span><span class="pd-meta">${esc(p.setor || '')}${p.horario ? ' · ' + esc(p.horario) : ''}</span></li>`;
-  const chips = (lista, k, lim, comTipo) => lista.length ? `<div class="pd-chips">${(mais[k] ? lista : lista.slice(0, lim)).map(p => `<span class="pd-chip">${esc(p.nome)}<small>${comTipo ? esc(p.tipo) : esc(p.setor || '')}</small></span>`).join('')}${verTodos(k, lista.length, lim)}</div>` : '';
-  const extras = [...trocas.map(a => `Troca de folga: ${esc(a.nome)} (${esc(a.antes)} → ${esc(a.depois)})`), ...cobrindo.map(s => `${esc(nomeId(s.cobertura))} cobre ${esc(nomeId(s.escalado))}`)];
+  const linhaTrab = p => `<li><span class="pd-dot"></span><span class="pd-nm">${esc(nomeCurto(p.nome))}${p.diarista ? ' <em>diarista</em>' : ''}</span><span class="pd-meta">${esc(p.setor || '')}${p.horario ? ' · ' + esc(p.horario) : ''}</span></li>`;
+  const chips = (lista, k, lim, comTipo) => lista.length ? `<div class="pd-chips">${(mais[k] ? lista : lista.slice(0, lim)).map(p => `<span class="pd-chip">${esc(nomeCurto(p.nome))}<small>${comTipo ? esc(p.tipo) : esc(p.setor || '')}</small></span>`).join('')}${verTodos(k, lista.length, lim)}</div>` : '';
+  const extras = [...trocas.map(a => `Troca de folga: ${esc(nomeCurto(a.nome))} (${esc(a.antes)} → ${esc(a.depois)})`), ...cobrindo.map(s => `${esc(nomeId(s.cobertura))} cobre ${esc(nomeId(s.escalado))}`)];
   const stSem = e ? (e.status === 'aprovada' ? ['Publicada', 'ok'] : e.envio ? ['Aguardando aprovação', 'pend'] : ['Pendente', 'pend']) : ['Não gerada', 'none'];
   const podeEditarSem = e && !S.somenteLeitura && (ehAdmin() || e.status !== 'aprovada');
   const atalhos = [
@@ -3646,7 +3648,7 @@ function vEscala() {
     <button class="btn sm" data-act="semHoje">Esta semana</button>
     ${e ? (aprov ? '<span class="badge b-ok">Aprovada</span>' : '<span class="badge b-draft">Rascunho — aguardando aprovação</span>') : '<span class="badge b-off">Não gerada</span>'}
     <div class="sp"></div>
-    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
+    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(nomeCurto(s.nome))}</option>`).join('')}</select>
   </div>
   <div class="row mt edit-only">
     <button class="btn pri big" data-act="gerar">${ic('bolt')} ${e ? 'REGENERAR ESCALA AUTOMÁTICA' : 'GERAR ESCALA AUTOMÁTICA'}</button>
@@ -3683,7 +3685,7 @@ function vEscala() {
     const ls = grupos[sid].sort((x, y) => (x.f || x.a).nome.localeCompare((y.f || y.a).nome));
     const cad = C.cadastradosSetor(S.funcionarios, sid, sem), regra = C.regraCobertura(cad.length);
     let cob = '';
-    if (regra) { const atr = {}; cad.forEach(f => { if (e.atribuicoes[f.id]) atr[f.id] = e.atribuicoes[f.id].g; }); const t = C.trabalhandoTerQua(cad, atr, sem); cob = ` · <b>Hotel fechado</b> — Ter: ${t.ter.map(f => esc(f.nome)).join(', ') || 'ninguém'} · Qua: ${t.qua.map(f => esc(f.nome)).join(', ') || 'ninguém'}${regra === 'reduzida' ? ' <span>(no máximo 1)</span>' : ''}`; }
+    if (regra) { const atr = {}; cad.forEach(f => { if (e.atribuicoes[f.id]) atr[f.id] = e.atribuicoes[f.id].g; }); const t = C.trabalhandoTerQua(cad, atr, sem); cob = ` · <b>Hotel fechado</b> — Ter: ${t.ter.map(f => esc(nomeCurto(f.nome))).join(', ') || 'ninguém'} · Qua: ${t.qua.map(f => esc(nomeCurto(f.nome))).join(', ') || 'ninguém'}${regra === 'reduzida' ? ' <span>(no máximo 1)</span>' : ''}`; }
     h += `<tr class="sec"><td colspan="${editavel ? 10 : 9}" style="background:${corSetor(sid)};color:#1f2937">${esc(nomeSetor(sid) === 'Sem setor' ? (ls[0].a.setorNome || 'Sem setor') : nomeSetor(sid))}<span>${ls.length} funcionário(s)</span><span style="color:#1f2937">${cob}</span></td></tr>`;
     ls.forEach(({ id, a, f }) => {
       const nome = (f || a).nome;
@@ -3872,7 +3874,7 @@ function folhaHTML(m, editavel) {
   m.grupos.forEach((g, gi) => {
     if (gi > 0) h += `<tr class="sep"><td class="fnm"></td>${m.cols.map((d, i) => `<td ${m.feriados[i] ? `style="background:${COR_FERIADO}"` : ''}></td>`).join('')}</tr>`;
     g.linhas.forEach(l => {
-      h += `<tr><td class="fnm" style="background:${g.cor}" title="${esc(g.nome)}">${esc(l.nome.toUpperCase())}</td>`;
+      h += `<tr><td class="fnm" style="background:${g.cor}" title="${esc(nomeCurto(g.nome))}">${esc(l.nome.toUpperCase())}</td>`;
       segmentos(l.cel).forEach(sg => {
         if (sg.tipo === 'V') h += `<td colspan="${sg.n}" class="fv">FÉRIAS</td>`;
         else {
@@ -4798,10 +4800,10 @@ function vVT() {
   // avisos
   const semValor = S.funcionarios.filter(f => { const v = C.vtValorEm(f, m.dias[m.dim - 1]) || {}; return f.ativo && !v.total && !v.fixo && !(f.vt && f.vt.nao); });
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste mês ainda <b>sem escala</b> (${m.semEscala.map(semanaLabel).join('; ')}). Esses dias aparecem com <b>?</b> e não entram no cálculo. Gere a escala em <a href="#mensal">Escala mensal</a>.</div></div>`;
-  if (semValor.length && UI.vtTab !== 'cadastro') h += `<div class="alert w"><span class="ic">!</span><div>Sem valor de vale-transporte cadastrado: <b>${semValor.map(f => esc(f.nome)).join(', ')}</b>. <a href="#" data-act="vtTab" data-t="cadastro">Cadastrar valores</a> (ou marque “não recebe VT”).</div></div>`;
+  if (semValor.length && UI.vtTab !== 'cadastro') h += `<div class="alert w"><span class="ic">!</span><div>Sem valor de vale-transporte cadastrado: <b>${semValor.map(f => esc(nomeCurto(f.nome))).join(', ')}</b>. <a href="#" data-act="vtTab" data-t="cadastro">Cadastrar valores</a> (ou marque “não recebe VT”).</div></div>`;
   ['q1', 'q2'].forEach(q => {
     const d = vtDifFechamento(m, q); if (!d || !d.dif.length) return;
-    h += `<div class="alert w"><span class="ic">!</span><div>A ${VT_PER[q]} foi fechada em ${dtHora(d.fe.em)}, mas a escala ou os ajustes mudaram depois: ${d.dif.map(x => `<b>${esc(x.nome)}</b> ${rs(x.antes)} → ${rs(x.agora)}`).join('; ')}. <a href="#" data-act="vtFechar" data-q="${q}" class="edit-only">Atualizar o fechamento</a></div></div>`;
+    h += `<div class="alert w"><span class="ic">!</span><div>A ${VT_PER[q]} foi fechada em ${dtHora(d.fe.em)}, mas a escala ou os ajustes mudaram depois: ${d.dif.map(x => `<b>${esc(nomeCurto(x.nome))}</b> ${rs(x.antes)} → ${rs(x.agora)}`).join('; ')}. <a href="#" data-act="vtFechar" data-q="${q}" class="edit-only">Atualizar o fechamento</a></div></div>`;
   });
   if (!m.linhas.length && UI.vtTab !== 'cadastro') return h + `<div class="card empty"><b>Ninguém com vale-transporte neste mês</b>Cadastre o valor da passagem de cada funcionário na aba <a href="#" data-act="vtTab" data-t="cadastro">Valores por funcionário</a>.</div>`;
   if (UI.vtTab === 'resumo') return h + vtResumoHTML(m);
@@ -4818,12 +4820,12 @@ function vtTabelaHTML(m, per) {
   <tr><th colspan="${n + 1}" class="ft2" style="background:#C4D79B;color:#000"><span>${vtTituloPer(m, per)}</span></th></tr>
   <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(l.nome.toUpperCase()))).join('')}</tr>
   <tr>${L.map((l, i) => thN(l, i, `<span class="vts">${esc(nomeSetor(l.setorId).toUpperCase())}</span>`)).join('')}</tr>
-  <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorTxt(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorTxt(m, l, per) || 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(l.nome)}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
+  <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorTxt(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorTxt(m, l, per) || 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(nomeCurto(l.nome))}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
   </thead><tbody>`;
   const sub = (q, rot) => `<tr class="vtsub"><td class="fnm">${rot}</td>${L.map((l, i) => `<td style="background:${VT_COR[i % 2]}">${l[q].valor ? brl(l[q].valor) : '-'}</td>`).join('')}</tr>`;
   for (let k = ini; k <= fim; k++) {
     const d = m.dias[k - 1], fer = feriadoEm(d);
-    h += `<tr><td class="fnm" ${fer ? `style="background:${COR_FERIADO}" title="Feriado: ${esc(fer.nome)}"` : ''}>${k} ${C.DIAS_CURTO[C.diaSemana(d)].toUpperCase()}</td>`;
+    h += `<tr><td class="fnm" ${fer ? `style="background:${COR_FERIADO}" title="Feriado: ${esc(nomeCurto(fer.nome))}"` : ''}>${k} ${C.DIAS_CURTO[C.diaSemana(d)].toUpperCase()}</td>`;
     L.forEach((l, i) => {
       const c = l.cel[k - 1];
       const cls = ['vtc', c.tipo === 'trab' ? '' : 'vt-' + c.tipo, c.ajuste || c.fixoEditado ? 'aj' : ''].join(' ');
@@ -4864,7 +4866,7 @@ function vtResumoHTML(m) {
   m.linhas.forEach(l => {
     const s = l.saldo.mes;
     const px = vtPix(l.id);
-    h += `<tr><td><b>${esc(l.nome)}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>${l.fixo ? `<td class="r" colspan="3">fixo: ${rs(l.fixo.q1)} (1ª) + ${rs(l.fixo.q2)} (2ª)</td>` : `<td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>`}
+    h += `<tr><td><b>${esc(nomeCurto(l.nome))}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>${l.fixo ? `<td class="r" colspan="3">fixo: ${rs(l.fixo.q1)} (1ª) + ${rs(l.fixo.q2)} (2ª)</td>` : `<td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>`}
     <td class="r">${l.q1.dias}</td><td class="r">${rs(l.q1.valor)}</td><td class="r">${l.q2.dias}</td><td class="r">${rs(l.q2.valor)}</td><td class="r">${l.mes.dias}</td><td class="r"><b>${rs(l.mes.valor)}</b></td><td class="r">${rs(l.pago.q1 + l.pago.q2)}</td><td class="r" style="color:${s > 0.004 ? 'var(--err)' : s < -0.004 ? 'var(--off)' : 'inherit'};font-weight:700">${rs(s)}</td></tr>`;
   });
   const sm = k => m.linhas.reduce((a, l) => a + k(l), 0);
@@ -4882,7 +4884,7 @@ function vtCadastroHTML(m) {
   fs.forEach(f => {
     const v = C.vtValorEm(f, ref), nao = f.vt && f.vt.nao;
     const px = vtPix(f.id);
-    h += `<tr><td><b>${esc(f.nome)}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>
+    h += `<tr><td><b>${esc(nomeCurto(f.nome))}</b>${f.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(f.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>
     ${v && v.fixo ? `<td class="r" colspan="2">fixo por quinzena</td><td class="r"><b>${rs(v.q1)} + ${rs(v.q2)}</b></td>` : `<td class="r">${v ? rs(v.valor) : '—'}</td><td class="r">${v ? v.qtd : '—'}</td>`}${v && v.fixo ? '' : `<td class="r"><b>${v ? rs(v.total) : nao ? '<span class="badge b-off">não recebe</span>' : '<span class="badge b-err">não cadastrado</span>'}</b></td>`}
     <td>${v ? (v.desde <= '2000-12-31' ? 'sempre' : C.dataBR(v.desde)) : ''}</td><td class="r">${ehAdmin() ? `<button class="btn sm edit-only" data-act="vtValor" data-id="${f.id}">${ic('edit')} Editar</button>` : ''}</td></tr>`;
   });
@@ -4903,7 +4905,7 @@ function vtEditarDia(fid, d) {
   const qd = +d.slice(8) <= 15 ? 'q1' : 'q2', cf = l.cel[(qd === 'q1' ? 15 : m.dim) - 1];
   const fx = l.fixo ? { padrao: cf.fixoPadrao || 0, editado: !!cf.fixoEditado, atual: cf.fixoQ || 0 } : null;
   const base = { trab: 'Trabalho', folga: 'Folga', ferias: 'Férias', semEscala: 'Semana sem escala', fora: 'Fora do período' }[c.base];
-  const w = abrirModal(`<div class="mh">${esc(l.nome)} — ${C.DIAS[C.diaSemana(d)].toLowerCase()}, ${C.dataBR(d)}</div><div class="mbd">
+  const w = abrirModal(`<div class="mh">${esc(nomeCurto(l.nome))} — ${C.DIAS[C.diaSemana(d)].toLowerCase()}, ${C.dataBR(d)}</div><div class="mbd">
   <p>Pela escala: <b>${base}</b> · valor diário ${rs(l.valorDia)}</p>
   <div class="fld"><label class="f">Neste dia</label><select id="vtT" style="width:100%"><option value="">Seguir a escala (automático)</option>${Object.entries(C.VT_TIPOS).map(([k, t]) => `<option value="${k}" ${a.t === k ? 'selected' : ''}>${t.nome}</option>`).join('')}</select></div>
   <div class="fld" id="vtVBox"><label class="f">Valor do VT neste dia <span class="muted small">(em branco = valor diário normal)</span></label><input type="text" inputmode="decimal" id="vtV" value="${a.v != null && a.v !== '' ? brl(a.v) : ''}" placeholder="${brl(l.valorDia)}"></div>
@@ -4958,7 +4960,7 @@ function vtEditarValor(fid) {
   const atual = C.vtValorEm(f, C.hojeISO()) || C.vtValorEm(f, UI.vtMes + '-28') || {};
   const desdePad = hist.length ? UI.vtMes + '-01' : '';
   const desc = x => (x.desde <= '2000-12-31' ? 'Desde sempre' : 'A partir de ' + C.dataBR(x.desde)) + ': ' + (x.fixo ? 'fixo ' + rs(x.q1) + ' na 1ª quinzena e ' + rs(x.q2) + ' na 2ª' : rs(x.valor) + ' × ' + x.qtd + ' = ' + rs(x.valor * x.qtd) + '/dia');
-  const w = abrirModal(`<div class="mh">Vale-transporte — ${esc(f.nome)}</div><div class="mbd">
+  const w = abrirModal(`<div class="mh">Vale-transporte — ${esc(nomeCurto(f.nome))}</div><div class="mbd">
   <div class="fld"><label class="f">Forma de cálculo</label><select id="vtModo" style="width:100%"><option value="dia">Por dia trabalhado (pela escala)</option><option value="fixo" ${atual.fixo ? 'selected' : ''}>Valor fixo por quinzena</option></select></div>
   <div id="bxDia"><div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Valor da passagem (R$)</label><input type="text" inputmode="decimal" id="vtPv" value="${atual.valor ? brl(atual.valor) : ''}" placeholder="0,00"></div>
   <div class="fld"><label class="f">Passagens por dia</label><input type="text" inputmode="numeric" id="vtPq" value="${atual.qtd || 1}"></div></div>
@@ -5008,7 +5010,7 @@ function vtPagamento(fid) {
   const ym = UI.vtMes, m = vtModelo(ym), l = m.linhas.find(x => x.id === fid); if (!l) return;
   const pg = ((vtDoc(ym).pagamentos || {})[fid]) || {};
   let q = UI.vtPer === 'q2' ? 'q2' : 'q1'; if (UI.vtPer === 'mes' && pg.q1 && !pg.q2) q = 'q2';
-  const w = abrirModal(`<div class="mh">Pagamento de VT — ${esc(l.nome)}</div><div class="mbd">
+  const w = abrirModal(`<div class="mh">Pagamento de VT — ${esc(nomeCurto(l.nome))}</div><div class="mbd">
   <div class="fld"><label class="f">Quinzena</label><select id="pgQ" style="width:100%">${['q1', 'q2'].map(k => `<option value="${k}" ${k === q ? 'selected' : ''}>${VT_PER[k]} — a pagar ${rs(l[k].valor)}${pg[k] ? ' · pago ' + rs(pg[k].valor) : ''}</option>`).join('')}</select></div>
   <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Valor pago (R$)</label><input type="text" inputmode="decimal" id="pgV"></div>
   <div class="fld"><label class="f">Data</label><input type="date" id="pgD"></div></div>
@@ -5039,7 +5041,7 @@ async function vtReabrir(q) {
 async function vtPagarTodos(q) {
   const ym = UI.vtMes, m = vtModelo(ym), pend = m.linhas.filter(l => l[q].valor > 0 && Math.abs(l[q].valor - l.pago[q]) > 0.004);
   if (!pend.length) return toast('Todos já estão pagos nesta quinzena.');
-  const w = abrirModal(`<div class="mh">Marcar ${VT_PER[q]} como paga</div><div class="mbd"><p>${pend.length} funcionário(s), total <b>${rs(pend.reduce((a, l) => a + l[q].valor, 0))}</b>: ${pend.map(l => esc(l.nome)).join(', ')}.</p>
+  const w = abrirModal(`<div class="mh">Marcar ${VT_PER[q]} como paga</div><div class="mbd"><p>${pend.length} funcionário(s), total <b>${rs(pend.reduce((a, l) => a + l[q].valor, 0))}</b>: ${pend.map(l => esc(nomeCurto(l.nome))).join(', ')}.</p>
   <div class="grid g2" style="gap:12px"><div class="fld"><label class="f">Data</label><input type="date" id="pgD" value="${C.hojeISO()}"></div><div class="fld"><label class="f">Forma</label><select id="pgF">${['PIX', 'Dinheiro', 'Transferência', 'Folha de pagamento', 'Outro'].map(x => `<option>${x}</option>`).join('')}</select></div></div></div>
   <div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Marcar como pago</button></div>`);
   w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
