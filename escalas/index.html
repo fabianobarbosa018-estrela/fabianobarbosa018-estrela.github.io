@@ -3457,6 +3457,37 @@ function anivMesHtml(hoje) {
         <a class="btn sm pri" href="https://wa.me/?text=${encodeURIComponent(msg(n))}" target="_blank" rel="noopener">Parabenizar</a></li>`;
     }).join('') + '</ul></section>';
 }
+// Alertas do painel: retornos, férias e pagamentos em aberto (só leitura, sem IA)
+function alertasPainel(hoje) {
+  const itens = [];
+  const mes = hoje.slice(0, 7), ajDia = vtDoc(mes).ajustes || {}, ate3 = C.addDias(hoje, 3), ate7 = C.addDias(hoje, 7);
+  S.funcionarios.filter(f => f.ativo).forEach(f => {
+    (f.ferias || []).forEach(p => {
+      if (p.ini >= hoje && p.ini <= ate7) itens.push({ t: 'Férias', n: f.nome, d: 'começam ' + C.dataBR(p.ini).slice(0, 5) });
+      const volta = C.addDias(p.fim, 1);
+      if (volta >= hoje && volta <= ate3) itens.push({ t: 'Retorno', n: f.nome, d: 'volta das férias ' + C.dataBR(volta).slice(0, 5) });
+    });
+    Object.entries(ajDia[f.id] || {}).forEach(([dia, a]) => {
+      if (!a || !a.ate || (a.t !== 'atestado' && a.t !== 'afast')) return;
+      const volta = C.addDias(a.ate, 1);
+      if (volta >= hoje && volta <= ate3) itens.push({ t: 'Retorno', n: f.nome, d: 'volta do afastamento ' + C.dataBR(volta).slice(0, 5) });
+    });
+  });
+  const seen = new Set();
+  return itens.filter(x => { const k = x.t + x.n + x.d; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+function alertasHtml(hoje) {
+  const itens = alertasPainel(hoje);
+  let pagar = '';
+  if (pode('servicos')) {
+    const mes = hoje.slice(0, 7);
+    const saldo = r2(servPrestadores().reduce((a, p) => a + (servCalc(mes, p.id).saldo || 0), 0));
+    if (saldo > 0.004) pagar = `<li><span>Pagamentos em aberto neste mês</span><b>R$ ${servMoeda(saldo)}</b></li>`;
+  }
+  if (!itens.length && !pagar) return '';
+  return `<section class="pd-card pd-alertas"><header><span>Atenção</span><b class="pd-n">${itens.length + (pagar ? 1 : 0)}</b></header>
+    <ul class="pd-lista">` + itens.map(x => `<li><span><b>${esc(x.n)}</b> · ${esc(x.t)}</span><span class="small muted">${esc(x.d)}</span></li>`).join('') + pagar + '</ul></section>';
+}
 function vPainel() {
   const hoje = UI.painelDia || C.hojeISO(), sem = C.inicioSemana(hoje), mes = hoje.slice(0, 7);
   const ativos = S.funcionarios.filter(f => f.ativo);
@@ -3550,6 +3581,7 @@ function vPainel() {
   </div>
   ${souHoje ? '' : `<div class="pd-aviso">Mostrando ${esc(dExt)}</div>`}
   ${anivMesHtml(hoje)}
+  ${alertasHtml(hoje)}
 
   <div class="pd-ks">
     ${kpi('k-at', ico.users, ativos.length, 'Ativos', inatTxt().replace(' · ', ''))}
