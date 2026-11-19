@@ -178,7 +178,7 @@
 
   function telaConferir() {
     const s = st(), f = s.form, L = s.leitura;
-    const funcs = S.funcionarios.slice().sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const funcs = S.funcionarios.slice().sort((a, b) => (b.ativo - a.ativo) || cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome, 'pt-BR'));
     const ret = f.inicio && f.dias > 0 ? C.addDias(f.inicio, +f.dias) : '';
     const dv = c => s.duvidas && s.duvidas.includes(c) ? ' ats-dv' : '';
     const v = s.verif || {}, bloqueio = s.bloqueio;

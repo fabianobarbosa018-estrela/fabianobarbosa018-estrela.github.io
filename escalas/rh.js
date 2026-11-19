@@ -109,7 +109,7 @@
       if (s.setor && f.setorId !== s.setor) return false;
       if (q) { const cpf = String((rhDe(f.id).pessoais || {}).cpf || '').replace(/\D/g, ''); if (!((f.nome + ' ' + (f.funcao || '')).toLowerCase().includes(q) || (qd.length >= 3 && cpf.includes(qd)))) return false; }
       return true;
-    }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    }).sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome, 'pt-BR'));
     if (!S.setores.length) h += '<div class="alert w"><span class="ic">!</span><div>Cadastre os <a href="#setores">setores</a> antes dos funcionários.</div></div>';
     h += `<div class="orc-lista-h"><b>${s.filtro || q || s.setor ? 'Resultado' : 'Funcionários ativos'}</b><span class="small muted">${lista.length} pessoa(s)</span></div>`;
     if (!lista.length) return h + '<div class="card"><p class="muted" style="margin:0">Ninguém encontrado com esses filtros.</p></div>';

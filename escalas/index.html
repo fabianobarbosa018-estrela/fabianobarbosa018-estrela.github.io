@@ -3280,7 +3280,8 @@ function render() {
   const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'pagamentos', 'despesas', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
-  const grupos = GRUPOS_MENU.map(([t, c]) => [t, c.filter(r => rotaPermitida(r) && !(r === 'diaria' && ehAdmin()))]).filter(g => g[1].length);
+  const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
+  const grupos = GRUPOS_MENU.map(([t, c]) => [t, c.filter(r => rotaPermitida(r) && !(r === 'diaria' && ehAdmin())).sort((x, y) => nomeRota(x).localeCompare(nomeRota(y), 'pt-BR'))]).filter(g => g[1].length);
   const quem = S.modo === 'nuvem' && S.pronto && !S.precisaLogin ? '<div class="nav-quem"><b>' + esc(ehAdmin() ? 'Administrador' : (S.usuarioNome || 'Funcionário')) + '</b><span>' + (ehAdmin() ? 'acesso completo' : 'acesso de funcionário') + '</span></div>' : '';
   document.getElementById('nav').innerHTML = !S.pronto || S.precisaLogin ? '' : grupos.map(([titulo, chaves]) => '<div class="nav-g">' + titulo + '</div>' + chaves.map(k => { const r = ROTAS.find(x => x[0] === k); return '<a href="#' + k + '" class="' + (UI.rota === k ? 'on' : '') + '" title="' + (r ? r[1] : k) + '">' + ic(k) + '<span class="nav-t">' + (r ? r[1] : k) + '</span></a>'; }).join('')).join('') + quem;
   document.getElementById('topTitle').textContent = (ROTAS.find(r => r[0] === UI.rota) || [0, ''])[1];
@@ -4147,7 +4148,7 @@ function vHistorico() {
 
 /* ---------------- EXPORTAR ---------------- */
 function vExportar() {
-  const fs = S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const fs = S.funcionarios.slice().sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const temEsc = UI.expPeriodo === 'semana' ? !!S.escalas[UI.semana] : semanasDoMes(UI.mes).sems.some(s => S.escalas[s]);
   return `<div class="row mb"><div><h1>Exportar e compartilhar</h1><p class="sub" style="margin:0">PDF, Excel e impressão</p></div></div>
   <div class="card"><div class="grid g2" style="gap:12px">
@@ -5811,8 +5812,8 @@ Store.init();
 </script>
 <script src="orcamentos.js?v=1811b"></script>
 <script src="atestados_ler.js?v=1711b"></script>
-<script src="atestados.js?v=1811a"></script>
+<script src="atestados.js?v=1811b"></script>
 <script src="modulos.js?v=1"></script>
-<script src="rh.js?v=1811j"></script>
+<script src="rh.js?v=1811k"></script>
 </body>
 </html>
