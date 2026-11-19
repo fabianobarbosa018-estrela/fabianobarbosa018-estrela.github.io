@@ -292,11 +292,11 @@
     var gPost = function (id) { return posterior && posterior.atribuicoes[id] ? posterior.atribuicoes[id].g : null; };
     var atrib = {};
 
-    var idsSetores = Object.keys(porSetor).sort(function (a, b) { return (setorPorId[a].nome || '').localeCompare(setorPorId[b].nome || ''); });
+    var idsSetores = Object.keys(porSetor).sort(function (a, b) { return (setorPorId[a].nome || '').localeCompare(setorPorId[b].nome || '', 'pt-BR'); });
     var errosSetor = [];
     idsSetores.forEach(function (sid) {
       var setor = setorPorId[sid];
-      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
+      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || '', 'pt-BR'); });
       var cad = cadastradosSetor(todos, sid, sem);
       var n = cad.length, regra = regraCobertura(n);
 
@@ -563,7 +563,7 @@
     var atrib = {}, erros = [], avisos = [], devolveram = [], pendentes = [];
 
     Object.keys(porSetor).forEach(function (sid) {
-      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.criadoEm || '').localeCompare(b.criadoEm || '') || a.nome.localeCompare(b.nome); });
+      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.criadoEm || '').localeCompare(b.criadoEm || '', 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'); });
       var cad = cadastradosSetor(todos, sid, sem), n = cad.length, regra = regraCobertura(n);
       if (modo === 'festas' && regra === 'reduzida') regra = 'dupla';
       if (lista.length > 9) { erros.push({ setor: setorPorId[sid].nome, msg: 'Setor "' + setorPorId[sid].nome + '": muitos funcionários para a semana especial (máximo 9).' }); return; }

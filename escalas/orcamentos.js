@@ -222,7 +222,7 @@
     if (!q) return [];
     return (itens || []).filter(function (i) { return normaliza(i.nome).indexOf(q) >= 0; }).sort(function (a, b) {
       var pa = normaliza(a.nome).indexOf(q) === 0 ? 0 : 1, pb = normaliza(b.nome).indexOf(q) === 0 ? 0 : 1;
-      return pa - pb || a.nome.localeCompare(b.nome);
+      return pa - pb || a.nome.localeCompare(b.nome, 'pt-BR');
     }).slice(0, limite || 8);
   }
 
@@ -1063,7 +1063,7 @@
       campo('Telefone', 'contratadoTelefone', c.contratadoTelefone, ' inputmode="tel"') + '</div>' + area('Endereço', 'contratadoEndereco', c.contratadoEndereco, 'Rua, número, bairro, cidade', 2) +
       '<p class="small muted">O CPF pode ficar em branco se o contrato for assinado pelo link: o contratado informa na hora de assinar.</p>';
     if (e === 2) corpo = '<h3>Serviço</h3>' + grade + campo('Serviço contratado', 'servico', c.servico) +
-      '<div class="fld"><label class="f">Setor</label><select data-ctr-campo="setorId"><option value="">—</option>' + (S.setores || []).slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome)); }).map(function (st) { return '<option value="' + eh(st.id) + '"' + (c.setorId === st.id ? ' selected' : '') + '>' + eh(st.nome) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="fld"><label class="f">Setor</label><select data-ctr-campo="setorId"><option value="">—</option>' + (S.setores || []).slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); }).map(function (st) { return '<option value="' + eh(st.id) + '"' + (c.setorId === st.id ? ' selected' : '') + '>' + eh(st.nome) + '</option>'; }).join('') + '</select></div>' +
       campo('Local', 'local', c.local) + '</div>' + area('Descrição do serviço', 'descricao', c.descricao) + area('Atividades contratadas (uma por linha)', 'atividades', c.atividades, 'Ex.:\nLimpeza da piscina\nOrganização do redário', 4);
     if (e === 3) {
       var fim = OrcCalc.fimContrato(prepararContrato(Object.assign({}, c)));

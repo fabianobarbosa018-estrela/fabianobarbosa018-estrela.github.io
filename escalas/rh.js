@@ -81,7 +81,7 @@
   function seguro(fn) { try { return fn() || ''; } catch (e) { console.error('[RH]', e); return ''; } }
   function pendenciasHtml() {
     const lista = S.funcionarios.filter(f => f.ativo).map(f => ({ f, falta: faltantes(f) })).filter(x => x.falta.length)
-      .sort((a, b) => b.falta.length - a.falta.length || String(a.f.nome || '').localeCompare(String(b.f.nome || '')));
+      .sort((a, b) => b.falta.length - a.falta.length || String(a.f.nome || '').localeCompare(String(b.f.nome || ''), 'pt-BR'));
     if (!lista.length) return '';
     return `<div class="card mb rh-pend"><h3 style="margin:0 0 2px">Cadastro incompleto (${lista.length})</h3>
       <p class="small muted" style="margin:0 0 8px">Quem ainda falta algum dado pessoal. Toque na pessoa para abrir a ficha e mandar o link.</p>` + lista.map(x =>
@@ -109,7 +109,7 @@
       if (s.setor && f.setorId !== s.setor) return false;
       if (q) { const cpf = String((rhDe(f.id).pessoais || {}).cpf || '').replace(/\D/g, ''); if (!((f.nome + ' ' + (f.funcao || '')).toLowerCase().includes(q) || (qd.length >= 3 && cpf.includes(qd)))) return false; }
       return true;
-    }).sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome));
+    }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     if (!S.setores.length) h += '<div class="alert w"><span class="ic">!</span><div>Cadastre os <a href="#setores">setores</a> antes dos funcionários.</div></div>';
     h += `<div class="orc-lista-h"><b>${s.filtro || q || s.setor ? 'Resultado' : 'Funcionários ativos'}</b><span class="small muted">${lista.length} pessoa(s)</span></div>`;
     if (!lista.length) return h + '<div class="card"><p class="muted" style="margin:0">Ninguém encontrado com esses filtros.</p></div>';

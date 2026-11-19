@@ -1396,11 +1396,11 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     var gPost = function (id) { return posterior && posterior.atribuicoes[id] ? posterior.atribuicoes[id].g : null; };
     var atrib = {};
 
-    var idsSetores = Object.keys(porSetor).sort(function (a, b) { return (setorPorId[a].nome || '').localeCompare(setorPorId[b].nome || ''); });
+    var idsSetores = Object.keys(porSetor).sort(function (a, b) { return (setorPorId[a].nome || '').localeCompare(setorPorId[b].nome || '', 'pt-BR'); });
     var errosSetor = [];
     idsSetores.forEach(function (sid) {
       var setor = setorPorId[sid];
-      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
+      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || '', 'pt-BR'); });
       var cad = cadastradosSetor(todos, sid, sem);
       var n = cad.length, regra = regraCobertura(n);
       var rg = regrasSetor(setor);
@@ -1688,7 +1688,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     var atrib = {}, erros = [], avisos = [], devolveram = [], pendentes = [];
 
     Object.keys(porSetor).forEach(function (sid) {
-      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.criadoEm || '').localeCompare(b.criadoEm || '') || a.nome.localeCompare(b.nome); });
+      var lista = porSetor[sid].slice().sort(function (a, b) { return (a.criadoEm || '').localeCompare(b.criadoEm || '', 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'); });
       var cad = cadastradosSetor(todos, sid, sem), n = cad.length, regra = regraCobertura(n);
       if (modo === 'festas' && regra === 'reduzida') regra = 'dupla';
       var rg = regrasSetor(setorPorId[sid]);
@@ -1914,10 +1914,10 @@ const setorPorId = id => S.setores.find(s => s.id === id);
 const funcPorId = id => S.funcionarios.find(f => f.id === id);
 const nomeSetor = id => (setorPorId(id) || {}).nome || 'Sem setor';
 const semanaLabel = sem => C.dataBR(sem).slice(0, 5) + ' a ' + C.dataBR(C.fimSemana(sem));
-const setoresOrd = () => S.setores.slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || a.nome.localeCompare(b.nome));
+const setoresOrd = () => S.setores.slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || a.nome.localeCompare(b.nome, 'pt-BR'));
 const ordemSetor = id => { const i = setoresOrd().findIndex(s => s.id === id); return i < 0 ? 9999 : i; };
 const corSetor = id => { const s = setorPorId(id); if (s && s.cor) return s.cor; const i = ordemSetor(id); return i === 9999 ? '#FFFFFF' : PALETA[i % PALETA.length]; };
-const cmpSetor = (a, b) => ordemSetor(a) - ordemSetor(b) || nomeSetor(a).localeCompare(nomeSetor(b));
+const cmpSetor = (a, b) => ordemSetor(a) - ordemSetor(b) || nomeSetor(a).localeCompare(nomeSetor(b), 'pt-BR');
 function feriadosLista() { if (Array.isArray(S.config.feriados)) return S.config.feriados; const y = +C.hojeISO().slice(0, 4); return C.feriadosNacionais(y).concat(C.feriadosNacionais(y + 1)); }
 function feriadoEm(d) { return feriadosLista().find(f => f.data === d); }
 const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
@@ -2022,7 +2022,7 @@ const Store = {
     else if (col === 'servicos') S.servicos[id] = limpo;
     else if (col === 'rh' || col === 'rh_docs') (S[col] = S[col] || {})[id] = limpo;
     else if (col === 'auditoria') { const i = S.auditoria.findIndex(x => x.id === id); const o = Object.assign({ id }, limpo); if (i >= 0) S.auditoria[i] = o; else S.auditoria.unshift(o); }
-    else { const arr = S[col]; const i = arr.findIndex(x => x.id === id); const obj = Object.assign({ id }, limpo); if (i >= 0) arr[i] = obj; else arr.push(obj); }
+    else { const arr = S[col] = S[col] || []; const i = arr.findIndex(x => x.id === id); const obj = Object.assign({ id }, limpo); if (i >= 0) arr[i] = obj; else arr.push(obj); }
   },
   remover(col, id) {
     if (col === 'escalas') { delete S.escalas[id]; delete S.escalasAntigas[id]; }
@@ -2030,7 +2030,7 @@ const Store = {
     else if (col === 'vt') delete S.vt[id];
     else if (col === 'servicos') delete S.servicos[id];
     else if (col === 'rh' || col === 'rh_docs') { if (S[col]) delete S[col][id]; }
-    else S[col] = S[col].filter(x => x.id !== id);
+    else S[col] = (S[col] || []).filter(x => x.id !== id);
   },
   async set(col, id, data) {
     if (S.somenteLeitura) { toast(S.modo === 'nuvem' ? 'Sem conexão: não é possível alterar agora.' : 'Você tem acesso somente leitura.'); throw new Error('ro'); }
@@ -2098,7 +2098,7 @@ const Nuvem = {
   async carregarTudo() {
     const r = await this.rpc('esc_ler', { p_desde: null });
     if (r.perfil) aplicarPerfil(r.perfil); else await this.carregarPapel();
-    Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, rh: {}, rh_docs: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
+    Object.assign(S, { despesas: [], orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, rh: {}, rh_docs: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO) });
     this.aplicarDocs(r.docs || []);
     S.desde = r.agora; S.offline = false; S.somenteLeitura = false; S.erroConexao = false; S.precisaLogin = false; S.pronto = true; S.sincAt = new Date();
     // a tela aberta tem de ser uma que este perfil pode ver
@@ -2203,7 +2203,7 @@ const Nuvem = {
     if (!expirou) { try { await this.rpc('esc_sair', {}); } catch (e) { } }
     try { localStorage.removeItem(this.TOKEN); localStorage.removeItem(this.COPIA); } catch (e) { }
     const eraFunc = S.papel === 'restrito';
-    Object.assign(S, { orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO, { nomeHotel: S.config.nomeHotel }), precisaLogin: true, pronto: true, desde: null, papel: undefined, perms: null, usuarioNome: '', usuarioLogin: '', usuarioId: null, loginModo: eraFunc ? 'func' : null });
+    Object.assign(S, { despesas: [], orcamentos: [], orcCatalogo: [], setores: [], funcionarios: [], prestadores: [], servicos: {}, vt: {}, escalas: {}, escalasAntigas: {}, auditoria: [], config: Object.assign({}, CONFIG_PADRAO, { nomeHotel: S.config.nomeHotel }), precisaLogin: true, pronto: true, desde: null, papel: undefined, perms: null, usuarioNome: '', usuarioLogin: '', usuarioId: null, loginModo: eraFunc ? 'func' : null });
     UI.usr = null; UI.visaoSemana = null;
     if (expirou) toast('Sua sessão expirou. Entre de novo.');
     render(); atualizarStatus();
@@ -2356,10 +2356,14 @@ const ICON = {
   check: '<path d="M5 13l4 4L19 7"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
   atestados: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 8v6M9 11h6M8 17h8"/>',
   usuarios: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6 1.2 0 2.3.2 3.3.5"/><path d="M17.5 12.5l3.5 1.4v2.9c0 2-1.5 3.6-3.5 4.2-2-.6-3.5-2.2-3.5-4.2v-2.9z"/>',
+  ferias: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  pagamentos: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
+  despesas: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  relatorios: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['ferias', 'Férias'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['pagamentos', 'Pagamentos'], ['despesas', 'Despesas'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -2386,7 +2390,7 @@ const servMesDe = k => k.split('__')[0];
 const servDiasDoMes = mes => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
 const servMesVizinho = (mes, delta) => { let [y, m] = mes.split('-').map(Number); m += delta; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return y + '-' + String(m).padStart(2, '0'); };
 const servMeses = () => [...new Set(Object.keys(S.servicos).filter(k => !k.endsWith('__lotes')).map(servMesDe))].sort();
-const servPrestadores = () => S.prestadores.filter(p => p.ativo !== false).slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || ''));
+const servPrestadores = () => S.prestadores.filter(p => p.ativo !== false).slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
 const r2 = v => Math.round((+v || 0) * 100) / 100;
 /* Só o primeiro nome, para as telas do dia a dia (o cadastro continua com o nome completo) */
 const nomeCurto = n => String(n || '').trim().split(/\s+/)[0] || '';
@@ -2837,7 +2841,7 @@ async function servLotesSalvar(el) {
 
 /* ----- Cadastro de prestadores ----- */
 function servPrestLista() {
-  const linhas = S.prestadores.slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || '')).map(p => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_capNome(p.nome))}</b><div class="small muted">${esc(p.funcao || '—')} · ${esc(SERV_MOD[p.modalidade] || '')}${p.ativo === false ? ' · inativo' : ''}</div></div><button class="btn sm" data-act="prestEditar" data-id="${p.id}">Editar</button></div>`).join('');
+  const linhas = S.prestadores.slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || '', 'pt-BR')).map(p => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_capNome(p.nome))}</b><div class="small muted">${esc(p.funcao || '—')} · ${esc(SERV_MOD[p.modalidade] || '')}${p.ativo === false ? ' · inativo' : ''}</div></div><button class="btn sm" data-act="prestEditar" data-id="${p.id}">Editar</button></div>`).join('');
   abrirModal(`<div class="mh">Prestadores</div><div class="mbd">${linhas || '<p class="muted">Nenhum prestador cadastrado.</p>'}</div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button><button class="btn pri" data-act="prestNovo">+ Novo prestador</button></div>`, true);
 }
 function servPrestForm(id) {
@@ -3274,7 +3278,7 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'historico']], ['Sistema', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'ferias', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'pagamentos', 'despesas', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const grupos = GRUPOS_MENU.map(([t, c]) => [t, c.filter(r => rotaPermitida(r) && !(r === 'diaria' && ehAdmin()))]).filter(g => g[1].length);
@@ -3291,7 +3295,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: window.vRH || vFuncionarios, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { ferias: window.vFerias, pagamentos: window.vPagamentos, despesas: window.vDespesas, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -3512,7 +3516,7 @@ function vPainel() {
     if (st === 'F') folg.push(pessoa(f));
     else if (st === 'T' || st === 'X') trab.push(pessoa(f));
   });
-  const porNome = (a, b) => a.nome.localeCompare(b.nome);
+  const porNome = (a, b) => a.nome.localeCompare(b.nome, 'pt-BR');
   trab.sort((a, b) => cmpSetor(a.setorId, b.setorId) || porNome(a, b));
   folg.sort((a, b) => cmpSetor(a.setorId, b.setorId) || porNome(a, b));
   // diaristas lançados nesse dia (Serviços prestados) também estão trabalhando
@@ -3682,7 +3686,7 @@ function vEscala() {
   h += `<div class="tw mt"><table class="esc"><thead><tr><th class="nm">Funcionário</th>${dias.map((d, i) => `<th class="d ${d === hoje ? 'today' : ''}" ${feriadoEm(d) ? `style="background:#DDEBF7" title="Feriado: ${esc(feriadoEm(d).nome)}"` : ''}>${C.DIAS_CURTO[i]}<br><span style="font-weight:500">${C.dataBR(d).slice(0, 5)}</span>${feriadoEm(d) ? '<br><span style="color:var(--off);font-size:10px">feriado</span>' : ''}</th>`).join('')}<th>Combinação</th>${editavel ? '<th class="hide-m">Ações</th>' : ''}</tr></thead><tbody>`;
   const totT = [0, 0, 0, 0, 0, 0, 0], totF = [0, 0, 0, 0, 0, 0, 0];
   ordem.forEach(sid => {
-    const ls = grupos[sid].sort((x, y) => (x.f || x.a).nome.localeCompare((y.f || y.a).nome));
+    const ls = grupos[sid].sort((x, y) => (x.f || x.a).nome.localeCompare((y.f || y.a).nome, 'pt-BR'));
     const cad = C.cadastradosSetor(S.funcionarios, sid, sem), regra = C.regraCobertura(cad.length);
     let cob = '';
     if (regra) { const atr = {}; cad.forEach(f => { if (e.atribuicoes[f.id]) atr[f.id] = e.atribuicoes[f.id].g; }); const t = C.trabalhandoTerQua(cad, atr, sem); cob = ` · <b>Hotel fechado</b> — Ter: ${t.ter.map(f => esc(nomeCurto(f.nome))).join(', ') || 'ninguém'} · Qua: ${t.qua.map(f => esc(nomeCurto(f.nome))).join(', ') || 'ninguém'}${regra === 'reduzida' ? ' <span>(no máximo 1)</span>' : ''}`; }
@@ -3847,7 +3851,7 @@ function folhaModelo(o) {
   if (o.setorIds && o.setorIds.length) linhas = linhas.filter(l => o.setorIds.includes(l.sid));
   if (o.funcId) linhas = linhas.filter(l => l.id === o.funcId);
   const gm = {}; linhas.forEach(l => (gm[l.sid] = gm[l.sid] || []).push(l));
-  const grupos = Object.keys(gm).sort(cmpSetor).map(sid => ({ sid, nome: gm[sid][0].sNome, cor: corSetor(sid), linhas: gm[sid].sort((a, b) => (a.criado || '').localeCompare(b.criado || '') || a.nome.localeCompare(b.nome)) }));
+  const grupos = Object.keys(gm).sort(cmpSetor).map(sid => ({ sid, nome: gm[sid][0].sNome, cor: corSetor(sid), linhas: gm[sid].sort((a, b) => (a.criado || '').localeCompare(b.criado || '', 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR')) }));
   const feriados = cols.map(d => feriadoEm(d) || null);
   const semEscala = sems.filter(s => !S.escalas[s]);
   const pend = sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length;
@@ -3896,21 +3900,10 @@ function folhaHTML(m, editavel) {
 }
 
 /* ---------------- FUNCIONÁRIOS ---------------- */
-function vFuncionarios() {
-  return `<div class="row mb"><div><h1>Funcionários</h1><p class="sub" style="margin:0">Cadastro, edição, transferência e situação</p></div><div class="sp"></div>
-    <button class="btn edit-only" data-act="importarFunc">Cadastrar vários de uma vez</button>
-    <button class="btn pri edit-only" data-act="novoFunc">${ic('plus')} Novo funcionário</button></div>
-  <div class="card mb"><div class="row">
-    <input type="search" id="busca" placeholder="Buscar por nome ou função…" value="${esc(UI.busca)}" style="flex:1;min-width:180px">
-    <select id="fSetor"><option value="">Todos os setores</option>${setoresOrd().map(s => `<option value="${s.id}" ${UI.filtroSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select>
-    <select id="fSit"><option value="ativos" ${UI.situacao === 'ativos' ? 'selected' : ''}>Ativos</option><option value="inativos" ${UI.situacao === 'inativos' ? 'selected' : ''}>Inativos</option><option value="todos" ${UI.situacao === 'todos' ? 'selected' : ''}>Todos</option></select>
-  </div></div>
-  <div id="listaFunc">${listaFuncHTML()}</div>`;
-}
 function listaFuncHTML() {
   const q = UI.busca.trim().toLowerCase();
   const fs = S.funcionarios.filter(f => (UI.situacao === 'todos' || (UI.situacao === 'ativos' ? f.ativo : !f.ativo)) && (!UI.filtroSetor || f.setorId === UI.filtroSetor) && (!q || (f.nome + ' ' + (f.funcao || '')).toLowerCase().includes(q)))
-    .sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome));
+    .sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome, 'pt-BR'));
   if (!S.funcionarios.length) return '<div class="card empty"><b>Nenhum funcionário cadastrado</b>' + (S.setores.length ? 'Clique em "Novo funcionário" ou "Cadastrar vários de uma vez".' : 'Cadastre os <a href="#setores">setores</a> primeiro.') + '</div>';
   if (!fs.length) return '<div class="card empty"><b>Nenhum resultado</b>Ajuste os filtros.</div>';
   const sem = C.inicioSemana(C.hojeISO()), e = S.escalas[sem];
@@ -4101,6 +4094,16 @@ function abrirFormSetor(s) {
 }
 
 /* ---------------- HISTÓRICO ---------------- */
+/* Só para exibição: lançamentos iguais feitos no mesmo minuto por quem salvou viram uma linha (nada é apagado) */
+function agruparAuditoria(lista) {
+  const mapa = new Map(), out = [];
+  lista.forEach(x => {
+    const k = [String(x.ts || '').slice(0, 16), x.por || '', x.tipo || '', x.texto || ''].join('|');
+    if (mapa.has(k)) { mapa.get(k)._vezes++; return; }
+    const o = Object.assign({ _vezes: 1 }, x); mapa.set(k, o); out.push(o);
+  });
+  return out;
+}
 function vHistorico() {
   const tabs = [['escalas', 'Escalas anteriores'], ['domingos', 'Folgas aos domingos'], ['combinacoes', 'Combinações utilizadas'], ['rodizio', 'Rodízio de folgas'], ['alteracoes', 'Histórico de alterações']];
   let h = `<div class="row mb"><div><h1>Histórico</h1><p class="sub" style="margin:0">O histórico é usado automaticamente para organizar as próximas escalas</p></div></div>
@@ -4117,7 +4120,7 @@ function vHistorico() {
     const linhas = [];
     const ids = new Set(S.funcionarios.filter(f => f.ativo).map(f => f.id)); escs.forEach(e => Object.keys(e.atribuicoes || {}).forEach(id => ids.add(id)));
     ids.forEach(id => { let a0 = null; const doms = []; escs.forEach(e => { const a = (e.atribuicoes || {})[id]; if (a) { a0 = a0 || a; if (a.g === 4) doms.push(C.addDias(e.semana, 6)); } }); const f = funcPorId(id); linhas.push({ id, nome: nomeDe(id, a0), setor: f ? nomeSetor(f.setorId) : (a0 ? a0.setorNome : ''), doms, ativo: f && f.ativo }); });
-    linhas.sort((a, b) => a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome));
+    linhas.sort((a, b) => a.setor.localeCompare(b.setor, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
     h += `<div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th>Setor</th><th>Total</th><th>Último domingo de folga</th><th class="hide-m">Domingos de folga</th></tr></thead><tbody>${linhas.map(l => `<tr><td><b>${esc(l.nome)}</b>${!l.ativo ? ' <span class="badge b-off">inativo</span>' : ''}</td><td>${esc(l.setor)}</td><td>${l.doms.length}</td><td>${l.doms[0] ? C.dataBR(l.doms[0]) : '<span class="muted">nunca</span>'}</td><td class="hide-m">${l.doms.slice(0, 8).map(d => '<span class="chip b">' + C.dataBR(d).slice(0, 5) + '</span>').join('')}${l.doms.length > 8 ? '…' : ''}</td></tr>`).join('')}</tbody></table></div>`;
     return h;
   }
@@ -4125,27 +4128,27 @@ function vHistorico() {
     const ult = escs.slice(0, 12).reverse();
     if (!ult.length) return h + '<div class="card empty"><b>Sem histórico</b></div>';
     const ids = new Set(); ult.forEach(e => Object.keys(e.atribuicoes || {}).forEach(id => ids.add(id)));
-    const ls = [...ids].map(id => { let a0 = null; ult.forEach(e => { if ((e.atribuicoes || {})[id]) a0 = e.atribuicoes[id]; }); const f = funcPorId(id); return { id, nome: nomeDe(id, a0), setor: f ? nomeSetor(f.setorId) : a0.setorNome }; }).sort((a, b) => a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome));
+    const ls = [...ids].map(id => { let a0 = null; ult.forEach(e => { if ((e.atribuicoes || {})[id]) a0 = e.atribuicoes[id]; }); const f = funcPorId(id); return { id, nome: nomeDe(id, a0), setor: f ? nomeSetor(f.setorId) : a0.setorNome }; }).sort((a, b) => a.setor.localeCompare(b.setor, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
     h += legenda() + `<div class="tw mt"><table class="list esc"><thead><tr><th class="nm">Funcionário</th><th class="hide-m">Setor</th>${ult.map(e => `<th class="d">${C.dataBR(e.semana).slice(0, 5)}</th>`).join('')}</tr></thead><tbody>${ls.map(l => `<tr><td class="nm"><b>${esc(l.nome)}</b></td><td class="hide-m">${esc(l.setor)}</td>${ult.map(e => { const a = (e.atribuicoes || {})[l.id]; return `<td class="d">${a ? pillA(a) : '<span class="muted">·</span>'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div><p class="small muted mt">Últimas ${ult.length} semanas. O número é a combinação de folgas recebida.</p>`;
     return h;
   }
   if (UI.histTab === 'rodizio') {
     const cont = {};
     escs.forEach(e => Object.entries(e.atribuicoes || {}).forEach(([id, a]) => { cont[id] = cont[id] || { 1: 0, 2: 0, 3: 0, 4: 0, n: 0, a }; cont[id][a.g]++; cont[id].n++; }));
-    const ls = Object.entries(cont).map(([id, c]) => { const f = funcPorId(id); return { id, c, nome: nomeDe(id, c.a), setor: f ? nomeSetor(f.setorId) : c.a.setorNome }; }).sort((a, b) => a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome));
+    const ls = Object.entries(cont).map(([id, c]) => { const f = funcPorId(id); return { id, c, nome: nomeDe(id, c.a), setor: f ? nomeSetor(f.setorId) : c.a.setorNome }; }).sort((a, b) => a.setor.localeCompare(b.setor, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
     if (!ls.length) return h + '<div class="card empty"><b>Sem histórico</b></div>';
     h += `<div class="tw"><table class="list"><thead><tr><th>Funcionário</th><th class="hide-m">Setor</th><th>Semanas</th>${C.PERMITIDAS.map(g => `<th title="${C.GRUPOS[g].nome}">${gPill(g)}</th>`).join('')}</tr></thead><tbody>${ls.map(l => `<tr><td><b>${esc(l.nome)}</b></td><td class="hide-m">${esc(l.setor)}</td><td>${l.c.n}</td>${C.PERMITIDAS.map(g => `<td>${l.c[g]}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="small muted mt">Quantas vezes cada funcionário recebeu cada combinação. ${C.PERMITIDAS.map(g => gPill(g) + ' ' + C.GRUPOS[g].nome).join(' · ')}</p>`;
     return h;
   }
   // alterações
   if (!S.auditoria.length) return h + '<div class="card empty"><b>Nenhuma alteração registrada</b></div>';
-  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Quem</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td style="white-space:nowrap">${x.porId ? '<b>' + esc(x.por || 'Funcionário') + '</b>' : esc(x.por || 'Administrador')}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x.semana ? ` <a href="#mensal" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  h += `<div class="tw"><table class="list"><thead><tr><th>Data</th><th>Quem</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>${agruparAuditoria(S.auditoria.slice().sort((a, b) => b.ts.localeCompare(a.ts))).slice(0, 400).map(x => `<tr><td style="white-space:nowrap">${dtHora(x.ts)}</td><td style="white-space:nowrap">${x.porId ? '<b>' + esc(x.por || 'Funcionário') + '</b>' : esc(x.por || 'Administrador')}</td><td><span class="badge ${x.tipo === 'escala' ? 'b-blue' : 'b-off'}">${esc(x.tipo)}</span></td><td>${esc(x.texto)}${x._vezes > 1 ? ` <span class="badge b-off">×${x._vezes} no mesmo minuto</span>` : ''}${x.semana ? ` <a href="#mensal" data-act="irSemana" data-sem="${x.semana}" class="small">(${semanaLabel(x.semana)})</a>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   return h;
 }
 
 /* ---------------- EXPORTAR ---------------- */
 function vExportar() {
-  const fs = S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  const fs = S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   const temEsc = UI.expPeriodo === 'semana' ? !!S.escalas[UI.semana] : semanasDoMes(UI.mes).sems.some(s => S.escalas[s]);
   return `<div class="row mb"><div><h1>Exportar e compartilhar</h1><p class="sub" style="margin:0">PDF, Excel e impressão</p></div></div>
   <div class="card"><div class="grid g2" style="gap:12px">
@@ -4278,7 +4281,7 @@ async function mudarGrupo(id, g) {
 async function trocarFolgas(id) {
   const sem = UI.semana, e = S.escalas[sem]; const a = e.atribuicoes[id]; const f = funcPorId(id);
   const outros = Object.keys(e.atribuicoes).filter(x => x !== id && e.atribuicoes[x].g !== a.g).map(x => ({ id: x, a: e.atribuicoes[x], f: funcPorId(x) }))
-    .sort((p, q) => ((q.f || q.a).setorId === (f || a).setorId) - ((p.f || p.a).setorId === (f || a).setorId) || (p.f || p.a).nome.localeCompare((q.f || q.a).nome));
+    .sort((p, q) => ((q.f || q.a).setorId === (f || a).setorId) - ((p.f || p.a).setorId === (f || a).setorId) || (p.f || p.a).nome.localeCompare((q.f || q.a).nome, 'pt-BR'));
   const w = abrirModal(`<div class="mh">Trocar folgas</div><div class="mbd"><p><b>${esc((f || a).nome)}</b> está com ${gPill(a.g)} ${C.GRUPOS[a.g].nome}. Trocar com:</p>
   <select id="tSel" style="width:100%">${outros.map(o => `<option value="${o.id}" ${o.a.bloq ? 'disabled' : ''}>${esc((o.f || o.a).nome)} — ${esc(nomeSetor((o.f || o.a).setorId))} — ${C.GRUPOS[o.a.g].nome}${o.a.bloq ? ' (bloqueado)' : ''}</option>`).join('')}</select>
   <p class="small muted mt">A troca é conferida contra todas as regras antes de ser salva.</p></div><div class="mf"><button class="btn" data-x="c">Cancelar</button><button class="btn pri" data-x="s">Trocar</button></div>`);
@@ -4302,7 +4305,7 @@ async function abrirEdicaoAprovada(sem) {
   const dias = C.diasDaSemana(sem);
   const orig = clone(e.atribuicoes);
   const nomeDe = id => (funcPorId(id) || orig[id]).nome;
-  const ids = Object.keys(orig).sort((x, y) => nomeDe(x).localeCompare(nomeDe(y)));
+  const ids = Object.keys(orig).sort((x, y) => nomeDe(x).localeCompare(nomeDe(y), 'pt-BR'));
   const stDe = (id, i) => C.statusDia(orig[id], dias[i], funcPorId(id), true);
   const subs = [];
   const linhas = ids.map(id => {
@@ -4748,7 +4751,7 @@ const numBR = s => { s = String(s == null ? '' : s).trim().replace(/[R$\s]/g, ''
 const VT_COR = ['#DDEBF7', '#FCE4D6'];
 const VT_PER = { q1: '1ª quinzena', q2: '2ª quinzena', mes: 'Mês completo' };
 const vtDoc = ym => S.vt[ym] || {};
-function vtOrdenados() { return S.funcionarios.slice().sort((a, b) => cmpSetor(a.setorId, b.setorId) || (a.criadoEm || '').localeCompare(b.criadoEm || '') || a.nome.localeCompare(b.nome)); }
+function vtOrdenados() { return S.funcionarios.slice().sort((a, b) => cmpSetor(a.setorId, b.setorId) || (a.criadoEm || '').localeCompare(b.criadoEm || '', 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR')); }
 function vtModelo(ym) { return C.calcularVT({ mes: ym, funcionarios: vtOrdenados(), escalas: S.escalas, doc: vtDoc(ym) }); }
 function vtFaixa(per, dim) { return per === 'q1' ? [1, 15] : per === 'q2' ? [16, dim] : [1, dim]; }
 function vtTituloPer(m, per) { const [a, b] = vtFaixa(per, m.dim); return String(a).padStart(2, '0') + ' A ' + String(b).padStart(2, '0') + '/' + m.mes.slice(5, 7) + '/' + m.mes.slice(0, 4); }
@@ -5505,6 +5508,7 @@ document.addEventListener('click', async ev => {
     if (ACOES_SERVICOS_COMPLETO.includes(act) && !pode('servicos')) return toast('Seu acesso não inclui esta função.');
   }
   if (act && act.startsWith('orc') && window.orcAcao) return window.orcAcao(el, ev);
+  if (act && act.startsWith('mdl') && window.mdlAcao) return window.mdlAcao(el, ev);
   if (act && act.startsWith('rh') && window.rhAcao) return window.rhAcao(el, ev);
   if (act && act.startsWith('ats') && window.atsAcao) return window.atsAcao(el, ev);
   const sem = UI.semana;
@@ -5696,7 +5700,7 @@ document.addEventListener('click', async ev => {
     case 'ferAdd': {
       const d = document.getElementById('ferData').value, n = document.getElementById('ferNome').value.trim();
       if (!d) return toast('Escolha a data.');
-      const l = feriadosLista().filter(f => f.data !== d).concat([{ data: d, nome: n || 'Feriado' }]).sort((a, b) => a.data.localeCompare(b.data));
+      const l = feriadosLista().filter(f => f.data !== d).concat([{ data: d, nome: n || 'Feriado' }]).sort((a, b) => a.data.localeCompare(b.data, 'pt-BR'));
       try { await Store.set('config', 'geral', Object.assign({}, S.config, { feriados: l })); log('sistema', 'Feriado adicionado: ' + C.dataBR(d) + ' ' + (n || '')); } catch (e) { }
       return;
     }
@@ -5778,7 +5782,7 @@ document.addEventListener('change', ev => {
   else if (t.id === 'fSetor') { UI.filtroSetor = t.value; render(); }
   else if (t.id === 'fSit') { UI.situacao = t.value; render(); }
   else if (t.id === 'expPeriodo') { UI.expPeriodo = t.value; render(); }
-  else if (t.id === 'expEscopo') { UI.expEscopo = t.value; if (t.value === 'setor' && !UI.expSetor) UI.expSetor = (setoresOrd()[0] || {}).id; if (t.value === 'func' && !UI.expFunc) UI.expFunc = (S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome))[0] || {}).id; render(); }
+  else if (t.id === 'expEscopo') { UI.expEscopo = t.value; if (t.value === 'setor' && !UI.expSetor) UI.expSetor = (setoresOrd()[0] || {}).id; if (t.value === 'func' && !UI.expFunc) UI.expFunc = (S.funcionarios.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))[0] || {}).id; render(); }
   else if (t.id === 'expSetor') { UI.expSetor = t.value; render(); }
   else if (t.id === 'expFunc') { UI.expFunc = t.value; render(); }
   else if (t.id === 'inRestore' && t.files[0]) { restaurar(t.files[0]); t.value = ''; }
@@ -5809,6 +5813,7 @@ Store.init();
 <script src="orcamentos.js?v=1811b"></script>
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1811a"></script>
-<script src="rh.js?v=1811i"></script>
+<script src="modulos.js?v=1"></script>
+<script src="rh.js?v=1811j"></script>
 </body>
 </html>
