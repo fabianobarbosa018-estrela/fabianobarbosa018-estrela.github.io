@@ -4821,7 +4821,7 @@ function vtTabelaHTML(m, per) {
   let h = `<div class="folha-wrap"><table class="folha vt"><thead>
   <tr><th colspan="${n + 1}" class="ft1" style="background:#C4D79B;color:#000"><span>VALE TRANSPORTE</span></th></tr>
   <tr><th colspan="${n + 1}" class="ft2" style="background:#C4D79B;color:#000"><span>${vtTituloPer(m, per)}</span></th></tr>
-  <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(l.nome.toUpperCase()))).join('')}</tr>
+  <tr><th rowspan="3" class="fnm" style="background:#C4D79B">DATA</th>${L.map((l, i) => thN(l, i, esc(nomeCurto(l.nome).toUpperCase()))).join('')}</tr>
   <tr>${L.map((l, i) => thN(l, i, `<span class="vts">${esc(nomeSetor(l.setorId).toUpperCase())}</span>`)).join('')}</tr>
   <tr>${L.map((l, i) => thN(l, i, `<span class="vts" ${vtValorTxt(m, l, per) ? '' : 'style="color:#b91c1c"'}>${vtValorTxt(m, l, per) || 'sem valor'}</span>`, `class="edit-click" data-act="vtValor" data-id="${l.id}" title="Valor diário de ${esc(nomeCurto(l.nome))}${l.qtd > 1 ? ' (' + l.qtd + ' × ' + rs(l.passagem) + ')' : ''}"`)).join('')}</tr>
   </thead><tbody>`;
