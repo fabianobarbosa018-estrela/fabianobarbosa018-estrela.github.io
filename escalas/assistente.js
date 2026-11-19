@@ -13,12 +13,12 @@
 
   var SUGESTOES = [
     'Quem está de atestado?', 'Quem está de férias?', 'Quantos funcionários estão ativos?',
-    'Quanto falta pagar de serviços prestados?', 'Quais são as minhas pendências administrativas?', 'Ajuda'
+    'Quanto falta pagar de serviços prestados?', 'Quais são as minhas pendências administrativas?', 'Relatório de novembro', 'Rascunho de comunicado', 'Ajuda'
   ];
 
   function ajuda() {
     return 'Posso responder sobre atestados, férias, funcionários ativos, pagamentos em aberto e cadastros incompletos. Experimente:' +
-      lista(SUGESTOES.slice(0, 5).map(function (q) { return esc(q); }));
+      lista(SUGESTOES.slice(0, 7).map(function (q) { return esc(q); }));
   }
 
   function atestadosHoje() {
@@ -56,10 +56,117 @@
     });
   }
 
+
+  /* ---------- v2: relatórios e rascunhos (só texto; nada é gravado) ---------- */
+  var MESES_NOME = ['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  function reEsc(x) { return String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function mesDaPergunta(t) {
+    var h = hoje(), ano = h.slice(0, 4);
+    for (var i = 0; i < MESES_NOME.length; i++) if (new RegExp('\\b' + MESES_NOME[i] + '\\b').test(t)) return ano + '-' + String(i + 1).padStart(2, '0');
+    return h.slice(0, 7);
+  }
+  function achaFuncionario(t) {
+    var melhor = null;
+    S.funcionarios.forEach(function (f) {
+      var primeiro = norm(f.nome).split(' ')[0];
+      if (primeiro && primeiro.length > 2 && new RegExp('\\b' + reEsc(primeiro) + '\\b').test(t)) {
+        if (!melhor || primeiro.length > norm(melhor.nome).split(' ')[0].length) melhor = f;
+      }
+    });
+    return melhor;
+  }
+  function achaSetor(t) {
+    var melhor = null;
+    (S.setores || []).forEach(function (s) {
+      var n = norm(s.nome);
+      if (n && new RegExp('\\b' + reEsc(n) + '\\b').test(t)) { if (!melhor || n.length > norm(melhor.nome).length) melhor = s; }
+    });
+    return melhor;
+  }
+  function diasNoMes(f, ym) {
+    var aj = vtDoc(ym).ajustes || {}, dias = 0, quando = [];
+    Object.keys(aj[f.id] || {}).forEach(function (d) {
+      var a = aj[f.id][d];
+      if (a && (a.t === 'atestado' || a.t === 'afast') && d.slice(0, 7) === ym) { dias++; }
+    });
+    return dias;
+  }
+  function feriasNoMes(f, ym) {
+    var ini = ym + '-01', fim = C.addDias(C.addDias(ym + '-01', 31), -1);
+    return (f.ferias || []).filter(function (p) { return p.ini <= fim && p.fim >= ini; });
+  }
+  function nomeMes(ym) { return MESES_NOME[+ym.slice(5, 7) - 1] + ' de ' + ym.slice(0, 4); }
+
+  function relatorioMes(ym) {
+    var ativos = S.funcionarios.filter(function (f) { return f.ativo; });
+    var com = ativos.map(function (f) { return { f: f, dias: diasNoMes(f, ym), fer: feriasNoMes(f, ym) }; });
+    var atest = com.filter(function (x) { return x.dias > 0; }), fer = com.filter(function (x) { return x.fer.length; });
+    var txt = '<b>Relatório de ' + esc(nomeMes(ym)) + '</b>';
+    txt += '<br>Funcionários ativos: <b>' + ativos.length + '</b>';
+    txt += '<br>Com atestado ou afastamento: <b>' + atest.length + '</b> (' + atest.reduce(function (a, x) { return a + x.dias; }, 0) + ' dia(s))';
+    if (atest.length) txt += lista(atest.map(function (x) { return esc(nomeCurto(x.f.nome)) + ' · ' + x.dias + ' dia(s)'; }));
+    txt += '<br>Com férias no período: <b>' + fer.length + '</b>';
+    if (fer.length) txt += lista(fer.map(function (x) { return esc(nomeCurto(x.f.nome)) + ' · ' + x.fer.map(function (p) { return C.dataBR(p.ini).slice(0, 5) + ' a ' + C.dataBR(p.fim).slice(0, 5); }).join(', '); }));
+    if (pode('servicos')) {
+      var linhas = servPrestadores().map(function (p) { var c = servCalc(ym, p.id); return { p: p, liq: c.liquido || 0, pago: c.pago || 0, saldo: c.saldo || 0 }; })
+        .filter(function (x) { return x.liq > 0; });
+      var liq = r2(linhas.reduce(function (a, x) { return a + x.liq; }, 0)), pago = r2(linhas.reduce(function (a, x) { return a + x.pago; }, 0)), saldo = r2(linhas.reduce(function (a, x) { return a + x.saldo; }, 0));
+      txt += '<br>Serviços prestados: <b>R$ ' + servMoeda(liq) + '</b> · pago R$ ' + servMoeda(pago) + ' · em aberto R$ ' + servMoeda(saldo);
+    }
+    return txt;
+  }
+  function relatorioFuncionario(f, ym) {
+    var txt = '<b>' + esc(f.nome) + '</b> · ' + esc(nomeMes(ym));
+    txt += '<br>Setor: ' + esc(nomeSetor(f.setorId)) + ' · ' + (f.ativo ? 'ativo' : 'inativo');
+    var d = diasNoMes(f, ym), fe = feriasNoMes(f, ym);
+    txt += '<br>Atestado ou afastamento: <b>' + d + ' dia(s)</b>';
+    txt += '<br>Férias no mês: ' + (fe.length ? fe.map(function (p) { return C.dataBR(p.ini).slice(0, 5) + ' a ' + C.dataBR(p.fim).slice(0, 5); }).join(', ') : 'nenhuma');
+    if (pode('servicos') && (f.id)) {
+      var pr = servPrestadores().find(function (p) { return norm(p.nome) === norm(f.nome); });
+      if (pr) { var c = servCalc(ym, pr.id); txt += '<br>Serviços: R$ ' + servMoeda(c.liquido || 0) + ' · em aberto R$ ' + servMoeda(c.saldo || 0); }
+    }
+    return txt;
+  }
+  function relatorioSetor(s) {
+    var membros = S.funcionarios.filter(function (f) { return f.ativo && f.setorId === s.id; });
+    return '<b>Setor ' + esc(s.nome) + '</b> · ' + membros.length + ' funcionário(s) ativo(s)' + lista(membros.map(function (f) { return esc(nomeCurto(f.nome)); }));
+  }
+
+  function rascunho(t, original) {
+    var f = achaFuncionario(t), h = hoje(), dataBR = C.dataBR(h);
+    var texto, titulo;
+    if (/vencimento|vencer|vence/.test(t)) {
+      titulo = 'Aviso de vencimento';
+      var lim = C.addDias(h, 10);
+      var cts = (S.orcamentos || []).filter(function (c) { return c.tipoRegistro === 'contrato' && c.fim && c.fim >= h && c.fim <= lim && c.status !== 'cancelado' && c.status !== 'encerrado'; });
+      if (!cts.length) return 'Nenhum contrato vence nos próximos 10 dias.';
+      texto = 'AVISO DE VENCIMENTO\n\n' + cts.map(function (c) { return 'Contrato ' + (c.numero || '') + ' · ' + (c.contratadoNome || '') + ' vence em ' + C.dataBR(c.fim) + '.'; }).join('\n') + '\n\nHotel Fazenda Oásis';
+    } else if (/advertenc/.test(t)) {
+      titulo = 'Advertência';
+      texto = 'ADVERTÊNCIA\n\nFuncionário(a): ' + (f ? f.nome : '[nome completo]') + '\nData: ' + dataBR + '\nMotivo: [descreva o motivo]\n\nDescrição dos fatos: [descreva os fatos com data e local]\n\nEsta advertência fica registrada no cadastro do funcionário. Em caso de reincidência, poderão ser aplicadas as medidas previstas em lei.\n\nHotel Fazenda Oásis\n\nCiente: ______________________ (assinatura do funcionário)';
+    } else if (/comunicad/.test(t)) {
+      titulo = 'Comunicado';
+      texto = 'COMUNICADO\n\nHotel Fazenda Oásis, ' + dataBR + '\n\n[Escreva aqui o comunicado]\n\nAtenciosamente,\nAdministração';
+    } else {
+      titulo = 'Mensagem para funcionário';
+      texto = 'Olá, ' + (f ? nomeCurto(f.nome) : '[nome]') + '!\n\n[Escreva aqui a mensagem]\n\nQualquer dúvida, fale com a administração. Obrigado!';
+    }
+    return '<b>Rascunho: ' + esc(titulo) + '</b> (copie e revise antes de usar)<textarea class="ast-txa" readonly rows="10">' + esc(texto) + '</textarea>' +
+      '<div class="small muted">Rascunho apenas na tela. Nada foi gravado.</div>';
+  }
+
   function responder(texto) {
     var t = norm(texto);
     if (!t) return null;
     if (/\bajuda\b|sugest|o que voce|comandos|o que posso/.test(t)) return ajuda();
+    if (/rascunh|comunicad|advertenc|aviso|mensagem/.test(t)) return rascunho(t, texto);
+    if (/relatori/.test(t)) {
+      var setor = achaSetor(t), pessoa = achaFuncionario(t), ym = mesDaPergunta(t);
+      if (setor && /setor/.test(t)) return relatorioSetor(setor);
+      if (pessoa) return relatorioFuncionario(pessoa, ym);
+      if (setor) return relatorioSetor(setor);
+      return relatorioMes(ym);
+    }
     if (/pendenc|incomplet|cadastr/.test(t)) {
       var inc = cadastrosIncompletos(), pag = pagamentosAbertos(), at = atestadosHoje(), partes = [];
       partes.push(inc.length ? '<b>' + inc.length + ' cadastro(s) incompleto(s)</b>' + lista(inc.slice(0, 8).map(function (f) { return esc(nomeCurto(f.nome)); })) : 'Nenhum cadastro incompleto.');
@@ -94,7 +201,7 @@
         return esc(nomeCurto(x.p.nome)) + ' · R$ ' + servMoeda(x.saldo);
       }));
     }
-    return 'Não entendi essa pergunta. Tente uma destas:' + lista(SUGESTOES.slice(0, 5).map(function (q) { return esc(q); }));
+    return 'Não entendi essa pergunta. Tente uma destas:' + lista(SUGESTOES.slice(0, 7).map(function (q) { return esc(q); }));
   }
 
   function conversa() {
