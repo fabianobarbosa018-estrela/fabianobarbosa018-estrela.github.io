@@ -113,7 +113,10 @@
     if (!S.setores.length) h += '<div class="alert w"><span class="ic">!</span><div>Cadastre os <a href="#setores">setores</a> antes dos funcionários.</div></div>';
     h += `<div class="orc-lista-h"><b>${s.filtro || q || s.setor ? 'Resultado' : 'Funcionários ativos'}</b><span class="small muted">${lista.length} pessoa(s)</span></div>`;
     if (!lista.length) return h + '<div class="card"><p class="muted" style="margin:0">Ninguém encontrado com esses filtros.</p></div>';
-    return h + '<div class="orc-lista">' + lista.map(cartao).join('') + '</div>' +
+    const setoresDaLista = [...new Set(lista.map(f => f.setorId))].sort((x, y) => nomeSetor(x).localeCompare(nomeSetor(y), 'pt-BR'));
+    const grupos = setoresDaLista.map(sid => { const m = lista.filter(f => f.setorId === sid).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+      return `<div style="font-weight:700;margin:16px 0 6px">${esc(nomeSetor(sid))} <span class="small muted" style="font-weight:400">· ${m.length} pessoa(s)</span></div><div class="orc-lista">${m.map(cartao).join('')}</div>`; }).join('');
+    return h + grupos +
       (soLer() ? '' : '<div class="row" style="justify-content:center;margin:6px 0 14px"><button class="btn sm" data-act="importarFunc">Cadastrar vários de uma vez</button></div>');
   }
   function cartao(f) {
