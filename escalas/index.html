@@ -3447,7 +3447,7 @@ function anivMesHtml(hoje) {
   const cap = s => s.charAt(0) + s.slice(1).toLowerCase();
   const dia = +hoje.slice(8, 10);
   const primeiro = n => String(n || '').trim().split(/\s+/)[0] || '';
-  const msg = n => 'Feliz aniversário, ' + n + '! 🎂\n\nQue o seu dia seja cheio de alegria, saúde e muita paz. Obrigado por fazer parte da equipe do Hotel Fazenda Oasis e pelo seu trabalho dedicado todos os dias.\n\nQue este novo ano traga conquistas, felicidade e bons momentos com quem você ama.\n\nUm grande abraço da equipe do Hotel Fazenda Oasis!';
+  const msg = n => 'Oba, ' + n + ', chegou o seu dia! 🎉🎂\n\nQue esse ano venha cheio de alegria, saúde e aquele tanto de coisa boa que você merece. Obrigado por fazer parte do time do Hotel Fazenda Oasis, a gente sente sua falta quando você não está por aqui!\n\nAproveita muito o seu dia, viu? Um abraço enorme do pessoal do Oasis! 🥳';
   return `<section class="pd-card pd-aniv"><header><span>Aniversariantes de ${esc(cap(mes))}</span><b class="pd-n">${ANIV_MES.length}</b></header>
     <ul class="pd-lista">` + ANIV_MES.map(a => {
       const n = primeiro(a.nome), hoje_ = a.dia === dia;
