@@ -1929,7 +1929,10 @@ const PERMS = [
   ['escala', 'Escala mensal', 'Criar, gerar e editar a escala e enviar para a sua aprovação. Não aprova nem altera escala aprovada.'],
   ['servicos', 'Serviços prestados', 'Lançar serviços, cadastrar prestadores e valores, extras, descontos, lotes e pagamentos.'],
   ['diarias', 'Controle de diárias', 'Ver os diaristas, marcar os dias trabalhados e copiar o controle.'],
-  ['vt', 'Vale-transporte', 'Lançar e consultar o vale-transporte: controle diário, fechamentos e pagamentos.']
+  ['vt', 'Vale-transporte', 'Lançar e consultar o vale-transporte: controle diário, fechamentos e pagamentos.'],
+  ['funcionarios', 'Funcionários', 'Cadastrar e editar fichas, férias e ocorrências. Não desliga, não transfere e não exclui.'],
+  ['atestados', 'Atestados', 'Lançar e cancelar atestados médicos e consultar o histórico.'],
+  ['relatorios', 'Relatórios', 'Ver os relatórios do mês: atestados, férias, vale-transporte e serviços.']
 ];
 const ehAdmin = () => S.papel !== 'restrito';
 const pode = k => ehAdmin() || !!(S.perms && S.perms[k]);
@@ -1938,14 +1941,17 @@ const ACOES_PERM = {
   escala: [['criar', 'Gerar e criar'], ['editar', 'Editar rascunho'], ['enviar', 'Enviar para aprovação'], ['aprovar', 'Aprovar e alterar escala publicada']],
   servicos: [['criar', 'Lançar'], ['editar', 'Editar lançamentos'], ['excluir', 'Excluir registros'], ['pagamentos', 'Pagamentos e fechamentos']],
   diarias: [['criar', 'Marcar dias'], ['editar', 'Alterar e desmarcar'], ['excluir', 'Excluir registros'], ['pagamentos', 'Pagamentos e fechamentos']],
-  vt: [['criar', 'Lançar'], ['editar', 'Editar lançamentos'], ['excluir', 'Excluir registros'], ['pagamentos', 'Fechamentos e pagamentos']]
+  vt: [['criar', 'Lançar'], ['editar', 'Editar lançamentos'], ['excluir', 'Excluir registros'], ['pagamentos', 'Fechamentos e pagamentos']],
+  funcionarios: [['criar', 'Cadastrar funcionário'], ['editar', 'Editar ficha, férias e ocorrências']],
+  atestados: [['criar', 'Lançar atestado'], ['cancelar', 'Cancelar atestado']],
+  relatorios: []
 };
-const MOD_NOME = { escala: 'Escala', servicos: 'Serviços prestados', diarias: 'Controle de diárias', vt: 'Vale-transporte', contratos: 'Contratos', orcamentos: 'Orçamentos', usuarios: 'Usuários', conta: 'Conta', funcionarios: 'Funcionários', setores: 'Setores', config: 'Configurações', atestados: 'Atestados', auditoria: 'Histórico' };
-const ACAO_NOME = { ver: 'acessar', criar: 'criar/lançar', editar: 'editar', excluir: 'excluir', enviar: 'enviar para aprovação', aprovar: 'aprovar', pagamentos: 'mexer em pagamentos e fechamentos' };
+const MOD_NOME = { escala: 'Escala', servicos: 'Serviços prestados', diarias: 'Controle de diárias', vt: 'Vale-transporte', contratos: 'Contratos', orcamentos: 'Orçamentos', usuarios: 'Usuários', conta: 'Conta', funcionarios: 'Funcionários', setores: 'Setores', config: 'Configurações', atestados: 'Atestados', auditoria: 'Histórico', relatorios: 'Relatórios' };
+const ACAO_NOME = { ver: 'acessar', criar: 'criar/lançar', editar: 'editar', cancelar: 'cancelar', excluir: 'excluir', enviar: 'enviar para aprovação', aprovar: 'aprovar', pagamentos: 'mexer em pagamentos e fechamentos' };
 const podeAcao = (m, a) => ehAdmin() || !!(S.perms && S.perms[m] && S.perms.acoes && S.perms.acoes[m] && S.perms.acoes[m][a]);
-const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], conta: [] };
+const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], funcionarios: ['funcionarios'], atestados: ['atestados'], relatorios: ['relatorios'], conta: [] };
 const rotaPermitida = r => ehAdmin() ? (r !== 'conta' && (r !== 'usuarios' || S.modo === 'nuvem')) : (r in ROTA_PERM) && (!ROTA_PERM[r].length || ROTA_PERM[r].some(pode));
-const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt'].find(rotaPermitida) || 'conta');
+const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'funcionarios', 'atestados', 'servicos', 'vt', 'relatorios'].find(rotaPermitida) || 'conta');
 function aplicarPerfil(p) {
   const antes = JSON.stringify([S.papel, S.perms, S.usuarioNome, S.usuarioLogin]);
   S.papel = p && p.papel === 'restrito' ? 'restrito' : 'admin';
@@ -1960,6 +1966,7 @@ function podeGravar(col) {
   if (col === 'vt') return pode('vt');
   if (col === 'prestadores') return pode('servicos');
   if (col === 'servicos') return pode('servicos') || pode('diarias');
+  if (col === 'funcionarios' || col === 'rh' || col === 'rh_docs') return pode('funcionarios');
   return false;
 }
 const fmtLogin = l => /^\d{10,11}$/.test(l || '') ? '(' + l.slice(0, 2) + ') ' + l.slice(2, l.length - 4) + '-' + l.slice(-4) : (l || '');
@@ -5495,6 +5502,8 @@ document.addEventListener('change', async (ev) => {
 document.getElementById('burger').onclick = () => { document.getElementById('side').classList.toggle('open'); document.getElementById('shade').classList.toggle('on'); };
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
+// o que a gerência (quem tem 'funcionarios' liberado) pode fazer nas fichas; o resto segue só com administrador
+const ACOES_GERENCIA = ['rhNovo', 'rhEditar', 'rhFeriasAdd', 'rhFeriasDel', 'rhOcorr', 'rhDocVer'];
 const ACOES_SO_ADMIN = ['rhNovo', 'rhEditar', 'rhDesligar', 'rhReativar', 'rhTransferir', 'rhFeriasAdd', 'rhFeriasDel', 'rhOcorr', 'rhDocVer', 'aprovar', 'aprovarMes', 'reabrir', 'excluirEscala', 'editarAprovada', 'escDevolver', 'novoFunc', 'importarFunc', 'editFunc', 'transfFunc', 'delFunc', 'novoSetor', 'editSetor', 'setorMover', 'delSetor', 'addSug', 'delAntigas', 'ferAdd', 'ferDel', 'ferNac', 'trocarSenha', 'listarBk', 'baixarBk', 'backup', 'salvarCfg', 'removerAssinatura', 'vtValor', 'expPDF', 'expPrint', 'expXLS', 'baixarSetor', 'enviarSetor'];
 const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
 document.addEventListener('click', async ev => {
@@ -5502,7 +5511,9 @@ document.addEventListener('click', async ev => {
   const act = el.dataset.act, id = el.dataset.id;
   if (!ehAdmin()) {
     // a tela já não mostra estes botões ao funcionário; aqui é a segunda trava (a terceira é o servidor)
-    if (!act || act.startsWith('orc') || act.startsWith('usr') || act.startsWith('ats') || ACOES_SO_ADMIN.includes(act)) { if (act) toast('Só o administrador pode fazer isso.'); return; }
+    const liberadoGerencia = ACOES_GERENCIA.includes(act) && pode('funcionarios');
+    const liberadoAtestado = !!act && act.startsWith('ats') && pode('atestados');
+    if (!act || act.startsWith('orc') || act.startsWith('usr') || (act.startsWith('ats') && !liberadoAtestado) || (ACOES_SO_ADMIN.includes(act) && !liberadoGerencia)) { if (act) toast('Só o administrador pode fazer isso.'); return; }
     if (ACOES_SERVICOS_COMPLETO.includes(act) && !pode('servicos')) return toast('Seu acesso não inclui esta função.');
   }
   if (act && act.startsWith('orc') && window.orcAcao) return window.orcAcao(el, ev);
@@ -5812,6 +5823,6 @@ Store.init();
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1811b"></script>
 <script src="modulos.js?v=2"></script>
-<script src="rh.js?v=1811m"></script>
+<script src="rh.js?v=1811n"></script>
 </body>
 </html>
