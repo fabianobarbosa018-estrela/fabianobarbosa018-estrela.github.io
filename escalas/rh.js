@@ -96,7 +96,7 @@
     todos.forEach(f => { const x = situacao(f); cont[x]++; });
     const ativos = todos.filter(f => f.ativo).length;
     const ind = (k, n, l, cls) => `<button class="ctr-ind${s.filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-act="rhFiltro" data-f="${k}"><b>${n}</b><span>${l}</span></button>`;
-    let h = seguro(() => (window.CAD ? CAD.barra() : '')) + seguro(anivHtml) + seguro(pendenciasHtml) + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
+    let h = seguro(() => (window.CAD ? CAD.barra() : '')) + seguro(anivHtml) + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
       ${soLer() ? '' : '<button class="btn pri orc-novo" data-act="rhNovo">+ Novo funcionário</button>'}</div>
       <div class="ctr-inds">${ind('todos', cont.total, 'Cadastrados')}${ind('', ativos, 'Ativos')}${ind('afastado', cont.afastado, 'Afastados', cont.afastado ? 'alerta' : '')}${ind('ferias', cont.ferias, 'De férias')}${ind('suspenso', cont.suspenso, 'Suspensos', cont.suspenso ? 'perigo' : '')}${ind('desligado', cont.desligado, 'Desligados')}</div>
       <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função ou CPF" value="${esc(s.busca)}" autocomplete="off">
