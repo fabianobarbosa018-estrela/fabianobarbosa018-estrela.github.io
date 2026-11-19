@@ -126,7 +126,7 @@
     const sit = situacao(a, h0), x = SIT[sit], f = funcPorId(a.func_id), setor = f ? nomeSetor(f.setorId) : '';
     const falta = a.status === 'analise' ? [!a.func_id && 'funcionário', !a.inicio && 'início', !a.dias && 'dias'].filter(Boolean) : [];
     return `<div class="orc-card ats-card ${sit}" data-ats="${a.id}"><div class="orc-card-l1"><span class="orc-num">${a.status === 'analise' ? 'Recebido ' + dtHora(a.enviado_em) : 'Atestado nº ' + a.id}${a.tem_arquivo ? ' · 📎 documento' : ''}</span><span class="badge ${x[1]}">${x[0]}</span></div>
-      <div class="orc-card-l2"><b>${a.func_nome ? esc(a.func_nome) : '<span class="muted">Funcionário a identificar</span>'}</b>${a.dias ? `<span class="orc-val">${a.dias} dia${a.dias > 1 ? 's' : ''}</span>` : ''}</div>
+      <div class="orc-card-l2"><b>${a.func_nome ? esc(nomeCurto(a.func_nome)) : '<span class="muted">Funcionário a identificar</span>'}</b>${a.dias ? `<span class="orc-val">${a.dias} dia${a.dias > 1 ? 's' : ''}</span>` : ''}</div>
       <div class="orc-desc">${setor ? esc(setor) + ' · ' : ''}${a.inicio ? br(a.inicio) + (a.dias ? ' a ' + br(a.fim) : '') : 'datas a conferir'}${a.retorno && a.status !== 'analise' ? ' · <b>volta ' + br(a.retorno) + '</b>' : ''}${a.cid ? ' · CID ' + esc(a.cid) : ''}</div>
       ${falta.length ? `<div class="small" style="color:#a16207;margin-top:3px">Falta conferir: ${falta.join(', ')}</div>` : ''}
       ${sit === 'cancelado' && a.motivo_cancelamento ? `<div class="small muted" style="margin-top:3px">Motivo: ${esc(a.motivo_cancelamento)}</div>` : ''}
@@ -142,8 +142,8 @@
     const trilha = [
       ['Recebido', a.enviado_em, a.enviado_por], [a.status === 'analise' ? '' : 'Confirmado e lançado', a.confirmado_em || a.aprovado_em, a.confirmado_por || a.aprovado_por],
       ['Corrigido', a.corrigido_em, a.corrigido_por], ['Cancelado', a.cancelado_em, a.cancelado_por]].filter(t => t[0] && t[1]);
-    const w = abrirModal(`<div class="mh">Atestado ${a.func_nome ? 'de ' + esc(a.func_nome) : ''} <span class="badge ${x[1]}" style="margin-left:6px">${x[0]}</span></div><div class="mbd">
-      <div class="orc-info">${linha('Funcionário', a.func_nome ? esc(a.func_nome) : 'a identificar')}${linha('Setor', f ? esc(nomeSetor(f.setorId)) : '')}${linha('Emissão', a.emissao ? br(a.emissao) : '')}
+    const w = abrirModal(`<div class="mh">Atestado ${a.func_nome ? 'de ' + esc(nomeCurto(a.func_nome)) : ''} <span class="badge ${x[1]}" style="margin-left:6px">${x[0]}</span></div><div class="mbd">
+      <div class="orc-info">${linha('Funcionário', a.func_nome ? esc(nomeCurto(a.func_nome)) : 'a identificar')}${linha('Setor', f ? esc(nomeSetor(f.setorId)) : '')}${linha('Emissão', a.emissao ? br(a.emissao) : '')}
         ${linha('Início', a.inicio ? br(a.inicio) : '')}${linha('Término', a.fim ? br(a.fim) : '')}${linha('Dias', a.dias ? String(a.dias) : '')}${linha('Retorno', a.retorno ? br(a.retorno) : '')}
         ${linha('CID', a.cid ? esc(a.cid) : 'não informado')}${linha('Nome lido no documento', a.nome_doc ? esc(a.nome_doc) : '')}${linha('Leitura', a.leitura_segura === true ? 'automática, conferida' : a.leitura_segura === false ? 'conferida manualmente' : '')}</div>
       ${a.obs ? `<p class="small" style="margin:10px 0 0">${esc(a.obs)}</p>` : ''}
