@@ -1862,6 +1862,9 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       var conta = function (c) { return c.tipo === 'trab' || c.fixoQ; };
       var soma = function (de, ate) { var n = 0, v = 0; cel.forEach(function (c, i) { if (i + 1 >= de && i + 1 <= ate) { if (c.tipo === 'trab' && (c.valor > 0 || c.fixoDia)) n++; if (conta(c)) v += c.valor; } }); return { dias: n, valor: r2(v) }; };
       var q1 = soma(1, 15), q2 = soma(16, dim), mes = soma(1, dim);
+      // acerto (desconto < 0 ou acréscimo > 0) lançado manualmente para a 2ª quinzena deste mês
+      var ac = doc.acertos && doc.acertos[f.id] && doc.acertos[f.id].mes === o.mes && doc.acertos[f.id].aplicaEm === 'q2' ? (+doc.acertos[f.id].valor || 0) : 0;
+      if (ac) { q2.acerto = r2(ac); q2.valor = r2(q2.valor + ac); mes.valor = r2(mes.valor + ac); }
       var p = pg[f.id] || {}, pago = { q1: r2(+((p.q1 || {}).valor) || 0), q2: r2(+((p.q2 || {}).valor) || 0) };
       var vfim = vtValorEm(f, dias[dim - 1]) || vtValorEm(f, dias[0]);
       linhas.push({ id: f.id, nome: f.nome, setorId: f.setorId, ativo: f.ativo, fixo: vfim && vfim.fixo ? { q1: vfim.q1, q2: vfim.q2 } : null, valorDia: vfim ? vfim.total : 0, passagem: vfim ? vfim.valor : 0, qtd: vfim ? vfim.qtd : 0, cel: cel, q1: q1, q2: q2, mes: mes, pago: pago,
@@ -4868,7 +4871,7 @@ function vtResumoHTML(m) {
     const s = l.saldo.mes;
     const px = vtPix(l.id);
     h += `<tr><td><b>${esc(nomeCurto(l.nome))}</b>${l.ativo ? '' : ' <span class="badge b-off">inativo</span>'}</td><td>${esc(nomeSetor(l.setorId))}</td><td>${px.pix ? esc(px.pix) + (px.titular ? '<div class="small muted">' + esc(px.titular) + '</div>' : '') : '<span class="muted">—</span>'}</td>${l.fixo ? `<td class="r" colspan="3">fixo: ${rs(l.fixo.q1)} (1ª) + ${rs(l.fixo.q2)} (2ª)</td>` : `<td class="r">${rs(l.passagem)}</td><td class="r">${l.qtd}</td><td class="r">${rs(l.valorDia)}</td>`}
-    <td class="r">${l.q1.dias}</td><td class="r">${rs(l.q1.valor)}</td><td class="r">${l.q2.dias}</td><td class="r">${rs(l.q2.valor)}</td><td class="r">${l.mes.dias}</td><td class="r"><b>${rs(l.mes.valor)}</b></td><td class="r">${rs(l.pago.q1 + l.pago.q2)}</td><td class="r" style="color:${s > 0.004 ? 'var(--err)' : s < -0.004 ? 'var(--off)' : 'inherit'};font-weight:700">${rs(s)}</td></tr>`;
+    <td class="r">${l.q1.dias}</td><td class="r">${rs(l.q1.valor)}</td><td class="r">${l.q2.dias}</td><td class="r">${rs(l.q2.valor)}${l.q2.acerto ? `<div class="small muted">${l.q2.acerto > 0 ? '+' : ''}${rs(l.q2.acerto)} acerto</div>` : ''}</td><td class="r">${l.mes.dias}</td><td class="r"><b>${rs(l.mes.valor)}</b></td><td class="r">${rs(l.pago.q1 + l.pago.q2)}</td><td class="r" style="color:${s > 0.004 ? 'var(--err)' : s < -0.004 ? 'var(--off)' : 'inherit'};font-weight:700">${rs(s)}</td></tr>`;
   });
   const sm = k => m.linhas.reduce((a, l) => a + k(l), 0);
   h += `</tbody><tfoot><tr class="vtft"><td colspan="5"><b>TOTAL GERAL DO HOTEL</b></td><td class="r">${sm(l => l.q1.dias)}</td><td class="r"><b>${rs(T.q1)}</b></td><td class="r">${sm(l => l.q2.dias)}</td><td class="r"><b>${rs(T.q2)}</b></td><td class="r">${sm(l => l.mes.dias)}</td><td class="r"><b>${rs(T.mes)}</b></td><td class="r">${rs(T.pago)}</td><td class="r"><b>${rs(saldo)}</b></td></tr></tfoot></table></div>`;
