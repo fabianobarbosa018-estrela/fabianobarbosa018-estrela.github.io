@@ -1083,9 +1083,10 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
    - Cobertura (setor com 2 ou mais): SEMPRE pelo menos 1 trabalhando, todos os dias.
      Terça e quarta (hotel fechado): setor com mais de 2 funcionários tem no máximo 1 trabalhando.
    - Modelo:
-       semana COM domingo: quem folga domingo folga dom+seg+qui; os demais terça+quarta;
+       semana COM domingo: quem folga domingo folga dom+qui; os demais terça+quarta;
        semana SEM domingo: 1 pessoa segunda+terça, 1 pessoa quarta+quinta e as demais terça+quarta.
    - Funcionário de férias em qualquer dia da semana não recebe folgas nela.
+   - Semana com domingo (regra de dezembro): quem folga domingo folga dom+qui (2 folgas, 5 dias seguidos de trabalho); os demais terça+quarta.
    ===================================================================== */
 (function (root) {
   'use strict';
@@ -1096,7 +1097,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     1: { dias: [1, 2], nome: 'Segunda e terça' },
     2: { dias: [2, 3], nome: 'Terça e quarta' },
     3: { dias: [3, 4], nome: 'Quarta e quinta' },
-    4: { dias: [0, 1, 4], nome: 'Domingo, segunda e quinta' }
+    4: { dias: [0, 4], nome: 'Domingo e quinta' }
   };
   var IDX_TER = 2, IDX_QUA = 3;
   var PERMITIDAS = [1, 2, 3, 4];
@@ -1268,7 +1269,7 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
     return 'Setor "' + nomeSetor + '" (' + n + ' funcionários): na ' + x.dia + ' trabalham ' + x.qtd + ' (' + x.nomes.join(', ') + '). Na terça e na quarta o hotel fecha e o setor deve ter no máximo 1 trabalhando.';
   }
   function explicarImpossivel(setor, n, regra, lista, cad, blq, sem) {
-    var msg = 'Setor "' + setor.nome + '" (' + n + ' funcionários): não é possível montar a escala respeitando as regras (combinações seg+ter, ter+qua, qua+qui e dom+seg+qui; sempre pelo menos 1 trabalhando' + (regra === 'reduzida' ? '; no máximo 1 trabalhando na terça e na quarta' : '') + ').';
+    var msg = 'Setor "' + setor.nome + '" (' + n + ' funcionários): não é possível montar a escala respeitando as regras (combinações seg+ter, ter+qua, qua+qui e dom+qui; sempre pelo menos 1 trabalhando' + (regra === 'reduzida' ? '; no máximo 1 trabalhando na terça e na quarta' : '') + ').';
     var rgI = regrasSetor(setor);
     if (rgI.minimo > 1 || rgI.limite !== null || rgI.semFolga.length) msg += ' Regras configuradas no setor: mínimo ' + rgI.minimo + ' trabalhando por dia' + (rgI.limite !== null ? ', máximo ' + rgI.limite + ' de folga por dia' : '') + (rgI.semFolga.length ? ', sem folga na ' + rgI.semFolga.map(function (d) { return DIAS_CURTO[d].toLowerCase(); }).join(' e na ') : '') + '. Ajuste essas regras no cadastro do setor se necessário.';
     var motivos = [];
@@ -1469,10 +1470,10 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
         for (var a = 0; a <= m - d; a++)
           for (var c3 = 0; c3 <= m - d - a; c3++) {
             var b = m - d - a - c3;
-            // terça: qua+qui e dom+seg+qui; quarta: seg+ter e dom+seg+qui; segunda: ter+qua e qua+qui; quinta: seg+ter e ter+qua
+            // terça: qua+qui e dom+qui; quarta: seg+ter e dom+qui; segunda: ter+qua, qua+qui e dom+qui; quinta: seg+ter e ter+qua
             var ter = c3 + d + eTer, qua = a + d + eQua;
             var mTQ = regra === 'reduzida' ? 1 : rg.minimo; // terça e quarta: hotel fechado, no máximo 1 trabalhando
-            if (regra && (ter < mTQ || qua < mTQ || b + c3 + eSeg < rg.minimo || a + b + eQui < rg.minimo)) continue;
+            if (regra && (ter < mTQ || qua < mTQ || b + c3 + d + eSeg < rg.minimo || a + b + eQui < rg.minimo)) continue;
             if (regra === 'reduzida' && (ter > 1 || qua > 1)) continue;
             if (!cabeFolgasPadrao(rg, { 1: a, 2: b, 3: c3, 4: d })) continue; // limite de folga por dia / dias sem folga
             var pen = d ? 0 : 50000; // preferir que haja folga de domingo (rodízio)
@@ -1573,14 +1574,13 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       // 2) combinação permitida
       if (PERMITIDAS.indexOf(a.g) < 0) { erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ': combinação de folgas não permitida. Use apenas segunda e terça, terça e quarta, quarta e quinta, ou domingo, segunda e quinta.' }); return; }
       var folga = folgasDoGrupo(a.g);
-      // 3) quantidade de folgas: 2 (seg+ter, ter+qua, qua+qui); a semana do domingo tem dom+seg+qui
+      // 3) quantidade de folgas: 2 (seg+ter, ter+qua, qua+qui ou dom+qui)
       var n = folga.filter(Boolean).length, esperado = GRUPOS[a.g].dias.length;
       if (n !== esperado) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ' tem ' + n + ' folgas na semana (a combinação ' + a.g + ' tem ' + esperado + ').' });
       // 4) sexta e sábado
       DIAS_PROIBIDOS.forEach(function (d) { if (folga[d]) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ' está de folga na ' + DIAS[d].toLowerCase() + ', o que é proibido.' }); });
       // 5) domingo => quinta
       if (folga[IDX_DOMINGO] && !folga[IDX_QUINTA]) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ' folga no domingo, mas não folga na quinta-feira.' });
-      if (folga[IDX_DOMINGO] && !folga[1]) erros.push({ setor: nomeSetor(sid), funcId: id, msg: nome + ' folga no domingo, mas não folga na segunda-feira.' });
       if (folga[IDX_DOMINGO]) (domPorSetor[sid] = domPorSetor[sid] || []).push(nome);
       var t = trabPorSetorDia[sid] = trabPorSetorDia[sid] || [0, 0, 0, 0, 0, 0, 0];
       folga.forEach(function (fo, d) { if (!fo) t[d]++; });
