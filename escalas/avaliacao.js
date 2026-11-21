@@ -1,7 +1,7 @@
 /* ===================== AVALIAÇÃO DE FUNCIONÁRIOS =====================
    Aba separada do vale-transporte. Quem tem a permissão "avaliacao" registra ocorrências
    negativas e vê a lista de registros SEM autoria dos colegas.
-   Só o administrador vê quem registrou e a pontuação/ranking (para a bonificação).
+   Só o administrador vê quem registrou, a pontuação e o ranking (para a bonificação).
    Quem manda é o servidor (sql/avaliacao.sql): esta tela só mostra o que o servidor entrega. */
 (function () {
   const TIPOS = [
@@ -17,8 +17,7 @@
   const mesAgora = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Recife' }).slice(0, 7);
   const dataHora = (iso) => {
     if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
   const mesNome = (ym) => {
     const [y, m] = ym.split('-').map(Number);
@@ -67,12 +66,11 @@
     }
   }
   window.avCarregar = avCarregar;
-  window.avPrecisaCarregar = () => !AV.carregado && !AV.carregando;
 
-  // Pontuação do mês (admin): começa com 100, desconta cada registro, nunca abaixo de zero
+  // Pontuação do mês (admin): começa com 100, desconta cada registro, nunca abaixo de zero.
+  // Entram todos os funcionários ativos, com ou sem registro.
   function rankingDoMes(mes) {
-    const ativos = AV.func;
-    const porFunc = Object.fromEntries(ativos.map((f) => [f.id, { id: f.id, nome: f.nome, setorId: f.setorId, qtd: 0, descontos: 0 }]));
+    const porFunc = Object.fromEntries(AV.func.map((f) => [f.id, { id: f.id, nome: f.nome, setorId: f.setorId, qtd: 0, descontos: 0 }]));
     AV.registros.filter((r) => (r.ocorrido || '').slice(0, 7) === mes).forEach((r) => {
       const p = porFunc[r.funcionarioId];
       if (!p) return;
@@ -119,7 +117,7 @@
   function tabelaRegistros() {
     const linhas = AV.registros.slice().sort((a, b) => (b.ocorrido || '').localeCompare(a.ocorrido || '')).slice(0, 300);
     if (!linhas.length) return '<p class="small muted">Nenhum registro ainda.</p>';
-    return `<div class="tbl-wrap" style="overflow-x:auto"><table class="tbl"><thead><tr>
+    return `<div class="tw"><table><thead><tr>
         <th>Ocorrido em</th><th>Funcionário</th><th>Setor</th><th>Tipo</th><th>Descrição</th>${soAdmin() ? '<th>Registrado por</th>' : ''}
       </tr></thead><tbody>${linhas.map((r) => `<tr>
         <td>${esc(dataHora(r.ocorrido))}</td>
@@ -131,25 +129,56 @@
       </tr>`).join('')}</tbody></table></div>`;
   }
 
+  // Uma linha do ranking: posição, nome, barra de pontuação e nota final
+  function linhaRanking(p) {
+    const cor = p.final >= 80 ? 'var(--ok)' : p.final >= 50 ? 'var(--warn)' : 'var(--err)';
+    const primeiro = p.posicao === 1;
+    const detalhe = `${esc(nomeSetor(p.setorId))} · ${p.qtd} ${p.qtd === 1 ? 'registro' : 'registros'}${p.descontoAplicado ? ' · −' + p.descontoAplicado : ''}`;
+    return `<div style="display:grid;grid-template-columns:40px minmax(0,1fr) minmax(90px,200px) 56px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);${primeiro ? 'background:var(--ok-bg)' : ''}">
+      <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:${primeiro ? 'var(--ok)' : '#f3f4f6'};color:${primeiro ? '#fff' : 'var(--ink2)'}">${p.posicao}</div>
+      <div style="min-width:0">
+        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.nome)}</div>
+        <div class="small muted">${detalhe}</div>
+      </div>
+      <div style="height:10px;background:#f3f4f6;border-radius:999px;overflow:hidden"><div style="height:100%;width:${p.final}%;background:${cor};border-radius:999px"></div></div>
+      <div style="text-align:right;font-size:18px;font-weight:700">${p.final}</div>
+    </div>`;
+  }
+
   function painelAdmin() {
     const mes = AV.mes || mesAgora();
+    const atual = mes === mesAgora();
     const lista = rankingDoMes(mes);
-    const destaques = lista.filter((p) => p.posicao === 1 && p.qtd > 0);
+    const lider = lista.filter((p) => p.posicao === 1);
+    const totalOc = lista.reduce((s, p) => s + p.qtd, 0);
+    const comOc = lista.filter((p) => p.qtd > 0).length;
+    const media = lista.length ? Math.round(lista.reduce((s, p) => s + p.final, 0) / lista.length) : 0;
+    const cabecalho = lider.length
+      ? `<div style="font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--ok);font-weight:700">${atual ? 'Em primeiro lugar até agora' : 'Destaque de ' + esc(mesNome(mes))}</div>
+         <div style="font-size:22px;font-weight:700;margin-top:4px">${lider.map((p) => esc(p.nome)).join(' e ')}</div>
+         <div class="small muted" style="margin-top:2px">${lider[0].final} pontos${lider.length > 1 ? ' · empate na primeira posição' : ''}${atual ? ' · a posição muda com novos registros' : ''}</div>`
+      : '<div class="muted">Nenhum funcionário cadastrado.</div>';
+    const kpi = (rotulo, valor, detalhe) => `<div class="card" style="padding:14px">
+        <div class="small muted">${rotulo}</div>
+        <div style="font-size:22px;font-weight:700;margin-top:2px">${valor}</div>
+        <div class="small muted">${detalhe}</div></div>`;
     return `
-      <div class="small muted" style="margin-bottom:10px">Pontuação começa em ${INICIAL} todo mês. Os descontos são automáticos e a pontuação nunca fica abaixo de zero. Os gerentes não veem esta parte.</div>
-      <div class="fld" style="max-width:260px;margin-bottom:12px"><label class="f">Mês</label>
-        <input type="month" id="avMes" value="${esc(mes)}" data-av="mes" /></div>
-      <div class="card" style="padding:14px;margin-bottom:12px">
-        <b>Funcionário destaque de ${esc(mesNome(mes))}</b>
-        <div style="margin-top:6px">${destaques.length ? destaques.map((d) => `<span class="pill">${esc(d.nome)} · ${d.final} pontos</span>`).join(' ') : '<span class="small muted">Sem ocorrências neste mês (todos com 100).</span>'}</div>
-        ${destaques.length > 1 ? '<div class="small muted" style="margin-top:6px">Empate na primeira posição.</div>' : ''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div class="fld" style="max-width:220px;margin:0"><label class="f">Mês</label>
+          <input type="month" id="avMes" value="${esc(mes)}" data-av="mes" /></div>
+        <div class="small muted">Pontuação começa em ${INICIAL}. Só o administrador vê esta parte.</div>
       </div>
-      <div class="tbl-wrap" style="overflow-x:auto;margin-bottom:14px"><table class="tbl"><thead><tr>
-        <th>Posição</th><th>Funcionário</th><th>Setor</th><th>Registros</th><th>Descontos</th><th>Pontuação final</th>
-      </tr></thead><tbody>${lista.map((p) => `<tr>
-        <td>${p.posicao}º</td><td>${esc(p.nome)}</td><td>${esc(nomeSetor(p.setorId))}</td>
-        <td>${p.qtd}</td><td>−${p.descontoAplicado}</td><td><b>${p.final}</b></td>
-      </tr>`).join('')}</tbody></table></div>`;
+      <div class="card" style="padding:18px;margin-bottom:14px;border-left:4px solid var(--ok)">${cabecalho}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
+        ${kpi('Funcionários', lista.length, 'ativos no sistema')}
+        ${kpi('Com ocorrências', comOc, 'no mês')}
+        ${kpi('Ocorrências', totalOc, 'registradas no mês')}
+        ${kpi('Média', media, 'pontos')}
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--line);font-weight:700">Ranking do mês</div>
+        ${lista.length ? lista.map(linhaRanking).join('') : '<div class="muted" style="padding:16px">Sem funcionários.</div>'}
+      </div>`;
   }
 
   window.vAvaliacao = function () {
@@ -164,7 +193,7 @@
       ? [['registrar', 'Registrar'], ['registros', 'Registros'], ['ranking', 'Ranking e bonificação']]
       : [['registrar', 'Registrar'], ['registros', 'Registros']];
     const aba = abas.some((a) => a[0] === AV.aba) ? AV.aba : 'registrar';
-    const msg = AV.msg ? `<div class="alert ${AV.msgErro ? 'e' : 'ok'}" style="margin-bottom:12px"><span class="ic">${AV.msgErro ? '!' : '✓'}</span><div>${esc(AV.msg)}</div></div>` : '';
+    const msg = AV.msg ? `<div class="alert ${AV.msgErro ? 'e' : 's'}" style="margin-bottom:12px">${esc(AV.msg)}</div>` : '';
     const conteudo = aba === 'registrar' ? formularioRegistro()
       : aba === 'registros' ? tabelaRegistros()
       : painelAdmin();
@@ -176,7 +205,7 @@
   };
 
   // Cliques e envios da aba (delegação: não mexe no restante do sistema)
-  document.addEventListener('click', async (ev) => {
+  document.addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-av]');
     if (!b) return;
     const acao = b.dataset.av;
@@ -205,8 +234,7 @@
     if (dados.descricao.length < 10) { erro.textContent = 'A descrição precisa ter pelo menos 10 caracteres.'; return; }
     AV.enviando = true; erro.textContent = ''; render();
     try {
-      const id = novoUuid();
-      await Nuvem.rpc('esc_avaliacao_salvar', { p_id: id, p_dados: dados });
+      await Nuvem.rpc('esc_avaliacao_salvar', { p_id: novoUuid(), p_dados: dados });
       AV.msg = 'Ocorrência registrada.'; AV.msgErro = false;
       AV.enviando = false;
       AV.carregado = false;
