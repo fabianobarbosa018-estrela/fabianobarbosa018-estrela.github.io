@@ -1932,7 +1932,8 @@ const PERMS = [
   ['escala', 'Escala mensal', 'Criar, gerar e editar a escala e enviar para a sua aprovação. Não aprova nem altera escala aprovada.'],
   ['servicos', 'Serviços prestados', 'Lançar serviços, cadastrar prestadores e valores, extras, descontos, lotes e pagamentos.'],
   ['diarias', 'Controle de diárias', 'Ver os diaristas, marcar os dias trabalhados e copiar o controle.'],
-  ['vt', 'Vale-transporte', 'Lançar e consultar o vale-transporte: controle diário, fechamentos e pagamentos.']
+  ['vt', 'Vale-transporte', 'Lançar e consultar o vale-transporte: controle diário, fechamentos e pagamentos.'],
+  ['avaliacao', 'Avaliação', 'Registrar ocorrências negativas dos funcionários. Não vê pontuação, ranking nem quem registrou.']
 ];
 const ehAdmin = () => S.papel !== 'restrito';
 const pode = k => ehAdmin() || !!(S.perms && S.perms[k]);
@@ -1941,14 +1942,15 @@ const ACOES_PERM = {
   escala: [['criar', 'Gerar e criar'], ['editar', 'Editar rascunho'], ['enviar', 'Enviar para aprovação'], ['aprovar', 'Aprovar e alterar escala publicada']],
   servicos: [['criar', 'Lançar'], ['editar', 'Editar lançamentos'], ['excluir', 'Excluir registros'], ['pagamentos', 'Pagamentos e fechamentos']],
   diarias: [['criar', 'Marcar dias'], ['editar', 'Alterar e desmarcar'], ['excluir', 'Excluir registros'], ['pagamentos', 'Pagamentos e fechamentos']],
-  vt: [['criar', 'Lançar'], ['editar', 'Editar lançamentos'], ['excluir', 'Excluir registros'], ['pagamentos', 'Fechamentos e pagamentos']]
+  vt: [['criar', 'Lançar'], ['editar', 'Editar lançamentos'], ['excluir', 'Excluir registros'], ['pagamentos', 'Fechamentos e pagamentos']],
+  avaliacao: [['criar', 'Registrar ocorrência'], ['editar', 'Editar registros'], ['excluir', 'Excluir registros']]
 };
-const MOD_NOME = { escala: 'Escala', servicos: 'Serviços prestados', diarias: 'Controle de diárias', vt: 'Vale-transporte', contratos: 'Contratos', orcamentos: 'Orçamentos', usuarios: 'Usuários', conta: 'Conta', funcionarios: 'Funcionários', setores: 'Setores', config: 'Configurações', atestados: 'Atestados', auditoria: 'Histórico' };
+const MOD_NOME = { escala: 'Escala', servicos: 'Serviços prestados', diarias: 'Controle de diárias', vt: 'Vale-transporte', contratos: 'Contratos', orcamentos: 'Orçamentos', usuarios: 'Usuários', conta: 'Conta', funcionarios: 'Funcionários', setores: 'Setores', config: 'Configurações', atestados: 'Atestados', auditoria: 'Histórico', avaliacao: 'Avaliação' };
 const ACAO_NOME = { ver: 'acessar', criar: 'criar/lançar', editar: 'editar', excluir: 'excluir', enviar: 'enviar para aprovação', aprovar: 'aprovar', pagamentos: 'mexer em pagamentos e fechamentos' };
 const podeAcao = (m, a) => ehAdmin() || !!(S.perms && S.perms[m] && S.perms.acoes && S.perms.acoes[m] && S.perms.acoes[m][a]);
-const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], conta: [] };
+const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], avaliacao: ['avaliacao'], conta: [] };
 const rotaPermitida = r => ehAdmin() ? (r !== 'conta' && (r !== 'usuarios' || S.modo === 'nuvem')) : (r in ROTA_PERM) && (!ROTA_PERM[r].length || ROTA_PERM[r].some(pode));
-const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt'].find(rotaPermitida) || 'conta');
+const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt', 'avaliacao'].find(rotaPermitida) || 'conta');
 function aplicarPerfil(p) {
   const antes = JSON.stringify([S.papel, S.perms, S.usuarioNome, S.usuarioLogin]);
   S.papel = p && p.papel === 'restrito' ? 'restrito' : 'admin';
@@ -2329,6 +2331,7 @@ function atualizarStatus() {
 const ICON = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   users: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',
+  avaliacao: '<path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v3h8V3"/>',
   bus: '<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 18v3M16 18v3"/>',
   wallet: '<path d="M20 7H5a2 2 0 010-4h13v4"/><path d="M3 5v14a2 2 0 002 2h15V7"/><circle cx="17" cy="14" r="1"/>',
   painel: '<path d="M3 13h8V3H3zM13 21h8v-8h-8zM3 21h8v-6H3zM13 3v8h8V3z"/>',
@@ -2363,7 +2366,7 @@ const ICON = {
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['avaliacao', 'Avaliação'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -3278,7 +3281,7 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'avaliacao', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
@@ -3296,7 +3299,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -3578,6 +3581,7 @@ function vPainel() {
     ehAdmin() && ['#funcionarios', ico.users, 'Funcionários'],
     (pode('servicos') || pode('diarias')) && ['#servicos', ico.dollar, 'Serviços'],
     pode('vt') && ['#vt', ico.work, 'Vale-transp.'],
+    pode('avaliacao') && ['#avaliacao', ico.users, 'Avaliação'],
     ehAdmin() && ['#orcamentos', ic('orcamentos'), 'Orçamentos']
   ].filter(Boolean);
   const al = ehAdmin() ? alertasGerais() : [];
@@ -5816,5 +5820,6 @@ Store.init();
 <script src="atestados.js?v=1811b"></script>
 <script src="modulos.js?v=2"></script>
 <script src="rh.js?v=1811m"></script>
+<script src="avaliacao.js?v=1"></script>
 </body>
 </html>
