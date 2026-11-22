@@ -167,4 +167,57 @@ begin
           jsonb_build_object('fora_ranking', p_fora, 'nome', v_nome), 'ok');
 end $function$;
 
+-- ---------- 7. destaque mensal: registro com sorteio no servidor ----------
+alter table esc_docs drop constraint if exists esc_docs_colecao_check;
+alter table esc_docs add constraint esc_docs_colecao_check check (colecao in (
+  'setores','funcionarios','escalas','auditoria','config','vt','envios','prestadores',
+  'servicos','orcamentos','orcCatalogo','rh','rh_docs','despesas','avaliacoes','destaques'));
+
+create or replace function esc_avaliacao_destaque_gravar(p_token text, p_mes text, p_candidatos text[], p_criterio text) returns jsonb
+language plpgsql security definer set search_path to 'public', 'extensions'
+as $function$
+declare v_escolhido text; v_nome text; v_setorid text; v_setor text; v_crit text; v_dados jsonb; v_n int;
+begin
+  perform esc__so_admin(p_token);
+  if p_mes is null or p_mes !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then raise exception 'DADOS_INVALIDOS' using errcode = 'P0001'; end if;
+  if p_mes >= to_char(now() at time zone 'America/Recife', 'YYYY-MM') then raise exception 'MES_EM_ANDAMENTO' using errcode = 'P0001'; end if;
+  if exists (select 1 from esc_docs where colecao = 'destaques' and id = p_mes and not apagado) then raise exception 'JA_REGISTRADA' using errcode = 'P0001'; end if;
+  v_n := coalesce(array_length(p_candidatos, 1), 0);
+  if v_n = 0 then raise exception 'DADOS_INVALIDOS' using errcode = 'P0001'; end if;
+  if p_criterio not in ('pontuacao', 'menos_ocorrencias', 'tempo_sem_premio', 'sorteio') then raise exception 'DADOS_INVALIDOS' using errcode = 'P0001'; end if;
+  if exists (select 1 from unnest(p_candidatos) c where not exists (
+      select 1 from esc_docs d where d.colecao = 'funcionarios' and d.id = c and not d.apagado
+        and coalesce((d.dados ->> 'ativo')::boolean, true))) then
+    raise exception 'FUNCIONARIO_INVALIDO' using errcode = 'P0001';
+  end if;
+  if v_n > 1 then
+    v_escolhido := p_candidatos[1 + floor(random() * v_n)::int];
+    v_crit := 'sorteio';
+  else
+    v_escolhido := p_candidatos[1];
+    v_crit := p_criterio;
+  end if;
+  select d.dados ->> 'nome', d.dados ->> 'setorId' into v_nome, v_setorid
+    from esc_docs d where d.colecao = 'funcionarios' and d.id = v_escolhido;
+  select s.dados ->> 'nome' into v_setor from esc_docs s where s.colecao = 'setores' and s.id = v_setorid;
+  v_dados := jsonb_build_object('mes', p_mes, 'vencedorId', v_escolhido, 'vencedorNome', v_nome,
+    'setorNome', coalesce(v_setor, '—'), 'criterio', v_crit, 'candidatos', to_jsonb(p_candidatos),
+    'registradoEm', to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') || 'Z',
+    'registradoPor', 'Administrador');
+  insert into esc_docs(colecao, id, dados, apagado, atualizado_em, atualizado_por)
+  values ('destaques', p_mes, v_dados, false, clock_timestamp(), 'Administrador');
+  insert into esc_log(quem, acao, colecao, doc_id, modulo, operacao, antes, depois, resultado)
+  values ('Administrador', 'salvar', 'destaques', p_mes, 'avaliacao', 'destaque', null, v_dados, 'ok');
+  return v_dados;
+end $function$;
+
+create or replace function esc_avaliacao_destaques_ler(p_token text) returns jsonb
+language plpgsql security definer set search_path to 'public', 'extensions'
+as $function$
+begin
+  perform esc__so_admin(p_token);
+  return coalesce((select jsonb_agg(d.dados order by d.id desc) from esc_docs d
+                    where d.colecao = 'destaques' and not d.apagado), '[]'::jsonb);
+end $function$;
+
 commit;

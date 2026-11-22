@@ -14,7 +14,7 @@
   ];
   const TIPO = Object.fromEntries(TIPOS.map((t) => [t.id, t]));
   const INICIAL = 100;
-  const AV = { carregado: false, carregando: false, erro: null, func: [], setores: [], registros: [], mes: null, aba: 'registrar', msg: null, msgErro: false, enviando: false };
+  const AV = { carregado: false, carregando: false, erro: null, func: [], setores: [], registros: [], mes: null, aba: 'registrar', msg: null, msgErro: false, enviando: false, destaques: [] };
 
   const ICONE = {
     registrar: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
@@ -55,6 +55,7 @@
     if (/SESSAO_INVALIDA/.test(m)) return 'Sua sessão expirou. Entre de novo.';
     if (/SEM_CONEXAO/.test(m)) return 'Sem conexão com a internet. Tente de novo.';
     if (/FOTO_INVALIDA/.test(m)) return 'Não foi possível usar esta foto. Tente outra.';
+    if (/MES_EM_ANDAMENTO/.test(m)) return 'O destaque só pode ser registrado depois que o mês fechar.';
     return 'Não foi possível concluir. Tente de novo.';
   }
 
@@ -177,6 +178,8 @@
       AV.func = (f && f.funcionarios) || [];
       AV.setores = (f && f.setores) || [];
       AV.registros = ((r && r.registros) || []).map((x) => Object.assign({ id: x.i }, x.d));
+      AV.destaques = soAdmin() ? await Nuvem.rpc('esc_avaliacao_destaques_ler', {}) : [];
+      AV.destaques = Array.isArray(AV.destaques) ? AV.destaques : [];
       AV.carregado = true;
     } catch (e) {
       AV.erro = erroAmigavel(e);
@@ -366,6 +369,93 @@
     </div>`;
   }
 
+  // Texto do critério usado no destaque (tela e impressão para todos)
+  function criterioTexto(c) {
+    return { pontuacao: 'Maior pontuação do mês', menos_ocorrencias: 'Empate resolvido pelo menor número de ocorrências', tempo_sem_premio: 'Empate resolvido por quem recebeu o destaque há mais tempo', sorteio: 'Empate resolvido por sorteio entre os empatados' }[c] || c;
+  }
+
+  // Desempate em três passos: menos ocorrências, quem recebeu o destaque há mais tempo, sorteio
+  function escolherDestaque(lista) {
+    const topo = lista.filter((p) => p.posicao === 1);
+    if (!topo.length) return null;
+    if (topo.length === 1) return { candidatos: [topo[0].id], criterio: 'pontuacao' };
+    const minQ = Math.min(...topo.map((p) => p.qtd));
+    const c = topo.filter((p) => p.qtd === minQ);
+    if (c.length === 1) return { candidatos: [c[0].id], criterio: 'menos_ocorrencias' };
+    const ultimo = {};
+    AV.destaques.forEach((d) => { if (!ultimo[d.vencedorId] || d.mes > ultimo[d.vencedorId]) ultimo[d.vencedorId] = d.mes; });
+    const dataDe = (p) => ultimo[p.id] || '';
+    const menor = c.map(dataDe).reduce((a, b) => (a < b ? a : b));
+    const c2 = c.filter((p) => dataDe(p) === menor);
+    if (c2.length === 1) return { candidatos: [c2[0].id], criterio: 'tempo_sem_premio' };
+    return { candidatos: c2.map((p) => p.id), criterio: 'sorteio' };
+  }
+
+  function nomeCurtoDe(id, nomeReserva) {
+    const f = AV.func.find((x) => x.id === id) || { nome: nomeReserva || '' };
+    return nomesCurtos(AV.func)(f);
+  }
+
+  function blocoDestaque(mes, lista) {
+    const reg = AV.destaques.find((d) => d.mes === mes);
+    const rotulo = `<div class="small muted" style="text-transform:uppercase;letter-spacing:.5px;font-weight:700">Destaque de ${esc(mesNome(mes))}</div>`;
+    const historico = AV.destaques.slice(0, 6).map((d) => `<li>${esc(mesNome(d.mes))}: ${esc(nomeCurtoDe(d.vencedorId, d.vencedorNome))} · ${esc(criterioTexto(d.criterio))}</li>`).join('');
+    const rodape = AV.destaques.length ? `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><div class="small muted" style="font-weight:700;margin-bottom:6px">Histórico</div><ul style="margin:0;padding-left:18px;font-size:13px">${historico}</ul></div>` : '';
+    let corpo;
+    if (reg) {
+      corpo = `${rotulo}
+        <div style="font-size:20px;font-weight:700;color:#0f4c5c;margin-top:4px">${esc(nomeCurtoDe(reg.vencedorId, reg.vencedorNome))}</div>
+        <div class="small muted" style="margin-top:2px">${esc(reg.setorNome || '')} · ${esc(criterioTexto(reg.criterio))}</div>
+        <div style="margin-top:12px"><button class="btn" type="button" data-av="imprimir-destaque" data-mes="${esc(mes)}">Imprimir destaque (para todos)</button></div>`;
+    } else if (mes >= mesAgora()) {
+      corpo = `${rotulo}<div class="muted" style="margin-top:6px">Será registrado depois que o mês fechar.</div>`;
+    } else {
+      const escolhido = escolherDestaque(lista);
+      if (!escolhido) {
+        corpo = '<div class="muted">Sem funcionários para definir o destaque.</div>';
+      } else {
+        const nomes = escolhido.candidatos.map((id) => nomeCurtoDe(id)).join(' e ');
+        corpo = `${rotulo}
+          <div style="font-size:18px;font-weight:700;margin-top:4px">${esc(nomes)}</div>
+          <div class="small muted" style="margin-top:2px">${esc(criterioTexto(escolhido.criterio))}</div>
+          <div style="margin-top:12px"><button class="btn" type="button" data-av="registrar-destaque" data-mes="${esc(mes)}">Registrar destaque do mês</button></div>
+          <div class="small muted" style="margin-top:6px">Depois de registrado, o destaque não pode ser alterado.</div>`;
+      }
+    }
+    return `<section class="av-cartao" style="margin-bottom:14px;border-left:5px solid #0f4c5c">${corpo}${rodape}</section>`;
+  }
+
+  // Folha para todos: só o funcionário do mês, sem pontos e sem ranking
+  function imprimirDestaque(mes) {
+    const reg = AV.destaques.find((d) => d.mes === mes);
+    if (!reg) return;
+    const logo = new URL('logo.png', location.href).href;
+    const nome = nomeCurtoDe(reg.vencedorId, reg.vencedorNome);
+    const estilo = `body{margin:0;font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}
+      .barra{padding:12px;display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid #e5e7eb}
+      .barra button{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid #0f4c5c;background:#0f4c5c;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+      .barra button+button{background:#fff;color:#0f4c5c}
+      .folha{padding:24px;text-align:center;border:6px double #e9a23b;margin:16px;min-height:80vh;display:flex;flex-direction:column;justify-content:center;align-items:center}
+      .folha img{height:90px;width:auto;margin-bottom:12px}
+      .rot{font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#a16207;font-weight:700}
+      .nome{font-size:44px;font-weight:800;color:#0f4c5c;margin:14px 0 6px}
+      .det{font-size:16px;color:#4b5563}
+      .crit{font-size:13px;color:#6b7280;margin-top:18px}
+      @media print{.barra{display:none}.folha{margin:0;border-width:4px}@page{size:A4 portrait;margin:14mm}}`;
+    const corpo = `<div class="folha"><img src="${logo}" alt="Hotel Fazenda Oásis">
+      <div class="rot">Funcionário destaque de ${esc(mesNome(mes))}</div>
+      <div class="nome">${esc(nome)}</div>
+      <div class="det">${esc(reg.setorNome || '')}</div>
+      <div class="crit">${esc(criterioTexto(reg.criterio))}</div>
+      <div class="crit" style="margin-top:6px">Hotel Fazenda Oásis</div></div>`;
+    const pagina = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Funcionário destaque</title><style>${estilo}</style></head><body><div class="barra"><button onclick="window.print()">Imprimir ou salvar PDF</button><button onclick="window.close()">Fechar</button></div>${corpo}</body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) { AV.msg = 'O navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.'; AV.msgErro = true; render(); return; }
+    win.document.open();
+    win.document.write(pagina);
+    win.document.close();
+  }
+
   function painelAdmin() {
     const mes = AV.mes || mesAgora();
     const atual = mes === mesAgora();
@@ -389,6 +479,7 @@
           <input id="avMes" type="month" value="${esc(mes)}" data-av="mes" /></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" type="button" data-av="imprimir">Imprimir resultado</button><div class="small muted">Pontuação começa em ${INICIAL}. Só o administrador vê esta parte.</div></div>
       </div>
+      ${blocoDestaque(mes, lista)}
       ${topo}
       <div class="av-kpis">
         ${kpi('Funcionários', lista.length, 'ativos no sistema')}
@@ -499,6 +590,16 @@
     if (acao === 'ver-todos') { AV.verTodos = !AV.verTodos; render(); }
     if (acao === 'foto-remover') { AV.foto = null; const box = document.getElementById('avFotoBox'); if (box) box.innerHTML = previewFoto(); }
     if (acao === 'imprimir' && soAdmin()) imprimirResultado();
+    if (acao === 'imprimir-destaque' && soAdmin()) imprimirDestaque(b.dataset.mes);
+    if (acao === 'registrar-destaque' && soAdmin()) {
+      const mes = b.dataset.mes;
+      const escolhido = escolherDestaque(rankingDoMes(mes));
+      if (!escolhido || !window.confirm('Registrar o destaque deste mês? Depois de registrado, não pode ser alterado.')) return;
+      b.disabled = true;
+      Nuvem.rpc('esc_avaliacao_destaque_gravar', { p_mes: mes, p_candidatos: escolhido.candidatos, p_criterio: escolhido.criterio })
+        .then(() => avCarregar())
+        .catch((e) => { AV.msg = erroAmigavel(e); AV.msgErro = true; render(); });
+    }
   });
 
   document.addEventListener('change', (ev) => {
