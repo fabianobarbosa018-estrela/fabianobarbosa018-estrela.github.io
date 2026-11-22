@@ -197,6 +197,17 @@
     return lista;
   }
 
+  // Nome curto para o ranking: primeiro nome, com a inicial do sobrenome só se houver repetição
+  function nomesCurtos(lista) {
+    const cont = {};
+    lista.forEach((p) => { const f = p.nome.trim().split(/\s+/)[0]; cont[f] = (cont[f] || 0) + 1; });
+    return (p) => {
+      const partes = p.nome.trim().split(/\s+/);
+      if (cont[partes[0]] > 1 && partes.length > 1) return partes[0] + ' ' + partes[partes.length - 1][0] + '.';
+      return partes[0];
+    };
+  }
+
   function nomeSetor(id) {
     const s = AV.setores.find((x) => x.id === id);
     return s ? s.nome : '—';
@@ -269,12 +280,12 @@
   }
 
   // Uma linha do ranking: posição, nome, barra de pontuação e nota final
-  function linhaRanking(p) {
+  function linhaRanking(p, curto) {
     const cor = p.final >= 80 ? '#15803d' : p.final >= 50 ? '#a16207' : '#b91c1c';
     const detalhe = `${esc(nomeSetor(p.setorId))} · ${p.qtd} ${p.qtd === 1 ? 'registro' : 'registros'}${p.descontoAplicado ? ' · −' + p.descontoAplicado : ''}`;
     return `<div class="av-rk${p.posicao === 1 ? ' primeiro' : ''}">
       <div class="av-pos">${p.posicao}</div>
-      <div style="min-width:0"><div class="av-rk-nome">${esc(p.nome)}</div><div class="av-rk-det">${detalhe}</div></div>
+      <div style="min-width:0"><div class="av-rk-nome">${esc(curto(p))}</div><div class="av-rk-det">${detalhe}</div></div>
       <div class="av-nota">${p.final}</div>
       <div class="av-barra"><i style="width:${p.final}%;background:${cor}"></i></div>
     </div>`;
@@ -286,13 +297,14 @@
     const lista = rankingDoMes(mes);
     const lider = lista.filter((p) => p.posicao === 1);
     const visiveis = AV.verTodos ? lista : lista.slice(0, 3);
+    const curto = nomesCurtos(lista);
     const totalOc = lista.reduce((s, p) => s + p.qtd, 0);
     const comOc = lista.filter((p) => p.qtd > 0).length;
     const media = lista.length ? Math.round(lista.reduce((s, p) => s + p.final, 0) / lista.length) : 0;
     const todosEmpatados = lista.length > 0 && lider.length === lista.length;
     const topo = lider.length && !todosEmpatados
       ? `<div class="av-lider"><div class="rot">${atual ? 'Em primeiro lugar até agora' : 'Destaque de ' + esc(mesNome(mes))}</div>
-         <div class="nome">${lider.length > 3 ? lider.length + ' funcionários empatados' : lider.map((p) => esc(p.nome)).join(' e ')}</div>
+         <div class="nome">${lider.length > 3 ? lider.length + ' funcionários empatados' : lider.map((p) => esc(curto(p))).join(' e ')}</div>
          <div class="det">${lider[0].final} pontos${lider.length > 1 ? ' · empate na primeira posição' : ''}${atual ? ' · a posição muda com novos registros' : ''}</div></div>`
       : (lista.length ? '' : '<div class="av-cartao av-vazio">Nenhum funcionário cadastrado.</div>');
     const kpi = (rotulo, valor, detalhe) => `<div class="av-kpi"><span>${rotulo}</span><b>${valor}</b><small>${detalhe}</small></div>`;
@@ -311,7 +323,7 @@
       </div>
       <section class="av-painel">
         <div class="av-painel-top"><b>Ranking do mês</b><span class="small muted">${lista.length} funcionários</span></div>
-        ${lista.length ? visiveis.map(linhaRanking).join('') + (lista.length > 3 ? `<div style="padding:12px 16px;text-align:center"><button class="btn ghost" type="button" data-av="ver-todos">${AV.verTodos ? 'Mostrar só os 3 primeiros' : 'Ver todos os ' + lista.length}</button></div>` : '') : '<div class="av-vazio">Sem funcionários.</div>'}
+        ${lista.length ? visiveis.map((p) => linhaRanking(p, curto)).join('') + (lista.length > 3 ? `<div style="padding:12px 16px;text-align:center"><button class="btn ghost" type="button" data-av="ver-todos">${AV.verTodos ? 'Mostrar só os 3 primeiros' : 'Ver todos os ' + lista.length}</button></div>` : '') : '<div class="av-vazio">Sem funcionários.</div>'}
       </section>
       <p class="av-rodape">A pontuação é calculada automaticamente. Os gerentes não veem esta parte.</p>`;
   }
