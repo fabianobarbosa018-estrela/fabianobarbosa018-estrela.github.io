@@ -302,7 +302,8 @@
   }
 
   function formularioRegistro() {
-    const opcFunc = AV.func.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    // Quem está marcado como fora do ranking não aparece para escolha (pode ser devolvido na aba Ranking)
+    const opcFunc = AV.func.filter((f) => !f.foraRanking).slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       .map((f) => `<option value="${esc(f.id)}">${esc(f.nome)} · ${esc(nomeSetor(f.setorId))}</option>`).join('');
     const opcTipo = TIPOS.map((t) => `<option value="${t.id}">${esc(t.nome)}</option>`).join('');
     return `
