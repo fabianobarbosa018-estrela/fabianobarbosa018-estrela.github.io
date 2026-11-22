@@ -336,6 +336,14 @@
         <div class="av-painel-top"><b>Ranking do mês</b><span class="small muted">${lista.length} funcionários</span></div>
         ${lista.length ? visiveis.map((p) => linhaRanking(p, curto)).join('') + (lista.length > 3 ? `<div style="padding:12px 16px;text-align:center"><button class="btn ghost" type="button" data-av="ver-todos">${AV.verTodos ? 'Mostrar só os 3 primeiros' : 'Ver todos os ' + lista.length}</button></div>` : '') : '<div class="av-vazio">Sem funcionários.</div>'}
       </section>
+      <section class="av-painel" style="margin-top:14px">
+        <div class="av-painel-top"><b>Participação no ranking</b><span class="small muted">${AV.func.filter((f) => !f.foraRanking).length} de ${AV.func.length} participam</span></div>
+        ${AV.func.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((f) => `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f1f3f5;cursor:pointer;margin:0">
+          <input type="checkbox" data-av="participa" data-id="${esc(f.id)}" ${f.foraRanking ? '' : 'checked'} style="width:20px;height:20px;accent-color:#0f4c5c;flex:none">
+          <span style="flex:1;min-width:0;font-weight:600">${esc(nomesCurtos(AV.func)(f))}</span>
+          <span class="small muted">${esc(nomeSetor(f.setorId))}</span></label>`).join('')}
+        <p class="av-rodape" style="padding:12px 16px 14px;margin:0">Desmarque para tirar do ranking e da bonificação. A pessoa continua cadastrada e pode receber registros.</p>
+      </section>
       <p class="av-rodape">A pontuação é calculada automaticamente. Os gerentes não veem esta parte.</p>`;
   }
 
@@ -419,6 +427,13 @@
 
   document.addEventListener('change', (ev) => {
     if (ev.target && ev.target.dataset && ev.target.dataset.av === 'mes') { AV.mes = ev.target.value || mesAgora(); render(); }
+    if (ev.target && ev.target.dataset && ev.target.dataset.av === 'participa' && soAdmin()) {
+      const t = ev.target;
+      t.disabled = true;
+      Nuvem.rpc('esc_avaliacao_ranking_definir', { p_id: t.dataset.id, p_fora: !t.checked })
+        .then(() => avCarregar())
+        .catch((e) => { t.checked = !t.checked; t.disabled = false; AV.msg = erroAmigavel(e); AV.msgErro = true; render(); });
+    }
   });
 
   // Contador de caracteres da descrição (só visual)

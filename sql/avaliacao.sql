@@ -142,4 +142,22 @@ alter table esc_docs add constraint esc_docs_colecao_check check (colecao in (
   'setores','funcionarios','escalas','auditoria','config','vt','envios','prestadores',
   'servicos','orcamentos','orcCatalogo','rh','rh_docs','despesas','avaliacoes'));
 
+-- ---------- 6. ranking: admin marca quem participa ----------
+create or replace function esc_avaliacao_ranking_definir(p_token text, p_id text, p_fora boolean) returns void
+language plpgsql security definer set search_path to 'public', 'extensions'
+as $function$
+declare v_nome text;
+begin
+  perform esc__so_admin(p_token);
+  if p_id is null or p_fora is null then raise exception 'DADOS_INVALIDOS' using errcode = 'P0001'; end if;
+  update esc_docs set dados = dados || jsonb_build_object('fora_ranking', p_fora),
+         atualizado_em = clock_timestamp(), atualizado_por = 'Administrador'
+   where colecao = 'funcionarios' and id = p_id and not apagado
+  returning dados ->> 'nome' into v_nome;
+  if v_nome is null then raise exception 'FUNCIONARIO_INVALIDO' using errcode = 'P0001'; end if;
+  insert into esc_log(quem, acao, colecao, doc_id, modulo, operacao, antes, depois, resultado)
+  values ('Administrador', 'salvar', 'funcionarios', p_id, 'avaliacao', 'ranking', null,
+          jsonb_build_object('fora_ranking', p_fora, 'nome', v_nome), 'ok');
+end $function$;
+
 commit;
