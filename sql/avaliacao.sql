@@ -89,7 +89,7 @@ begin
   if p_id is null or p_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
     raise exception 'DADOS_INVALIDOS' using errcode = 'P0001';
   end if;
-  if p_dados is null or jsonb_typeof(p_dados) <> 'object' or octet_length(p_dados::text) > 5000 then
+  if p_dados is null or jsonb_typeof(p_dados) <> 'object' or octet_length(p_dados::text) > 500000 then
     raise exception 'DADOS_INVALIDOS' using errcode = 'P0001';
   end if;
 
@@ -124,6 +124,13 @@ begin
     'descricao', v_desc,
     'autor', coalesce(ses.o_nome, 'Administrador'), 'autorId', ses.o_uid,
     'registradoEm', to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS') || 'Z');
+
+  if p_dados ? 'foto' and coalesce(p_dados ->> 'foto', '') <> '' then
+    if left(p_dados ->> 'foto', 23) <> 'data:image/jpeg;base64,' or length(p_dados ->> 'foto') > 400000 then
+      raise exception 'FOTO_INVALIDA' using errcode = 'P0001';
+    end if;
+    v_dados := v_dados || jsonb_build_object('foto', p_dados ->> 'foto');
+  end if;
 
   insert into esc_docs(colecao, id, dados, apagado, atualizado_em, atualizado_por)
   values ('avaliacoes', p_id, v_dados, false, clock_timestamp(), coalesce(ses.o_nome, 'Administrador'))

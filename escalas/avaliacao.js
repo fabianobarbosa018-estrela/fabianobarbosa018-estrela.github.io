@@ -53,6 +53,7 @@
     if (/JA_REGISTRADA/.test(m)) return 'Este registro já existe.';
     if (/SESSAO_INVALIDA/.test(m)) return 'Sua sessão expirou. Entre de novo.';
     if (/SEM_CONEXAO/.test(m)) return 'Sem conexão com a internet. Tente de novo.';
+    if (/FOTO_INVALIDA/.test(m)) return 'Não foi possível usar esta foto. Tente outra.';
     return 'Não foi possível concluir. Tente de novo.';
   }
 
@@ -268,6 +269,38 @@
       `<button class="av-aba" role="tab" type="button" aria-selected="${atual === id}" data-av="aba" data-aba="${id}">${svg(icone)}<span>${esc(nome)}</span></button>`).join('')}</nav>` };
   }
 
+  // Foto do momento: reduzida no próprio aparelho (JPEG), para caber no registro
+  function lerFoto(arquivo) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(arquivo);
+      const img = new Image();
+      img.onload = () => {
+        const reduzir = (lado, qualidade) => {
+          const escala = Math.min(1, lado / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * escala);
+          c.height = Math.round(img.height * escala);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          return c.toDataURL('image/jpeg', qualidade);
+        };
+        let dados = reduzir(1024, 0.7);
+        if (dados.length > 390000) dados = reduzir(800, 0.5);
+        if (dados.length > 390000) dados = reduzir(600, 0.4);
+        URL.revokeObjectURL(url);
+        dados.length > 400000 ? reject(new Error('FOTO_INVALIDA')) : resolve(dados);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('FOTO_INVALIDA')); };
+      img.src = url;
+    });
+  }
+
+  function previewFoto() {
+    return AV.foto
+      ? `<img src="${AV.foto}" alt="Foto anexada" style="display:block;max-width:100%;max-height:260px;border-radius:12px;border:1px solid var(--line)">
+         <button type="button" class="btn ghost" data-av="foto-remover" style="margin-top:8px">Remover foto</button>`
+      : '<div class="small muted">Se preferir, anexe uma foto do momento. A descrição continua obrigatória.</div>';
+  }
+
   function formularioRegistro() {
     const opcFunc = AV.func.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       .map((f) => `<option value="${esc(f.id)}">${esc(f.nome)} · ${esc(nomeSetor(f.setorId))}</option>`).join('');
@@ -287,6 +320,9 @@
             <textarea id="avDesc" name="descricao" required minlength="5" maxlength="1000" rows="4" placeholder="Ex.: chegou 20 minutos depois do horário, sem aviso prévio à chefia."></textarea>
             <div class="av-dica"><span>Mínimo de 5 caracteres</span><span id="avContador">0 / 1000</span></div></div>
           <div class="av-cheio">
+            <div class="av-campo" style="margin-bottom:12px"><label for="avFotoInput">Foto do momento (opcional)</label>
+              <div id="avFotoBox">${previewFoto()}</div>
+              <input id="avFotoInput" type="file" accept="image/*" capture="environment" style="margin-top:8px;font:inherit"></div>
             <div id="avErro" class="av-erro"></div>
             <button class="av-enviar" type="submit" ${AV.enviando ? 'disabled' : ''}>${AV.enviando ? '<span class="av-spin" style="border-top-color:#fff;border-color:rgba(255,255,255,.4)"></span> Salvando…' : 'Registrar ocorrência'}</button>
           </div>
@@ -309,6 +345,7 @@
           <span class="av-tag ${tipo.cls}">${esc(tipo.nome)}</span>
         </div>
         <p class="av-reg-desc">${esc(r.descricao || '')}</p>
+        ${r.foto ? `<img src="${r.foto}" alt="Foto da ocorrência" loading="lazy" style="display:block;margin-top:10px;max-width:100%;max-height:260px;border-radius:12px;border:1px solid var(--line)">` : ''}
         ${soAdmin() ? `<div class="av-reg-rod">Registrado por ${esc(r.autor || '—')}</div>` : ''}
       </article>`;
     }).join('')}</div>`;
@@ -457,11 +494,22 @@
     if (acao === 'aba') { AV.aba = b.dataset.aba; AV.msg = null; render(); }
     if (acao === 'recarregar') { AV.carregado = false; AV.erro = null; avCarregar(); }
     if (acao === 'ver-todos') { AV.verTodos = !AV.verTodos; render(); }
+    if (acao === 'foto-remover') { AV.foto = null; const box = document.getElementById('avFotoBox'); if (box) box.innerHTML = previewFoto(); }
     if (acao === 'imprimir' && soAdmin()) imprimirResultado();
   });
 
   document.addEventListener('change', (ev) => {
     if (ev.target && ev.target.dataset && ev.target.dataset.av === 'mes') { AV.mes = ev.target.value || mesAgora(); render(); }
+    if (ev.target && ev.target.id === 'avFotoInput') {
+      const arquivo = ev.target.files && ev.target.files[0];
+      if (!arquivo) return;
+      const box = document.getElementById('avFotoBox');
+      if (box) box.innerHTML = '<div class="small muted">Preparando a foto…</div>';
+      lerFoto(arquivo)
+        .then((dados) => { AV.foto = dados; })
+        .catch(() => { AV.foto = null; AV.msg = 'Não foi possível usar esta foto. Tente outra.'; AV.msgErro = true; })
+        .finally(() => { const b = document.getElementById('avFotoBox'); if (b) b.innerHTML = previewFoto(); });
+    }
     if (ev.target && ev.target.dataset && ev.target.dataset.av === 'participa' && soAdmin()) {
       const t = ev.target;
       t.disabled = true;
@@ -490,23 +538,28 @@
       ocorrido: f.ocorrido.value ? f.ocorrido.value + ':00-03:00' : '',
       descricao: f.descricao.value.trim(),
     };
+    if (AV.foto) dados.foto = AV.foto;
     if (!dados.funcionarioId) { erro.textContent = 'Escolha o funcionário.'; return; }
     if (!dados.tipo) { erro.textContent = 'Escolha o tipo de ocorrência.'; return; }
     if (!f.ocorrido.value) { erro.textContent = 'Informe a data e o horário.'; return; }
     if (dados.descricao.length < 5) { erro.textContent = 'A descrição precisa ter pelo menos 5 caracteres.'; return; }
-    AV.enviando = true; erro.textContent = ''; render();
+    // Não redesenha o formulário durante o envio: se der erro, o texto digitado continua na tela
+    const btn = f.querySelector('button[type="submit"]');
+    AV.enviando = true; erro.textContent = '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
     try {
       await Nuvem.rpc('esc_avaliacao_salvar', { p_id: novoUuid(), p_dados: dados });
       AV.msg = 'Ocorrência registrada.'; AV.msgErro = false;
       AV.enviando = false;
+      AV.foto = null;
       AV.carregado = false;
       await avCarregar();
       AV.aba = 'registros';
       render();
     } catch (e) {
       AV.enviando = false;
-      AV.msg = erroAmigavel(e); AV.msgErro = true;
-      render();
+      erro.textContent = erroAmigavel(e);
+      if (btn) { btn.disabled = false; btn.textContent = 'Registrar ocorrência'; }
     }
   });
 })();
