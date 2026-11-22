@@ -142,6 +142,16 @@
 .av-mes{max-width:240px}
 .av-mes input{min-height:44px}
 .av-rodape{font-size:12px;color:var(--ink3);margin-top:10px}
+#av-print{display:none}
+@media print{
+  body.av-imprimindo > *:not(#av-print){display:none !important}
+  body.av-imprimindo #av-print{display:block !important;position:relative;color:#111827;font-family:Inter,Arial,sans-serif;padding:4mm}
+  body.av-imprimindo .av-marca{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;z-index:0}
+  body.av-imprimindo .av-marca span{transform:rotate(-32deg);font-size:70px;font-weight:800;letter-spacing:6px;color:rgba(15,76,92,.09);white-space:nowrap}
+  body.av-imprimindo .av-marca img{position:absolute;width:60%;opacity:.07}
+  body.av-imprimindo .av-folha{position:relative;z-index:1}
+  @page{size:A4 portrait;margin:14mm}
+}
 `;
 
   function garantirEstilos() {
@@ -313,7 +323,7 @@
       <div class="av-painel-top" style="border:0;padding:0 0 12px">
         <div class="av-campo av-mes"><label for="avMes">Mês</label>
           <input id="avMes" type="month" value="${esc(mes)}" data-av="mes" /></div>
-        <div class="small muted">Pontuação começa em ${INICIAL}. Só o administrador vê esta parte.</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" type="button" data-av="imprimir">Imprimir resultado</button><div class="small muted">Pontuação começa em ${INICIAL}. Só o administrador vê esta parte.</div></div>
       </div>
       ${topo}
       <div class="av-kpis">
@@ -327,6 +337,50 @@
         ${lista.length ? visiveis.map((p) => linhaRanking(p, curto)).join('') + (lista.length > 3 ? `<div style="padding:12px 16px;text-align:center"><button class="btn ghost" type="button" data-av="ver-todos">${AV.verTodos ? 'Mostrar só os 3 primeiros' : 'Ver todos os ' + lista.length}</button></div>` : '') : '<div class="av-vazio">Sem funcionários.</div>'}
       </section>
       <p class="av-rodape">A pontuação é calculada automaticamente. Os gerentes não veem esta parte.</p>`;
+  }
+
+  // Impressão do resultado (só administrador): folha com marca d'água "CONFIDENCIAL"
+  function imprimirResultado() {
+    const mes = AV.mes || mesAgora();
+    const lista = rankingDoMes(mes);
+    const curto = nomesCurtos(lista);
+    const lider = lista.filter((p) => p.posicao === 1);
+    const todos = lista.length > 0 && lider.length === lista.length;
+    const emitido = new Date().toLocaleString('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const destaque = lider.length && !todos
+      ? `<p style="margin:12px 0 0;font-size:14px"><b>Primeiro lugar:</b> ${lider.map((p) => esc(curto(p))).join(' e ')}, com ${lider[0].final} pontos.</p>`
+      : '';
+    const td = 'padding:7px 8px;border-bottom:1px solid #e5e7eb;text-align:left';
+    const th = 'padding:7px 8px;border-bottom:2px solid #0f4c5c;text-align:left;background:#f3f6f7;color:#0f4c5c;font-size:11px;text-transform:uppercase;letter-spacing:.4px';
+    const linhas = lista.map((p) => `<tr>
+      <td style="${td}">${p.posicao}º</td>
+      <td style="${td}">${esc(curto(p))}</td>
+      <td style="${td}">${esc(nomeSetor(p.setorId))}</td>
+      <td style="${td}">${p.qtd}</td>
+      <td style="${td}">${p.descontoAplicado ? '−' + p.descontoAplicado : '0'}</td>
+      <td style="${td};font-weight:700;color:#0f4c5c">${p.final}</td>
+    </tr>`).join('');
+    const html = `<div class="av-marca"><img src="logo.png" alt=""><span>CONFIDENCIAL</span></div>
+      <div class="av-folha">
+        <div style="display:flex;align-items:center;gap:14px;border-bottom:3px solid #e9a23b;padding-bottom:12px">
+          <img src="logo.png" alt="Hotel Fazenda Oásis" style="height:52px;width:auto">
+          <div><div style="font-size:18px;font-weight:700;color:#0f4c5c">Avaliação: resultado mensal</div>
+          <div style="font-size:12px;color:#4b5563">${esc(mesNome(mes))} · emitido em ${esc(emitido)}</div></div>
+        </div>
+        ${destaque}
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:14px">
+          <thead><tr><th style="${th}">Posição</th><th style="${th}">Funcionário</th><th style="${th}">Setor</th><th style="${th}">Registros</th><th style="${th}">Descontos</th><th style="${th}">Final</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        <p style="margin:16px 0 0;font-size:11px;color:#6b7280">Documento confidencial, de uso restrito à administração do Hotel Fazenda Oásis. A pontuação é calculada automaticamente a partir dos registros do mês.</p>
+      </div>`;
+    let box = document.getElementById('av-print');
+    if (!box) { box = document.createElement('div'); box.id = 'av-print'; document.body.appendChild(box); }
+    box.innerHTML = html;
+    document.body.classList.add('av-imprimindo');
+    const fim = () => { document.body.classList.remove('av-imprimindo'); window.removeEventListener('afterprint', fim); };
+    window.addEventListener('afterprint', fim);
+    setTimeout(() => window.print(), 80);
   }
 
   window.vAvaliacao = function () {
@@ -360,6 +414,7 @@
     if (acao === 'aba') { AV.aba = b.dataset.aba; AV.msg = null; render(); }
     if (acao === 'recarregar') { AV.carregado = false; AV.erro = null; avCarregar(); }
     if (acao === 'ver-todos') { AV.verTodos = !AV.verTodos; render(); }
+    if (acao === 'imprimir' && soAdmin()) imprimirResultado();
   });
 
   document.addEventListener('change', (ev) => {
