@@ -177,7 +177,8 @@
   // Pontuação do mês (admin): começa com 100, desconta cada registro, nunca abaixo de zero.
   // Entram todos os funcionários ativos, com ou sem registro.
   function rankingDoMes(mes) {
-    const porFunc = Object.fromEntries(AV.func.map((f) => [f.id, { id: f.id, nome: f.nome, setorId: f.setorId, qtd: 0, descontos: 0 }]));
+    // Quem está marcado como fora do ranking não entra na pontuação nem na bonificação
+    const porFunc = Object.fromEntries(AV.func.filter((f) => !f.foraRanking).map((f) => [f.id, { id: f.id, nome: f.nome, setorId: f.setorId, qtd: 0, descontos: 0 }]));
     AV.registros.filter((r) => (r.ocorrido || '').slice(0, 7) === mes).forEach((r) => {
       const p = porFunc[r.funcionarioId];
       if (!p) return;

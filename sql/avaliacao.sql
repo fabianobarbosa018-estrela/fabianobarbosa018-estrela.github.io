@@ -47,7 +47,7 @@ begin
   if ses.o_uid is not null and (ses.o_perms ->> 'avaliacao') is distinct from 'true' then
     raise exception 'SEM_PERMISSAO' using errcode = 'P0001', hint = 'avaliacao.ver';
   end if;
-  select coalesce(jsonb_agg(jsonb_build_object('id', d.id, 'nome', d.dados ->> 'nome', 'setorId', d.dados ->> 'setorId')
+  select coalesce(jsonb_agg(jsonb_build_object('id', d.id, 'nome', d.dados ->> 'nome', 'setorId', d.dados ->> 'setorId', 'foraRanking', coalesce((d.dados ->> 'fora_ranking')::boolean, false))
            order by lower(d.dados ->> 'nome')), '[]'::jsonb) into v_f
     from esc_docs d
    where d.colecao = 'funcionarios' and not d.apagado and coalesce((d.dados ->> 'ativo')::boolean, true);
