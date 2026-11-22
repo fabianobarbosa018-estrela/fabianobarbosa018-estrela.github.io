@@ -109,7 +109,7 @@ begin
   if v_tipo not in ('falta_injustificada', 'atraso', 'esquecimento_ponto', 'tarefa_nao_realizada') then
     raise exception 'TIPO_INVALIDO' using errcode = 'P0001';
   end if;
-  if length(v_desc) < 10 or length(v_desc) > 1000 then raise exception 'DESCRICAO_INVALIDA' using errcode = 'P0001'; end if;
+  if length(v_desc) < 5 or length(v_desc) > 1000 then raise exception 'DESCRICAO_INVALIDA' using errcode = 'P0001'; end if;
 
   begin
     v_quando := (p_dados ->> 'ocorrido')::timestamptz;

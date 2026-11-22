@@ -48,7 +48,7 @@
     if (/SEM_PERMISSAO/.test(m)) return 'Você não tem permissão para esta ação.';
     if (/FUNCIONARIO_INVALIDO/.test(m)) return 'Este funcionário não está disponível para avaliação.';
     if (/TIPO_INVALIDO/.test(m)) return 'Escolha um dos tipos de ocorrência da lista.';
-    if (/DESCRICAO_INVALIDA/.test(m)) return 'A descrição precisa ter entre 10 e 1000 caracteres.';
+    if (/DESCRICAO_INVALIDA/.test(m)) return 'A descrição precisa ter entre 5 e 1000 caracteres.';
     if (/DATA_INVALIDA/.test(m)) return 'Informe uma data e horário válidos (não pode ser no futuro).';
     if (/JA_REGISTRADA/.test(m)) return 'Este registro já existe.';
     if (/SESSAO_INVALIDA/.test(m)) return 'Sua sessão expirou. Entre de novo.';
@@ -249,8 +249,8 @@
           <div class="av-campo"><label for="avQuando">Data e horário do ocorrido</label>
             <input id="avQuando" type="datetime-local" name="ocorrido" required max="${agoraLocalRecife()}" /></div>
           <div class="av-campo av-cheio"><label for="avDesc">Descrição do que aconteceu</label>
-            <textarea id="avDesc" name="descricao" required minlength="10" maxlength="1000" rows="4" placeholder="Ex.: chegou 20 minutos depois do horário, sem aviso prévio à chefia."></textarea>
-            <div class="av-dica"><span>Mínimo de 10 caracteres</span><span id="avContador">0 / 1000</span></div></div>
+            <textarea id="avDesc" name="descricao" required minlength="5" maxlength="1000" rows="4" placeholder="Ex.: chegou 20 minutos depois do horário, sem aviso prévio à chefia."></textarea>
+            <div class="av-dica"><span>Mínimo de 5 caracteres</span><span id="avContador">0 / 1000</span></div></div>
           <div class="av-cheio">
             <div id="avErro" class="av-erro"></div>
             <button class="av-enviar" type="submit" ${AV.enviando ? 'disabled' : ''}>${AV.enviando ? '<span class="av-spin" style="border-top-color:#fff;border-color:rgba(255,255,255,.4)"></span> Salvando…' : 'Registrar ocorrência'}</button>
@@ -387,7 +387,7 @@
     if (!dados.funcionarioId) { erro.textContent = 'Escolha o funcionário.'; return; }
     if (!dados.tipo) { erro.textContent = 'Escolha o tipo de ocorrência.'; return; }
     if (!f.ocorrido.value) { erro.textContent = 'Informe a data e o horário.'; return; }
-    if (dados.descricao.length < 10) { erro.textContent = 'A descrição precisa ter pelo menos 10 caracteres.'; return; }
+    if (dados.descricao.length < 5) { erro.textContent = 'A descrição precisa ter pelo menos 5 caracteres.'; return; }
     AV.enviando = true; erro.textContent = ''; render();
     try {
       await Nuvem.rpc('esc_avaliacao_salvar', { p_id: novoUuid(), p_dados: dados });
