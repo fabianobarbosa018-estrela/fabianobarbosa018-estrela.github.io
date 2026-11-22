@@ -186,9 +186,33 @@
 
   // Pontuação do mês (admin): começa com 100, desconta cada registro, nunca abaixo de zero.
   // Entram todos os funcionários ativos, com ou sem registro.
+  // Dias de férias que caem no mês (contando só os dias do próprio mês)
+  function diasDeFeriasNoMes(f, mes) {
+    const [y, m] = mes.split('-').map(Number);
+    const inicio = Date.UTC(y, m - 1, 1);
+    const fim = Date.UTC(y, m, 0);
+    const total = (fim - inicio) / 86400000 + 1;
+    let dias = 0;
+    (f.ferias || []).forEach((p) => {
+      const a = Date.parse(p.ini + 'T00:00:00Z');
+      const b = Date.parse(p.fim + 'T00:00:00Z');
+      const de = Math.max(a, inicio);
+      const ate = Math.min(b, fim);
+      if (ate >= de) dias += (ate - de) / 86400000 + 1;
+    });
+    return { dias, total };
+  }
+  // Regra: quem passa mais da metade do mês de férias não participa do ranking desse mês.
+  // Férias não geram desconto de pontos (não são ocorrência).
+  const fora = (f, mes) => {
+    if (f.foraRanking) return true;
+    const r = diasDeFeriasNoMes(f, mes);
+    return r.dias > r.total / 2;
+  };
+
   function rankingDoMes(mes) {
-    // Quem está marcado como fora do ranking não entra na pontuação nem na bonificação
-    const porFunc = Object.fromEntries(AV.func.filter((f) => !f.foraRanking).map((f) => [f.id, { id: f.id, nome: f.nome, setorId: f.setorId, qtd: 0, descontos: 0 }]));
+    // Quem está fora do ranking (marcado ou de férias na maior parte do mês) não entra na pontuação nem na bonificação
+    const porFunc = Object.fromEntries(AV.func.filter((f) => !fora(f, mes)).map((f) => [f.id, { id: f.id, nome: f.nome, setorId: f.setorId, qtd: 0, descontos: 0 }]));
     AV.registros.filter((r) => (r.ocorrido || '').slice(0, 7) === mes).forEach((r) => {
       const p = porFunc[r.funcionarioId];
       if (!p) return;
