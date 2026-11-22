@@ -382,13 +382,24 @@
         </table>
         <p style="margin:16px 0 0;font-size:11px;color:#6b7280">Documento confidencial, de uso restrito à administração do Hotel Fazenda Oásis. A pontuação é calculada automaticamente a partir dos registros do mês.</p>
       </div>`;
-    let box = document.getElementById('av-print');
-    if (!box) { box = document.createElement('div'); box.id = 'av-print'; document.body.appendChild(box); }
-    box.innerHTML = html;
-    document.body.classList.add('av-imprimindo');
-    const fim = () => { document.body.classList.remove('av-imprimindo'); window.removeEventListener('afterprint', fim); };
-    window.addEventListener('afterprint', fim);
-    setTimeout(() => window.print(), 80);
+    // Abre uma página própria com o resultado: a impressão direta não funciona no app instalado do celular
+    const logo = new URL('logo.png', location.href).href;
+    const corpo = html.split('src="logo.png"').join('src="' + logo + '"');
+    const estilo = `body{margin:0;font-family:Inter,Arial,sans-serif;color:#111827;background:#fff}
+      .barra{padding:12px;display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid #e5e7eb}
+      .barra button{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid #0f4c5c;background:#0f4c5c;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+      .barra button+button{background:#fff;color:#0f4c5c}
+      .av-marca{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;z-index:0}
+      .av-marca span{transform:rotate(-32deg);font-size:70px;font-weight:800;letter-spacing:6px;color:rgba(15,76,92,.09);white-space:nowrap}
+      .av-marca img{position:absolute;width:60%;opacity:.07}
+      .av-folha{position:relative;z-index:1;padding:16px}
+      @media print{.barra{display:none}.av-folha{padding:0}@page{size:A4 portrait;margin:14mm}}`;
+    const pagina = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avaliação: resultado mensal</title><style>${estilo}</style></head><body><div class="barra"><button onclick="window.print()">Imprimir ou salvar PDF</button><button onclick="window.close()">Fechar</button></div>${corpo}</body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) { AV.msg = 'O navegador bloqueou a nova janela. Permita pop-ups para este site e tente de novo.'; AV.msgErro = true; render(); return; }
+    win.document.open();
+    win.document.write(pagina);
+    win.document.close();
   }
 
   window.vAvaliacao = function () {
