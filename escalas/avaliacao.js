@@ -288,7 +288,8 @@
     const totalOc = lista.reduce((s, p) => s + p.qtd, 0);
     const comOc = lista.filter((p) => p.qtd > 0).length;
     const media = lista.length ? Math.round(lista.reduce((s, p) => s + p.final, 0) / lista.length) : 0;
-    const topo = lider.length
+    const todosEmpatados = lista.length > 0 && lider.length === lista.length;
+    const topo = lider.length && !todosEmpatados
       ? `<div class="av-lider"><div class="rot">${atual ? 'Em primeiro lugar até agora' : 'Destaque de ' + esc(mesNome(mes))}</div>
          <div class="nome">${lider.length > 3 ? lider.length + ' funcionários empatados' : lider.map((p) => esc(p.nome)).join(' e ')}</div>
          <div class="det">${lider[0].final} pontos${lider.length > 1 ? ' · empate na primeira posição' : ''}${atual ? ' · a posição muda com novos registros' : ''}</div></div>`
