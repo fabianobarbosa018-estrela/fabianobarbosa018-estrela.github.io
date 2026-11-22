@@ -285,6 +285,7 @@
     const atual = mes === mesAgora();
     const lista = rankingDoMes(mes);
     const lider = lista.filter((p) => p.posicao === 1);
+    const visiveis = AV.verTodos ? lista : lista.slice(0, 3);
     const totalOc = lista.reduce((s, p) => s + p.qtd, 0);
     const comOc = lista.filter((p) => p.qtd > 0).length;
     const media = lista.length ? Math.round(lista.reduce((s, p) => s + p.final, 0) / lista.length) : 0;
@@ -310,7 +311,7 @@
       </div>
       <section class="av-painel">
         <div class="av-painel-top"><b>Ranking do mês</b><span class="small muted">${lista.length} funcionários</span></div>
-        ${lista.length ? lista.map(linhaRanking).join('') : '<div class="av-vazio">Sem funcionários.</div>'}
+        ${lista.length ? visiveis.map(linhaRanking).join('') + (lista.length > 3 ? `<div style="padding:12px 16px;text-align:center"><button class="btn ghost" type="button" data-av="ver-todos">${AV.verTodos ? 'Mostrar só os 3 primeiros' : 'Ver todos os ' + lista.length}</button></div>` : '') : '<div class="av-vazio">Sem funcionários.</div>'}
       </section>
       <p class="av-rodape">A pontuação é calculada automaticamente. Os gerentes não veem esta parte.</p>`;
   }
@@ -345,6 +346,7 @@
     const acao = b.dataset.av;
     if (acao === 'aba') { AV.aba = b.dataset.aba; AV.msg = null; render(); }
     if (acao === 'recarregar') { AV.carregado = false; AV.erro = null; avCarregar(); }
+    if (acao === 'ver-todos') { AV.verTodos = !AV.verTodos; render(); }
   });
 
   document.addEventListener('change', (ev) => {
