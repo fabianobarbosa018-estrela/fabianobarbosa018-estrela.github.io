@@ -290,9 +290,9 @@
     const media = lista.length ? Math.round(lista.reduce((s, p) => s + p.final, 0) / lista.length) : 0;
     const topo = lider.length
       ? `<div class="av-lider"><div class="rot">${atual ? 'Em primeiro lugar até agora' : 'Destaque de ' + esc(mesNome(mes))}</div>
-         <div class="nome">${lider.map((p) => esc(p.nome)).join(' e ')}</div>
+         <div class="nome">${lider.length > 3 ? lider.length + ' funcionários empatados' : lider.map((p) => esc(p.nome)).join(' e ')}</div>
          <div class="det">${lider[0].final} pontos${lider.length > 1 ? ' · empate na primeira posição' : ''}${atual ? ' · a posição muda com novos registros' : ''}</div></div>`
-      : '<div class="av-cartao av-vazio">Nenhum funcionário cadastrado.</div>';
+      : (lista.length ? '' : '<div class="av-cartao av-vazio">Nenhum funcionário cadastrado.</div>');
     const kpi = (rotulo, valor, detalhe) => `<div class="av-kpi"><span>${rotulo}</span><b>${valor}</b><small>${detalhe}</small></div>`;
     return `
       <div class="av-painel-top" style="border:0;padding:0 0 12px">
