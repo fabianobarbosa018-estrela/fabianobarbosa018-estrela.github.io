@@ -10,6 +10,7 @@
     { id: 'atraso', nome: 'Atraso', pontos: 20, cls: 'atraso' },
     { id: 'esquecimento_ponto', nome: 'Esqueceu o ponto', pontos: 3, cls: 'ponto' },
     { id: 'tarefa_nao_realizada', nome: 'Tarefa não realizada', pontos: 10, cls: 'tarefa' },
+    { id: 'quebra_utensilio', nome: 'Quebra de utensílio', pontos: 15, cls: 'quebra' },
   ];
   const TIPO = Object.fromEntries(TIPOS.map((t) => [t.id, t]));
   const INICIAL = 100;
@@ -104,6 +105,7 @@
 .av-tag.atraso{background:#fef3c7;color:#854d0e}
 .av-tag.ponto{background:#dbeafe;color:#1e40af}
 .av-tag.tarefa{background:#eef0f3;color:#374151}
+.av-tag.quebra{background:#fde7d9;color:#9a3412}
 .av-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
 .av-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--sh)}
 .av-kpi span{font-size:12px;color:var(--ink2);font-weight:600;text-transform:uppercase;letter-spacing:.4px}

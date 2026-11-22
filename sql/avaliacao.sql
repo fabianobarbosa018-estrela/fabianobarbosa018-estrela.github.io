@@ -106,7 +106,7 @@ begin
   if v_nome is null then raise exception 'FUNCIONARIO_INVALIDO' using errcode = 'P0001'; end if;
 
   -- só as 4 ocorrências oficiais (negativas); nada de outras categorias
-  if v_tipo not in ('falta_injustificada', 'atraso', 'esquecimento_ponto', 'tarefa_nao_realizada') then
+  if v_tipo not in ('falta_injustificada', 'atraso', 'esquecimento_ponto', 'tarefa_nao_realizada', 'quebra_utensilio') then
     raise exception 'TIPO_INVALIDO' using errcode = 'P0001';
   end if;
   if length(v_desc) < 5 or length(v_desc) > 1000 then raise exception 'DESCRICAO_INVALIDA' using errcode = 'P0001'; end if;
