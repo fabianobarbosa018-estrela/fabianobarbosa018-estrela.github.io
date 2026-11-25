@@ -82,12 +82,15 @@
   }
   /* Bloco extra nunca pode derrubar a lista de funcionários */
   function seguro(fn) { try { return fn() || ''; } catch (e) { console.error('[RH]', e); return ''; } }
+  let pendVer = false; // lista de cadastros incompletos: mostra 5 e expande com "Ver todos"
   function pendenciasHtml() {
     const lista = S.funcionarios.filter(f => f.ativo).map(f => ({ f, falta: faltantes(f) })).filter(x => x.falta.length)
       .sort((a, b) => b.falta.length - a.falta.length || String(a.f.nome || '').localeCompare(String(b.f.nome || ''), 'pt-BR'));
     if (!lista.length) return '';
-    return `<div class="card mb rh-pend"><h3 style="margin:0 0 2px">Cadastro incompleto (${lista.length})</h3>
-      <p class="small muted" style="margin:0 0 8px">Quem ainda falta algum dado pessoal. Toque na pessoa para abrir a ficha e mandar o link.</p>` + lista.map(x =>
+    const vis = pendVer ? lista : lista.slice(0, 5);
+    const botao = lista.length > 5 ? `<button class="btn sm" data-act="rhPendVer" style="margin-left:auto">${pendVer ? 'Mostrar menos' : 'Ver todos (' + lista.length + ')'}</button>` : '';
+    return `<div class="card mb rh-pend"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 2px"><h3 style="margin:0">Cadastro incompleto (${lista.length})</h3>${botao}</div>
+      <p class="small muted" style="margin:0 0 8px">Quem ainda falta algum dado pessoal. Toque na pessoa para abrir a ficha e mandar o link.</p>` + vis.map(x =>
       `<div class="rh-pend-linha" data-act="rhFicha" data-id="${x.f.id}" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer">
         <span><b>${esc(x.f.nome)}</b> <span class="small muted">· ${esc(nomeSetor(x.f.setorId))}</span></span>
         <span class="small muted" style="text-align:right">falta: ${esc(x.falta.join(', '))}</span></div>`).join('') + '</div>';
@@ -102,6 +105,7 @@
     let h = seguro(() => (window.CAD ? CAD.barra() : '')) + seguro(anivHtml) + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
       ${soLer() ? '' : '<button class="btn pri orc-novo" data-act="rhNovo">+ Novo funcionário</button>'}</div>
       <div class="ctr-inds">${ind('todos', cont.total, 'Cadastrados')}${ind('', ativos, 'Ativos')}${ind('afastado', cont.afastado, 'Afastados', cont.afastado ? 'alerta' : '')}${ind('ferias', cont.ferias, 'De férias')}${ind('suspenso', cont.suspenso, 'Suspensos', cont.suspenso ? 'perigo' : '')}${ind('desligado', cont.desligado, 'Desligados')}</div>
+      ${seguro(pendenciasHtml)}
       <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função, setor ou CPF" value="${esc(s.busca)}" autocomplete="off">
         <select id="rhSetor"><option value="">Todos os setores</option>${setoresOrd().map(x => `<option value="${x.id}"${s.setor === x.id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></div>
       <div class="orc-chips rh-filtros">${[['', 'Ativos'], ['afastado', 'Afastados'], ['ferias', 'De férias'], ['suspenso', 'Suspensos'], ['desligado', 'Desligados'], ['todos', 'Todos']].map(c => `<button class="orc-chip${s.filtro === c[0] ? ' on' : ''}" data-act="rhFiltro" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>`;
@@ -455,6 +459,7 @@
       case 'rhCadRevisar': return CAD.revisar();
       case 'rhFicha': s.ficha = id; s.aba = 'dados'; render(); window.scrollTo(0, 0); return;
       case 'rhAnivVer': anivVer = !anivVer; render(); return;
+      case 'rhPendVer': pendVer = !pendVer; render(); return;
       case 'rhVoltar': s.ficha = null; render(); window.scrollTo(0, 0); return;
       case 'rhAba': s.aba = el.dataset.a; return render();
       case 'rhDesligar': return desligar(id);
