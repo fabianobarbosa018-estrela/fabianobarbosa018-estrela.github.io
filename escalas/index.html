@@ -3759,7 +3759,7 @@ function vMensal() {
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   ${escalaFluxoHTML(UI.mes)}
   ${!S.somenteLeitura && podeAcao('escala', 'aprovar') && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><button class="btn ok" data-act="aprovarMes" data-mes="${UI.mes}">${ic('check')} Aprovar escala do mês (${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length} semana(s) em rascunho)</button></div>` : ''}
-  <div class="row mt"><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
+  <div class="row mt" style="align-items:center"><span class="small muted" style="font-weight:600">Exportar:</span><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
   // Semanas da escala: cartão por semana, com visualizar e editar
   h += `<div class="card mb sem-sec"><div class="row" style="justify-content:space-between;align-items:center"><b>Semanas da escala</b><span class="small muted">${sems.length} semanas no mês</span></div>
