@@ -573,6 +573,35 @@ table.list tr:hover td{background:#f8fbfc}
 .sem-d{font-weight:700;font-size:14px}
 .sem-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
 @media (max-width:600px){.sem-grid{grid-template-columns:1fr 1fr;gap:8px}.sem-card{padding:10px;gap:6px}.sem-d{font-size:13px}.sem-acoes .btn{flex:1 1 auto;justify-content:center}}
+/* Escala mensal: nova apresentação (cabeçalho, setores, semanas e exportação) */
+.mes-banner{display:flex;align-items:center;gap:14px;background:#0E4A57;color:#fff;border-radius:18px;padding:16px 18px;margin:0 0 12px;box-shadow:0 6px 18px rgba(14,74,87,.25)}
+.mes-banner-ic{width:46px;height:46px;border-radius:12px;background:rgba(232,185,63,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#E8B93F}
+.mes-banner-ic svg{width:28px;height:28px}
+.mes-banner-t{font-weight:800;font-size:19px;line-height:1.2}
+.mes-banner-s{font-size:13px;opacity:.85;margin-top:2px}
+.mes-pill{margin-left:auto;background:#E8B93F;color:#1b1b1b;border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;white-space:nowrap}
+.mes-card .mes-nav{display:flex;gap:10px;align-items:center}
+.mes-card .mes-nav input[type=month]{flex:1;text-align:center;font-weight:700;font-size:17px;min-height:48px}
+.mes-card .mes-nav .btn.icon{min-width:52px;height:48px;border-radius:14px}
+.setor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.setor-grid .btn{width:100%;justify-content:center;border-radius:14px;min-height:44px;font-size:14px}
+.sem-card{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+.sem-info{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sem-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.sem-dias{display:inline-flex;align-items:center;gap:4px;color:var(--ink2,#475569);padding-left:8px;border-left:1px solid var(--line)}
+.sem-dias svg{width:14px;height:14px}
+.sem-acoes{flex-direction:column;align-items:stretch;margin-top:0;flex-shrink:0;min-width:128px}
+.sem-acoes .btn{justify-content:center;gap:6px}
+.sem-acoes .btn svg{width:16px;height:16px}
+.sem-grid{grid-template-columns:1fr;gap:10px}
+@media (min-width:700px){.sem-grid{grid-template-columns:1fr 1fr}}
+.export-card{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-top:14px}
+.export-card .ex-t{flex:1;min-width:0}
+.export-card .ex-t b{font-size:16px}
+.ex-btns{display:flex;gap:10px;flex-shrink:0}
+.ex-btns .btn{width:52px;height:52px;padding:0;border-radius:14px;justify-content:center;display:flex;align-items:center}
+.ex-btns .btn svg{width:24px;height:24px}
+@media (max-width:600px){.setor-grid{gap:6px}.setor-grid .btn{font-size:13px;min-height:40px}.mes-pill{font-size:12px;padding:6px 10px}}
 /* Escala de uma semana: cabe na tela do celular, sem rolagem lateral */
 .sem-folha table.folha{width:100%;min-width:0;table-layout:fixed}
 .sem-folha table.folha .fnm{min-width:0;white-space:normal}
@@ -3750,16 +3779,16 @@ function vMensal() {
   }
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
-  let h = `<div class="row mb"><div><h1>Escala mensal</h1><p class="sub" style="margin:0">Folha de folga do mês, no mesmo formato da planilha do hotel</p><p class="small muted" style="margin:2px 0 0">Versão ${VERSAO_APP}</p></div></div>
-  <div class="card mb"><div class="row">
+  let h = `<div class="mes-banner"><span class="mes-banner-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4M7 14h2M11 14h2M15 14h2M7 18h2M11 18h2"/></svg></span><div><div class="mes-banner-t">Escala de Folgas</div><div class="mes-banner-s">Confira e gerencie a escala do mês</div></div><span class="mes-pill">${esc(servMesNome(UI.mes))}</span></div>
+  <div class="small muted" style="margin:0 0 6px">Versão ${VERSAO_APP}</div>
+  <div class="card mb mes-card"><div class="mes-nav">
     <button class="btn icon" data-act="mesAnt">${ic('chevL')}</button><input type="month" id="inMes" value="${UI.mes}"><button class="btn icon" data-act="mesProx">${ic('chevR')}</button>
   </div>
-  <div class="small muted mt">Setores para ver e baixar:</div>
-  <div class="row mt" style="gap:6px">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
+  <div class="small muted mt" style="font-weight:700">${ic('users')} Setores para ver e baixar:</div>
+  <div class="setor-grid mt">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   ${escalaFluxoHTML(UI.mes)}
   ${!S.somenteLeitura && podeAcao('escala', 'aprovar') && semanasDoMes(UI.mes).sems.some(s => S.escalas[s] && S.escalas[s].status !== 'aprovada') ? `<div class="row mt"><button class="btn ok" data-act="aprovarMes" data-mes="${UI.mes}">${ic('check')} Aprovar escala do mês (${semanasDoMes(UI.mes).sems.filter(s => S.escalas[s] && S.escalas[s].status !== 'aprovada').length} semana(s) em rascunho)</button></div>` : ''}
-  <div class="row mt" style="align-items:center"><span class="small muted" style="font-weight:600">Exportar:</span><button class="btn" data-act="mesPDF">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="mesXLS">${ic('xls')} Excel</button><button class="btn" data-act="mesPrint">${ic('print')} Imprimir</button></div>
   </div>`;
   // Semanas da escala: cartão por semana, com visualizar e editar
   h += `<div class="card mb sem-sec"><div class="row" style="justify-content:space-between;align-items:center"><b>Semanas da escala</b><span class="small muted">${sems.length} semanas no mês</span></div>
@@ -3767,8 +3796,9 @@ function vMensal() {
     const e = S.escalas[s], ap = !!(e && e.status === 'aprovada');
     const sit = !e ? '<span class="badge b-off">Não gerada</span>' : ap ? '<span class="badge b-ok">Aprovada</span>' : e.envio ? '<span class="badge b-blue">Enviada para aprovação</span>' : e.devolucao ? '<span class="badge b-err">Devolvida para ajustes</span>' : '<span class="badge b-draft">Pendente</span>';
     const edit = !e || S.somenteLeitura ? '' : ap ? (ehAdmin() ? `<button class="btn sm pri" data-act="editarAprovada" data-sem="${s}">${ic('edit')} Editar</button>` : '') : `<button class="btn sm" data-act="verSemana" data-sem="${s}">${ic('edit')} Editar</button>`;
-    return `<div class="sem-card ${ap ? 'ok' : ''}"><div class="sem-d">${semanaLabel(s)}</div>${sit}<div class="sem-acoes"><button class="btn sm" data-act="verSemana" data-sem="${s}">Visualizar</button>${edit}</div></div>`;
-  }).join('')}</div></div>`;
+    return `<div class="sem-card ${ap ? 'ok' : ''}"><div class="sem-info"><div class="sem-d">${semanaLabel(s)}</div><div class="sem-meta">${sit}<span class="sem-dias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>7 dias</span></div></div><div class="sem-acoes"><button class="btn sm" data-act="verSemana" data-sem="${s}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg> Visualizar</button>${edit}</div></div>`;
+  }).join('')}</div>
+  <div class="export-card"><div class="ex-t"><b>Exportar Escala</b><div class="small muted">Baixar em PDF, Excel ou Imprimir</div></div><div class="ex-btns"><button class="btn" data-act="mesPDF" title="Baixar PDF">${ic('pdf')}</button><button class="btn" data-act="mesXLS" title="Exportar Excel">${ic('xls')}</button><button class="btn" data-act="mesPrint" title="Imprimir">${ic('print')}</button></div></div></div>`;
   if (!m.grupos.length) return h + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
   if (m.semEscala.length) h += `<div class="alert w"><span class="ic">!</span><div>${m.semEscala.length} semana(s) deste período ainda sem escala (${m.semEscala.map(semanaLabel).join('; ')}): os dias aparecem em cinza claro.</div></div>`;
   return h + folhaHTML(m);
