@@ -569,6 +569,7 @@ table.list tr:hover td{background:#f8fbfc}
 .sem-card:not(.ok){border-left:4px solid var(--acc)}
 .sem-d{font-weight:700;font-size:14px}
 .sem-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+@media (max-width:600px){.sem-grid{grid-template-columns:1fr 1fr;gap:8px}.sem-card{padding:10px;gap:6px}.sem-d{font-size:13px}.sem-acoes .btn{flex:1 1 auto;justify-content:center}}
 /* Escala de uma semana: cabe na tela do celular, sem rolagem lateral */
 .sem-folha table.folha{width:100%;min-width:0;table-layout:fixed}
 .sem-folha table.folha .fnm{min-width:0;white-space:normal}
@@ -3750,7 +3751,7 @@ function vMensal() {
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="mesAnt">${ic('chevL')}</button><input type="month" id="inMes" value="${UI.mes}"><button class="btn icon" data-act="mesProx">${ic('chevR')}</button>
   </div>
-  <div class="small muted mt">Marque os setores que quer ver e baixar (pode marcar mais de um):</div>
+  <div class="small muted mt">Setores para ver e baixar:</div>
   <div class="row mt" style="gap:6px">${setoresOrd().map(x => `<button class="btn sm ${UI.setoresSel.includes(x.id) ? 'pri' : ''}" data-act="selSetor" data-id="${x.id}">${UI.setoresSel.includes(x.id) ? '✓ ' : ''}${esc(_cap1(x.nome))}</button>`).join('')}${UI.setoresSel.length ? '<button class="btn sm" data-act="selLimpar">Limpar</button>' : ''}</div>
   ${faltam.length ? `<div class="row mt edit-only"><button class="btn pri" data-act="gerarMes">${ic('bolt')} Gerar as ${faltam.length} semana(s) que faltam</button><span class="small muted">Cada semana (domingo a sábado) é gerada em sequência, considerando o rodízio da anterior.</span></div>` : ''}
   ${escalaFluxoHTML(UI.mes)}
