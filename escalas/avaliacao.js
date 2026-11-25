@@ -146,6 +146,12 @@
 .av-mes{max-width:240px}
 .av-mes input{min-height:44px}
 .av-rodape{font-size:12px;color:var(--ink3);margin-top:10px}
+.av-linha{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:0}
+.av-linha .av-campo{min-width:0}
+.av-linha input[type=date],.av-linha input[type=time]{-webkit-appearance:none;appearance:none;min-width:0;width:100%;max-width:100%}
+.av-obrig{color:#dc2626;font-weight:700}
+.av-top h2{font-size:18px}
+@media (max-width:560px){.av-cartao{padding:14px}.av-top{gap:10px}.av-titulo p{font-size:12px}}
 #av-print{display:none}
 @media print{
   body.av-imprimindo > *:not(#av-print){display:none !important}
@@ -260,7 +266,7 @@
       : 'Registre ocorrências dos funcionários';
     return `<header class="av-top">
       <img class="av-logo" src="logo.png" alt="Hotel Fazenda Oásis">
-      <div class="av-titulo"><h2>Avaliação</h2><p>${esc(subtitulo)}</p></div>
+      <div class="av-titulo"><h2>Ocorrências</h2><p>${esc(subtitulo)}</p></div>
       <button class="av-atu" data-av="recarregar" type="button" aria-label="Atualizar dados">${svg('atualizar')}<span>Atualizar</span></button>
     </header>`;
   }
@@ -320,8 +326,12 @@
             <select id="avFunc" name="funcionarioId" required><option value="">Escolha o funcionário…</option>${opcFunc}</select></div>
           <div class="av-campo"><label for="avTipo">Tipo de ocorrência</label>
             <select id="avTipo" name="tipo" required><option value="">Escolha o tipo…</option>${opcTipo}</select></div>
-          <div class="av-campo"><label for="avQuando">Data e horário do ocorrido</label>
-            <input id="avQuando" type="datetime-local" name="ocorrido" required max="${agoraLocalRecife()}" /></div>
+          <div class="av-cheio av-linha">
+            <div class="av-campo"><label for="avData">Data do ocorrido <span class="av-obrig">*</span></label>
+              <input id="avData" type="date" max="${agoraLocalRecife().slice(0, 10)}" autocomplete="off" /></div>
+            <div class="av-campo"><label for="avHora">Horário do ocorrido <span class="av-obrig">*</span></label>
+              <input id="avHora" type="time" autocomplete="off" /></div>
+            <input type="hidden" id="avQuando" name="ocorrido" value="" /></div>
           <div class="av-campo av-cheio"><label for="avDesc">Descrição do que aconteceu</label>
             <textarea id="avDesc" name="descricao" required minlength="5" maxlength="1000" rows="4" placeholder="Ex.: chegou 20 minutos depois do horário, sem aviso prévio à chefia."></textarea>
             <div class="av-dica"><span>Mínimo de 5 caracteres</span><span id="avContador">0 / 1000</span></div></div>
@@ -621,6 +631,20 @@
         .then(() => avCarregar())
         .catch((e) => { t.checked = !t.checked; t.disabled = false; AV.msg = erroAmigavel(e); AV.msgErro = true; render(); });
     }
+  });
+
+  // Data e horário (dois campos) viram o valor do campo oculto "ocorrido", que o envio já lê
+  function juntarDataHora() {
+    const f = document.getElementById('avForm');
+    if (!f) return;
+    const d = document.getElementById('avData'), h = document.getElementById('avHora');
+    f.ocorrido.value = d && h && d.value && h.value ? d.value + 'T' + h.value : '';
+  }
+  document.addEventListener('change', (ev) => {
+    if (ev.target && (ev.target.id === 'avData' || ev.target.id === 'avHora')) juntarDataHora();
+  });
+  document.addEventListener('input', (ev) => {
+    if (ev.target && (ev.target.id === 'avData' || ev.target.id === 'avHora')) juntarDataHora();
   });
 
   // Contador de caracteres da descrição (só visual)
