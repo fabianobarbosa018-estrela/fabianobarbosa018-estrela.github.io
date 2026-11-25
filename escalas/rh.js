@@ -56,11 +56,14 @@
       return { f, prox, falta: Math.round((prox - base) / 86400000), idade: prox.getFullYear() - y };
     }).filter(x => x && x.falta <= dias).sort((a, b) => a.falta - b.falta);
   }
+  let anivVer = false; // painel de aniversariantes: mostra 3 e expande com "Ver todos"
   function anivHtml() {
-    const lista = aniversarios(30);
-    if (!lista.length) return '';
+    const todos = aniversarios(30);
+    if (!todos.length) return '';
+    const lista = anivVer ? todos : todos.slice(0, 3);
     const quando = x => x.falta === 0 ? '<b>hoje</b>' : x.falta === 1 ? 'amanhã' : 'em ' + x.falta + ' dias';
-    return `<div class="card mb rh-aniv"><h3 style="margin:0 0 8px">Aniversários nos próximos 30 dias</h3>` + lista.map(x =>
+    const botao = todos.length > 3 ? `<button class="btn sm" data-act="rhAnivVer" style="margin-left:auto">${anivVer ? 'Mostrar menos' : 'Ver todos (' + todos.length + ')'}</button>` : '';
+    return `<div class="card mb rh-aniv"><div style="display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap"><h3 style="margin:0">Aniversariantes · próximos 30 dias</h3>${botao}</div>` + lista.map(x =>
       `<div class="rh-aniv-linha" data-act="rhFicha" data-id="${x.f.id}" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer">
         <span><b>${esc(x.f.nome)}</b> <span class="small muted">· ${esc(nomeSetor(x.f.setorId))}</span></span>
         <span class="small">${br(x.prox.toISOString().slice(0, 10))} · ${quando(x)} · ${x.idade} anos</span></div>`).join('') + '</div>';
@@ -99,15 +102,15 @@
     let h = seguro(() => (window.CAD ? CAD.barra() : '')) + seguro(anivHtml) + `<div class="orc-topo"><div><h2 style="margin:0">Funcionários</h2><div class="small muted">RH: cadastro, ficha, afastamentos, férias e ocorrências</div></div>
       ${soLer() ? '' : '<button class="btn pri orc-novo" data-act="rhNovo">+ Novo funcionário</button>'}</div>
       <div class="ctr-inds">${ind('todos', cont.total, 'Cadastrados')}${ind('', ativos, 'Ativos')}${ind('afastado', cont.afastado, 'Afastados', cont.afastado ? 'alerta' : '')}${ind('ferias', cont.ferias, 'De férias')}${ind('suspenso', cont.suspenso, 'Suspensos', cont.suspenso ? 'perigo' : '')}${ind('desligado', cont.desligado, 'Desligados')}</div>
-      <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função ou CPF" value="${esc(s.busca)}" autocomplete="off">
+      <div class="orc-busca rh-busca"><input type="search" id="rhBusca" placeholder="Pesquisar por nome, função, setor ou CPF" value="${esc(s.busca)}" autocomplete="off">
         <select id="rhSetor"><option value="">Todos os setores</option>${setoresOrd().map(x => `<option value="${x.id}"${s.setor === x.id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></div>
-      <div class="orc-chips">${[['', 'Ativos'], ['afastado', 'Afastados'], ['ferias', 'De férias'], ['suspenso', 'Suspensos'], ['desligado', 'Desligados'], ['todos', 'Todos']].map(c => `<button class="orc-chip${s.filtro === c[0] ? ' on' : ''}" data-act="rhFiltro" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>`;
+      <div class="orc-chips rh-filtros">${[['', 'Ativos'], ['afastado', 'Afastados'], ['ferias', 'De férias'], ['suspenso', 'Suspensos'], ['desligado', 'Desligados'], ['todos', 'Todos']].map(c => `<button class="orc-chip${s.filtro === c[0] ? ' on' : ''}" data-act="rhFiltro" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>`;
     const q = (s.busca || '').trim().toLowerCase(), qd = q.replace(/\D/g, '');
     const lista = todos.filter(f => {
       const x = situacao(f);
       if (s.filtro === 'todos') { } else if (s.filtro) { if (x !== s.filtro) return false; } else if (!f.ativo) return false;
       if (s.setor && f.setorId !== s.setor) return false;
-      if (q) { const cpf = String((rhDe(f.id).pessoais || {}).cpf || '').replace(/\D/g, ''); if (!((f.nome + ' ' + (f.funcao || '')).toLowerCase().includes(q) || (qd.length >= 3 && cpf.includes(qd)))) return false; }
+      if (q) { const cpf = String((rhDe(f.id).pessoais || {}).cpf || '').replace(/\D/g, ''); if (!((f.nome + ' ' + (f.funcao || '') + ' ' + nomeSetor(f.setorId)).toLowerCase().includes(q) || (qd.length >= 3 && cpf.includes(qd)))) return false; }
       return true;
     }).sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome, 'pt-BR'));
     if (!S.setores.length) h += '<div class="alert w"><span class="ic">!</span><div>Cadastre os <a href="#setores">setores</a> antes dos funcionários.</div></div>';
@@ -445,6 +448,7 @@
       case 'rhLink': return CAD.gerarLink(id);
       case 'rhCadRevisar': return CAD.revisar();
       case 'rhFicha': s.ficha = id; s.aba = 'dados'; render(); window.scrollTo(0, 0); return;
+      case 'rhAnivVer': anivVer = !anivVer; render(); return;
       case 'rhVoltar': s.ficha = null; render(); window.scrollTo(0, 0); return;
       case 'rhAba': s.aba = el.dataset.a; return render();
       case 'rhDesligar': return desligar(id);
