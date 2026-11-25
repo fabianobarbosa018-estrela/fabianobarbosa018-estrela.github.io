@@ -107,6 +107,8 @@
 .av-tag.ponto{background:#dbeafe;color:#1e40af}
 .av-tag.tarefa{background:#eef0f3;color:#374151}
 .av-tag.quebra{background:#fde7d9;color:#9a3412}
+.av-reg-tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.av-pts{display:inline-flex;align-items:center;font-size:12px;font-weight:800;border-radius:999px;padding:4px 10px;background:#0f4c5c;color:#fff;white-space:nowrap}
 .av-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
 .av-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--sh)}
 .av-kpi span{font-size:12px;color:var(--ink2);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
@@ -358,7 +360,7 @@
         <div class="av-reg-top">
           <div style="min-width:0"><div class="av-reg-nome">${esc(r.funcionarioNome || '—')}</div>
             <div class="av-reg-meta">${esc(setor)} · ${esc(dataHora(r.ocorrido))}</div></div>
-          <span class="av-tag ${tipo.cls}">${esc(tipo.nome)}</span>
+          <div class="av-reg-tags"><span class="av-tag ${tipo.cls}">${esc(tipo.nome)}</span>${soAdmin() && tipo.pontos ? `<span class="av-pts">−${tipo.pontos} pts</span>` : ''}</div>
         </div>
         <p class="av-reg-desc">${esc(r.descricao || '')}</p>
         ${r.foto ? `<img src="${r.foto}" alt="Foto da ocorrência" loading="lazy" style="display:block;margin-top:10px;max-width:100%;max-height:260px;border-radius:12px;border:1px solid var(--line)">` : ''}
