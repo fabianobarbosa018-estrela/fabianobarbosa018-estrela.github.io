@@ -4248,7 +4248,7 @@ async function acaoGerar(sem, opts) {
 }
 async function salvarAlteracao(sem, novasAtrib, texto) {
   const e = S.escalas[sem];
-  const v = C.validarEscala({ semana: sem, atribuicoes: novasAtrib }, S.funcionarios, S.setores, historicoArr());
+  const v = C.validarEscala({ semana: sem, modo: e && e.modo, atribuicoes: novasAtrib }, S.funcionarios, S.setores, historicoArr());
   if (v.erros.length) {
     await modalMsg('Alteração não permitida', `<p>Essa alteração <b>não foi salva</b> porque viola as regras obrigatórias:</p>${listaProblemas(v.erros, [])}`);
     render();
