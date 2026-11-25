@@ -124,10 +124,16 @@
   }
   function cartao(f) {
     const r = rhDe(f.id), vinc = (VINCULOS.find(v => v[0] === (r.profissionais || {}).vinculo) || [0, ''])[1];
-    return `<div class="orc-card rh-card ${situacao(f)}" data-func="${f.id}"><div class="orc-card-l1"><span class="orc-num">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</span>${badge(f)}</div>
-      <div class="orc-card-l2"><span class="rh-av">${esc(iniciais(f.nome))}</span><b>${esc(f.nome)}</b></div>
-      <div class="orc-desc">${f.dataEntrada ? 'Entrada ' + br(f.dataEntrada) : 'Entrada não informada'}${vinc ? ' · ' + esc(vinc) : ''}${!f.ativo && r.desligamento ? ' · desligado em ' + br(r.desligamento.data) : ''}</div>
-      <div class="orc-card-bt"><button class="btn sm pri" data-act="rhFicha" data-id="${f.id}">Ficha</button>${soLer() ? '' : `<button class="btn sm" data-act="rhEditar" data-id="${f.id}">Editar</button>`}</div></div>`;
+    const ic1 = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>';
+    const ic2 = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+    return `<div class="orc-card rh-card rh-c ${situacao(f)}" data-func="${f.id}">
+      <div class="rh-c-top"><span class="rh-av">${esc(iniciais(f.nome))}</span>
+        <div class="rh-c-info"><b class="rh-c-nome">${esc(f.nome)}</b>
+          <div class="rh-c-linha">${ic1}<span>${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</span></div>
+          <div class="rh-c-linha">${ic2}<span>${f.dataEntrada ? 'Entrada ' + br(f.dataEntrada) : 'Entrada não informada'}${vinc ? ' · ' + esc(vinc) : ''}${!f.ativo && r.desligamento ? ' · desligado em ' + br(r.desligamento.data) : ''}</span></div>
+        </div>
+        <div class="rh-c-sit">${badge(f)}</div></div>
+      <div class="rh-c-bt"><button class="btn sm pri" data-act="rhFicha" data-id="${f.id}">Ficha</button>${soLer() ? '' : `<button class="btn sm" data-act="rhEditar" data-id="${f.id}">Editar</button>`}</div></div>`;
   }
   const iniciais = n => String(n || '?').trim().split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
