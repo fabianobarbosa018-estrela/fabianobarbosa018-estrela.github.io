@@ -110,7 +110,7 @@
 
   /* --------------- Elegibilidade --------------- */
   function elegivel(f, sem) {
-    if (!f || !f.ativo) return false;
+    if (!f || !f.ativo || f.foraEscala) return false; // foraEscala: funcionário segue ativo, mas não entra na escala
     if (f.dataEntrada && f.dataEntrada > fimSemana(sem)) return false;
     if (feriasNoPeriodo(f, sem, fimSemana(sem))) return false;
     return true;
@@ -123,6 +123,7 @@
   /** motivo pelo qual um funcionário ativo não entra na semana */
   function motivoFora(f, sem) {
     if (!f) return 'removido';
+    if (f.foraEscala) return 'fora_escala';
     if (!f.ativo) return 'inativo';
     if (f.dataEntrada && f.dataEntrada > fimSemana(sem)) return 'nao_admitido';
     if (feriasNoPeriodo(f, sem, fimSemana(sem))) return 'ferias';
@@ -715,7 +716,7 @@
       var cel = dias.map(function (d) {
         var s = inicioSemana(d), e = escalas[s];
         var st = statusDia(e && e.atribuicoes ? e.atribuicoes[f.id] : null, d, f, !!e);
-        var base = (st === 'T' || st === 'X') ? 'trab' : st === 'F' ? 'folga' : st === 'V' ? 'ferias' : (!e && f.ativo && !(f.dataEntrada && d < f.dataEntrada)) ? 'semEscala' : 'fora';
+        var base = (st === 'T' || st === 'X') ? 'trab' : st === 'F' ? 'folga' : st === 'V' ? 'ferias' : (!e && f.ativo && !f.foraEscala && !(f.dataEntrada && d < f.dataEntrada)) ? 'semEscala' : 'fora';
         var a = aj[f.id] && aj[f.id][d], tipo = a && VT_TIPOS[a.t] ? a.t : base;
         var vd = vtValorEm(f, d), valor = 0;
         if (tipo === 'trab') valor = a && a.t === 'trab' && a.v != null && a.v !== '' ? +a.v : (vd && !vd.fixo ? vd.total : 0);
