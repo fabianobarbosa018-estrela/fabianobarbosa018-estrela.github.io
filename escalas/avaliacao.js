@@ -320,7 +320,7 @@
     return `
       <form id="avForm" class="av-cartao" autocomplete="off">
         <h3>Nova ocorrência</h3>
-        <p>Só são aceitos os quatro tipos negativos da lista. Descreva o fato com clareza.</p>
+        <p>Escolha um dos tipos negativos da lista. Descreva o fato com clareza.</p>
         <div class="av-form">
           <div class="av-campo"><label for="avFunc">Funcionário</label>
             <select id="avFunc" name="funcionarioId" required><option value="">Escolha o funcionário…</option>${opcFunc}</select></div>
