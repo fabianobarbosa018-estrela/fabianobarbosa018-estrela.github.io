@@ -84,6 +84,7 @@
     h += '<div class="ord-card"><h3>1. Importar conversa</h3>' +
       '<label class="ord-arq">Escolher arquivo .txt<input type="file" accept=".txt,text/plain" data-ord="arq"></label>' +
       (o.arquivo ? '<p class="small muted" style="margin:8px 0 0">' + esc(o.arquivo) + ' · ' + o.msgs + ' mensagem(ns) lida(s)</p>' : '<p class="small muted" style="margin:8px 0 0">No WhatsApp: abra a conversa, Mais opções → Mais → Exportar conversa → Sem mídia.</p>') +
+      '<div class="fld" style="margin-top:10px"><label class="f">Ou cole o texto da conversa</label><textarea data-ord="colar" rows="4" placeholder="Abra o _chat.txt, copie tudo e cole aqui" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:transparent;color:inherit;font:inherit"></textarea><button class="btn" data-act="ordColar" style="margin-top:6px;width:100%">Usar texto colado</button></div>' +
       '<div class="fld" style="margin-top:10px"><label class="f">Data da ordem</label><input type="date" data-ord="data" value="' + esc(o.data) + '"></div></div>';
 
     if (o.itens.length) {
@@ -169,6 +170,14 @@
     if (a === 'ordAdd') { seq++; o.itens.push({ id: seq, data: C.hojeISO(), hora: '', quem: 'Manual', texto: '', func: '', incluir: true }); return render(); }
     if (a === 'ordLimpar') { UI.ord = { itens: [], data: C.hojeISO(), arquivo: '', msgs: 0 }; return render(); }
     if (a === 'ordPDF') return gerarPDF();
+    if (a === 'ordColar') {
+      var ta = document.querySelector('[data-ord="colar"]'), txt = ta ? ta.value : '';
+      if (!txt.trim()) return toast('Cole o texto da conversa primeiro.');
+      var msgs = lerConversa(txt);
+      o.itens = montarItens(msgs); o.arquivo = 'texto colado'; o.msgs = msgs.length;
+      if (!msgs.length) toast('Não encontrei mensagens nesse texto.');
+      return render();
+    }
   };
   document.addEventListener('change', function (ev) {
     var t = ev.target, o = ord();
