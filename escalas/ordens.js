@@ -122,7 +122,7 @@
       }).join('');
       h += '<button class="btn" data-act="ordAdd" style="width:100%">Adicionar tarefa manual</button></div>';
 
-      var semFunc = inc.filter(function (x) { return !x.func; }).length, semTexto = inc.filter(function (x) { return !String(x.texto || '').trim(); }).length;
+      var semFunc = 0, semTexto = inc.filter(function (x) { return !String(x.texto || '').trim(); }).length;
       var porFunc = {};
       inc.forEach(function (x) { if (x.func) porFunc[x.func] = (porFunc[x.func] || 0) + 1; });
       h += '<div class="ord-card"><h3>3. Gerar ordens</h3>';
@@ -130,7 +130,6 @@
         var f = (S.funcionarios || []).find(function (q) { return q.id === fid; }) || { nome: '?' };
         return '<span>' + esc(f.nome) + ': ' + porFunc[fid] + ' tarefa(s)</span>';
       }).join('') + '</div>';
-      if (semFunc) h += '<p class="ord-aviso">' + semFunc + ' tarefa(s) sem funcionário. Escolha o responsável ou desmarque para gerar.</p>';
       if (semTexto) h += '<p class="ord-aviso">' + semTexto + ' tarefa(s) sem texto. Escreva o que deve ser feito ou desmarque.</p>';
       h += '<div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap">' +
         '<button class="btn pri" data-act="ordPDF"' + (inc.length && !semFunc && !semTexto ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
@@ -176,15 +175,15 @@
   async function gerarPDF() {
     try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
     catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
-    var o = ord(), inc = o.itens.filter(function (x) { return x.incluir && x.func; });
+    var o = ord(), inc = o.itens.filter(function (x) { return x.incluir; });
     if (!inc.length) return toast('Nenhuma tarefa para gerar.');
     var grupos = {}, ordem = [];
-    inc.forEach(function (x) { if (!grupos[x.func]) { grupos[x.func] = []; ordem.push(x.func); } grupos[x.func].push(x); });
+    inc.forEach(function (x) { var k = x.func || '__sem__'; if (!grupos[k]) { grupos[k] = []; ordem.push(k); } grupos[k].push(x); });
     var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     var dataBR = C.dataBR(o.data);
     for (var i = 0; i < ordem.length; i++) {
       if (i > 0) doc.addPage();
-      var f = (S.funcionarios || []).find(function (q) { return q.id === ordem[i]; }) || { nome: '' };
+      var f = (S.funcionarios || []).find(function (q) { return q.id === ordem[i]; }) || { nome: '______________________________' };
       var itens = grupos[ordem[i]];
       var y = await pdfCabecalho(doc, 8);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(15, 76, 92);
@@ -194,7 +193,7 @@
       doc.setDrawColor(212, 162, 55); doc.setLineWidth(0.8); doc.line(14, y + 17, 196, y + 17);
       doc.setFontSize(11); doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'bold'); doc.text('Funcionário:', 14, y + 26); doc.setFont('helvetica', 'normal'); doc.text(String(f.nome || ''), 42, y + 26);
-      doc.setFont('helvetica', 'bold'); doc.text('Setor:', 14, y + 33); doc.setFont('helvetica', 'normal'); doc.text(String(f.setorId ? nomeSetor(f.setorId) : '—'), 42, y + 33);
+      doc.setFont('helvetica', 'bold'); doc.text('Setor:', 14, y + 33); doc.setFont('helvetica', 'normal'); doc.text(String(f.setorId ? nomeSetor(f.setorId) : '______________________________'), 42, y + 33);
       doc.setFont('helvetica', 'bold'); doc.text('Data:', 14, y + 40); doc.setFont('helvetica', 'normal'); doc.text(dataBR, 42, y + 40);
       doc.autoTable({
         startY: y + 47, margin: { left: 14, right: 14 },
