@@ -1122,6 +1122,40 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
   .nav-g{padding:12px 12px 4px}
 }
 </style>
+<style id="usr-v2">
+/* Usuários e Permissões: visual compacto (só aparência; a lógica não mudou) */
+.usr-inds{gap:6px;margin:0 0 10px}
+.usr-inds .ctr-ind{padding:8px 6px;border-radius:11px;box-shadow:none}
+.usr-inds .ctr-ind b{font-size:20px;color:var(--pri);display:block;line-height:1.1}
+.usr-inds .ctr-ind span{font-size:11px;color:var(--ink2);line-height:1.15;display:block;margin-top:2px}
+.usr-inds .ctr-ind.alerta b{color:#a16207}
+.usr-inds .ctr-ind.perigo b{color:#b91c1c}
+.usr-tabs{display:flex;gap:4px;background:rgba(15,76,92,.06);padding:4px;border-radius:12px;border:0;margin:0 0 12px}
+.usr-tabs button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--ink2);min-height:0}
+.usr-tabs button.on{background:var(--card,#fff);color:var(--pri);box-shadow:0 1px 3px rgba(0,0,0,.12);border-bottom:0}
+.usr-adm{padding:9px 12px;border-radius:12px;margin-bottom:10px;background:linear-gradient(135deg,#0f4c5c,#0a3a47);color:#fff;border-color:transparent}
+.usr-adm .small{color:rgba(255,255,255,.78)}
+.usr-adm .usr-av.adm{width:36px;height:36px;background:#d4a237;color:#0f2e38}
+.usr-adm .btn{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)}
+.usr-linha-h{padding:9px 12px;gap:10px}
+.usr-linha-h .usr-av{width:34px;height:34px;font-size:12.5px}
+.usr-linha-h .usr-id b{font-size:14.5px}
+.usr-linha-h .usr-id .small{font-size:12px}
+.usr-linha-h .badge{flex-shrink:0}
+.usr-det{padding:10px 12px 12px}
+.usr-excl{padding:10px 14px;margin-top:12px}
+.usr-excl summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.usr-excl summary::-webkit-details-marker{display:none}
+.usr-excl[open] .usr-seta{transform:rotate(180deg)}
+.usr-excl .usr-nunca{margin-top:10px}
+.usr-excl .chip{font-size:12px}
+.orc-novo{border-radius:12px}
+.orc-lista-h{border-bottom:2px solid #d4a237;padding-bottom:6px;margin:8px 0}
+@media (max-width:560px){
+  .usr-inds{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .usr-linha-h .usr-id b{font-size:15px}
+}
+</style>
   <aside class="side" id="side">
     <div class="brand"><img class="brand-logo" src="logo.png" alt="Hotel Fazenda Oasis"><b id="brandName">Gestão de Escalas</b><small>Gestão operacional</small><button class="menu-min" id="btnMin" aria-label="Recolher ou expandir menu" title="Recolher menu">‹</button></div>
     <nav class="nav" id="nav"></nav>
@@ -5290,7 +5324,7 @@ function vUsuarios() {
   h += '<div class="ctr-inds usr-inds">' + ind(p.administradores || 1, 'Administrador', 'usuarios') + ind(p.ativos || 0, 'Com acesso ativo', 'usuarios') + ind(p.bloqueados || 0, 'Bloqueados', 'usuarios') +
     ind(p.convites || 0, 'Convites pendentes', 'usuarios', p.convites ? 'alerta' : '') + ind((p.pedidos || 0) + (p.escalas || 0), 'Aprovações aguardando', 'aprovacoes', (p.pedidos || 0) + (p.escalas || 0) ? 'alerta' : '') + ind(p.negados || 0, 'Tentativas negadas (7 dias)', 'auditoria', p.negados ? 'perigo' : '') + '</div>';
   const abas = [['usuarios', 'Usuários'], ['aprovacoes', 'Aprovações' + ((p.pedidos || 0) + (p.escalas || 0) ? ' (' + ((p.pedidos || 0) + (p.escalas || 0)) + ')' : '')], ['auditoria', 'Auditoria']];
-  h += '<div class="tabs">' + abas.map(a => `<button class="${u.aba === a[0] ? 'on' : ''}" data-act="usrAba" data-aba="${a[0]}">${a[1]}</button>`).join('') + '</div>';
+  h += '<div class="tabs usr-tabs">' + abas.map(a => `<button class="${u.aba === a[0] ? 'on' : ''}" data-act="usrAba" data-aba="${a[0]}">${a[1]}</button>`).join('') + '</div>';
   if (u.aba === 'aprovacoes') return h + usrTelaAprovacoes(pend, p);
   if (u.aba === 'auditoria') return h + usrTelaAuditoria(lista);
   // ---- usuários ----
@@ -5316,8 +5350,8 @@ function vUsuarios() {
     h += '</div>';
   });
   h += ativos < max ? `<button class="btn pri orc-novo" style="width:100%;margin:6px 0 12px" data-act="usrNovo">${ic('plus')} Adicionar funcionário</button>` : `<p class="small muted">Limite de ${max} funcionário(s) com acesso atingido. Bloqueie um acesso para liberar outro.</p>`;
-  h += `<div class="card"><h3 style="margin-bottom:6px">Exclusivo do administrador</h3><div class="usr-nunca">${['Orçamentos', 'Contratos', 'Funcionários', 'Setores', 'Atestados', 'Histórico', 'Exportar', 'Backup e configurações', 'Usuários e permissões', 'Central de aprovações'].map(t => `<span class="chip">${t}</span>`).join('')}</div>
-    <p class="small muted" style="margin:10px 0 0">O servidor confere a permissão em cada gravação, não só esconde botões. Um funcionário nunca altera as próprias permissões nem vira administrador.</p></div>`;
+  h += `<details class="card usr-excl"><summary><span><b>Exclusivo do administrador</b><span class="small muted"> · permissões completas</span></span><span class="usr-seta">▾</span></summary><div class="usr-nunca">${['Orçamentos', 'Contratos', 'Funcionários', 'Setores', 'Atestados', 'Histórico', 'Exportar', 'Backup e configurações', 'Usuários e permissões', 'Central de aprovações'].map(t => `<span class="chip">${t}</span>`).join('')}</div>
+    <p class="small muted" style="margin:10px 0 0">O servidor confere a permissão em cada gravação, não só esconde botões. Um funcionário nunca altera as próprias permissões nem vira administrador.</p></details>`;
   return h;
 }
 function usrMatriz(perms, idEditavel) {
