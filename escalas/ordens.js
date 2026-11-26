@@ -8,6 +8,8 @@
   'use strict';
 
   var PALAVRAS = /(favor|preciso|precisa|precisamos|pode|podem|limpar|limpa|arrumar|arruma|organizar|organiza|fazer|faz|trocar|troca|levar|leva|buscar|busca|verificar|verifica|colocar|coloca|lavar|lava|tirar|tira|ajeitar|varrer|passar|recolher|entregar|reparar|conserta|consertar|providenciar|separar|guardar|repor|conferir|checar|cuidar|atender|pendente|urgente|quando puder|se possivel)/;
+  var VERBO_INICIO = /^(trocar|colocar|consertar|tirar|tapar|pintar|rocar|jogar|ver|concluir|arrumar|limpar|lavar|instalar|cortar|retirar|guardar|varrer|regar|podar|substituir|apertar|emassar|reparar|ajustar|desentupir|providenciar|buscar|levar|organizar|fazer|verificar|checar|conferir|separar|recolher|entregar|tratar|cuidar|montar|desmontar|trocar)\b/;
+  var PROBLEMA = /(nao funciona|nao esta funcionando|nao estao funcionando|entupid|quebrad|vazand|vazamento|solto|rachad|infiltra|queimad|desligad|sujo|sujeira|manchad)/;
   var LINHA = /^[‎‏﻿]*\[?(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(?:-\s*)?([^:]{1,60}?):\s?(.*)$/;
   var seq = 0;
 
@@ -31,8 +33,16 @@
   }
 
   function pareceTarefa(t) {
-    var n = norm(t);
+    var n = norm(t).trim();
+    if (!n) return false;
+    if (VERBO_INICIO.test(n) || PROBLEMA.test(n)) return true;
     return n.length >= 8 && (PALAVRAS.test(n) || n.indexOf('?') >= 0);
+  }
+  function dataISO(d) { var p = String(d || '').split('/'); return p.length === 3 ? (p[2].length === 2 ? '20' + p[2] : p[2]) + '-' + p[1].padStart(2, '0') + '-' + p[0].padStart(2, '0') : ''; }
+  /* Aplica o período escolhido (De/Até) às mensagens já lidas */
+  function aplicarPeriodo(o) {
+    var lista = (o.todas || []).filter(function (m) { var d = dataISO(m.data); return (!o.de || d >= o.de) && (!o.ate || d <= o.ate); });
+    o.itens = montarItens(lista);
   }
 
   /* Procura o funcionário citado (nome completo ou primeiro nome, com 3+ letras) */
@@ -85,6 +95,7 @@
       '<label class="ord-arq">Escolher arquivo .txt<input type="file" accept=".txt,text/plain" data-ord="arq"></label>' +
       (o.arquivo ? '<p class="small muted" style="margin:8px 0 0">' + esc(o.arquivo) + ' · ' + o.msgs + ' mensagem(ns) lida(s)</p>' : '<p class="small muted" style="margin:8px 0 0">No WhatsApp: abra a conversa, Mais opções → Mais → Exportar conversa → Sem mídia.</p>') +
       '<div class="fld" style="margin-top:10px"><label class="f">Ou cole o texto da conversa</label><textarea data-ord="colar" rows="4" placeholder="Abra o _chat.txt, copie tudo e cole aqui" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:transparent;color:inherit;font:inherit"></textarea><button class="btn" data-act="ordColar" style="margin-top:6px;width:100%">Usar texto colado</button></div>' +
+      (o.todas ? '<div class="row" style="gap:8px;margin-top:10px"><div class="fld" style="flex:1"><label class="f">Período: de</label><input type="date" data-ord="de" value="' + esc(o.de || '') + '"></div><div class="fld" style="flex:1"><label class="f">até</label><input type="date" data-ord="ate" value="' + esc(o.ate || '') + '"></div></div>' : '') +
       '<div class="fld" style="margin-top:10px"><label class="f">Data da ordem</label><input type="date" data-ord="data" value="' + esc(o.data) + '"></div></div>';
 
     if (o.itens.length) {
@@ -122,7 +133,7 @@
   function lerArquivo(file) {
     file.text().then(function (txt) {
       var msgs = lerConversa(txt), o = ord();
-      o.itens = montarItens(msgs); o.arquivo = file.name; o.msgs = msgs.length;
+      o.todas = msgs; o.arquivo = file.name; o.msgs = msgs.length; aplicarPeriodo(o);
       if (!msgs.length) toast('Não encontrei mensagens nesse arquivo. Use a exportação de conversa do WhatsApp.');
       render();
     }).catch(function () { toast('Não foi possível ler o arquivo.'); });
@@ -174,7 +185,7 @@
       var ta = document.querySelector('[data-ord="colar"]'), txt = ta ? ta.value : '';
       if (!txt.trim()) return toast('Cole o texto da conversa primeiro.');
       var msgs = lerConversa(txt);
-      o.itens = montarItens(msgs); o.arquivo = 'texto colado'; o.msgs = msgs.length;
+      o.todas = msgs; o.arquivo = 'texto colado'; o.msgs = msgs.length; aplicarPeriodo(o);
       if (!msgs.length) toast('Não encontrei mensagens nesse texto.');
       return render();
     }
@@ -185,6 +196,7 @@
     var k = t.dataset.ord;
     if (k === 'arq') { if (t.files && t.files[0]) lerArquivo(t.files[0]); return; }
     if (k === 'data') { o.data = t.value || C.hojeISO(); return render(); }
+    if (k === 'de' || k === 'ate') { o[k] = t.value || ''; aplicarPeriodo(o); return render(); }
     var it = atualizarState(+t.dataset.id); if (!it) return;
     if (k === 'func') { it.func = t.value; return render(); }
     if (k === 'incluir') { it.incluir = t.checked; return render(); }
