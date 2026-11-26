@@ -57,9 +57,33 @@
     return h;
   }
 
+  /* Imprime o conteúdo atual numa folha isolada (funciona no iPhone e no computador). */
+  function imprimirConteudo() {
+    var origem = document.getElementById('view');
+    if (!origem) return window.print();
+    var css = Array.prototype.map.call(document.querySelectorAll('style, link[rel="stylesheet"]'), function (n) { return n.outerHTML; }).join('');
+    var html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + css +
+      '<style>html,body{background:#fff!important}body{padding:16px}.btn,button,input,select{display:none!important}</style></head><body>' + origem.innerHTML + '</body></html>';
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var blob = new Blob([html], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    if (ios) {
+      var w = window.open(url, '_blank');
+      if (!w) location.href = url;
+      return;
+    }
+    var f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    f.onload = function () {
+      try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, '_blank'); }
+      setTimeout(function () { f.remove(); URL.revokeObjectURL(url); }, 60000);
+    };
+    f.src = url;
+    document.body.appendChild(f);
+  }
   root.vRelatorios = vRelatorios;
   root.mdlAcao = function (el) {
-    if (el.dataset.act === 'mdlImprimir') return window.print();
+    if (el.dataset.act === 'mdlImprimir') return imprimirConteudo();
   };
   document.addEventListener('change', function (ev) {
     var t = ev.target;
