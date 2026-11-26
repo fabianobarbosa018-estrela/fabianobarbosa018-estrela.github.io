@@ -122,7 +122,7 @@
       }).join('');
       h += '<button class="btn" data-act="ordAdd" style="width:100%">Adicionar tarefa manual</button></div>';
 
-      var semFunc = 0, semTexto = inc.filter(function (x) { return !String(x.texto || '').trim(); }).length;
+      var semFunc = 0, semTexto = inc.filter(function (x) { return !semConteudo(x); }).length;
       var porFunc = {};
       inc.forEach(function (x) { if (x.func) porFunc[x.func] = (porFunc[x.func] || 0) + 1; });
       h += '<div class="ord-card"><h3>3. Gerar ordens</h3>';
@@ -130,7 +130,7 @@
         var f = (S.funcionarios || []).find(function (q) { return q.id === fid; }) || { nome: '?' };
         return '<span>' + esc(f.nome) + ': ' + porFunc[fid] + ' tarefa(s)</span>';
       }).join('') + '</div>';
-      if (semTexto) h += '<p class="ord-aviso">' + semTexto + ' tarefa(s) sem texto. Escreva o que deve ser feito ou desmarque.</p>';
+      if (semTexto) h += '<p class="ord-aviso">' + semTexto + ' tarefa(s) sem texto e sem foto marcada. Escreva o que deve ser feito ou desmarque.</p>';
       var podeGerar = !!(inc.length && !semFunc && !semTexto);
       h += '<div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap">' +
         '<button class="btn pri" data-act="ordPDF"' + (podeGerar ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
@@ -243,6 +243,8 @@
   function ordensSalvas() {
     return (S.ordens || []).slice().sort(function (a, b) { return String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')); });
   }
+  /* Tarefa com foto marcada para imprimir já vale, mesmo sem texto (sai como "Ver a foto abaixo") */
+  function semConteudo(x) { return !String(x.texto || '').trim() && !(x.foto && x.fotoIncluir); }
   function nomeFunc(id) {
     var f = (S.funcionarios || []).find(function (q) { return q.id === id; });
     return f ? f.nome : 'Sem funcionário';
@@ -259,7 +261,7 @@
     if (salvando) return;
     var o = ord(), inc = o.itens.filter(function (x) { return x.incluir; });
     if (!inc.length) return toast('Nenhuma tarefa para salvar.');
-    if (inc.some(function (x) { return !String(x.texto || '').trim(); })) return toast('Escreva o texto de todas as tarefas incluídas antes de salvar.');
+    if (inc.some(semConteudo)) return toast('Escreva o texto ou marque a foto de todas as tarefas incluídas antes de salvar.');
     salvando = true;
     try {
       await gravarOrdem({
