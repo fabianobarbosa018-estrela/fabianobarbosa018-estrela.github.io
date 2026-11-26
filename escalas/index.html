@@ -1999,9 +1999,9 @@ const ACOES_PERM = {
 const MOD_NOME = { escala: 'Escala', servicos: 'Serviços prestados', diarias: 'Controle de diárias', vt: 'Vale-transporte', contratos: 'Contratos', orcamentos: 'Orçamentos', usuarios: 'Usuários', conta: 'Conta', funcionarios: 'Funcionários', setores: 'Setores', config: 'Configurações', atestados: 'Atestados', auditoria: 'Histórico', avaliacao: 'Avaliação' };
 const ACAO_NOME = { ver: 'acessar', criar: 'criar/lançar', editar: 'editar', excluir: 'excluir', enviar: 'enviar para aprovação', aprovar: 'aprovar', pagamentos: 'mexer em pagamentos e fechamentos' };
 const podeAcao = (m, a) => ehAdmin() || !!(S.perms && S.perms[m] && S.perms.acoes && S.perms.acoes[m] && S.perms.acoes[m][a]);
-const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], avaliacao: ['avaliacao'], conta: [] };
+const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], avaliacao: ['__desativada__'], conta: [] };
 const rotaPermitida = r => ehAdmin() ? (r !== 'conta' && (r !== 'usuarios' || S.modo === 'nuvem')) : (r in ROTA_PERM) && (!ROTA_PERM[r].length || ROTA_PERM[r].some(pode));
-const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt', 'avaliacao'].find(rotaPermitida) || 'conta');
+const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt'].find(rotaPermitida) || 'conta');
 function aplicarPerfil(p) {
   const antes = JSON.stringify([S.papel, S.perms, S.usuarioNome, S.usuarioLogin]);
   S.papel = p && p.papel === 'restrito' ? 'restrito' : 'admin';
@@ -2417,7 +2417,7 @@ const ICON = {
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['avaliacao', 'Avaliação'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta'], ['novidades', 'Novidades do sistema']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['orcamentos', 'Orçamentos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta'], ['novidades', 'Novidades do sistema']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -3332,7 +3332,7 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'avaliacao', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Sistema', ['novidades']], ['Conta', ['conta']]];
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Operação', ['orcamentos']], ['Financeiro', ['servicos', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Sistema', ['novidades']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
@@ -3632,7 +3632,6 @@ function vPainel() {
     ehAdmin() && ['#funcionarios', ico.users, 'Funcionários'],
     (pode('servicos') || pode('diarias')) && ['#servicos', ico.dollar, 'Serviços'],
     pode('vt') && ['#vt', ico.work, 'Vale-transp.'],
-    pode('avaliacao') && ['#avaliacao', ico.users, 'Avaliação'],
     ehAdmin() && ['#orcamentos', ic('orcamentos'), 'Orçamentos']
   ].filter(Boolean);
   const al = ehAdmin() ? alertasGerais() : [];
