@@ -70,12 +70,24 @@
       if (!pareceTarefa(texto) && !foto) return;
       seq++;
       itens.push({ id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: texto, foto: foto, fotoIncluir: !!foto, local: '',
-        func: texto ? acharFuncionario(texto) : '', incluir: !ehFuncionario(m.quem) });
+        func: texto ? acharFuncionario(texto) : '', incluir: !ehFuncionario(m.quem), fotoLocal: false });
     });
     return itens;
   }
 
   function atualizarState(id) { return ord().itens.find(function (x) { return x.id === id; }); }
+  /* Foto da placa da porta (marcada como local) enviada logo antes da foto da tarefa, sem nada incluído no meio */
+  function fotoDoLocal(itens, x) {
+    for (var k = itens.indexOf(x) - 1; k >= 0; k--) {
+      if (itens[k].fotoLocal && itens[k].foto) return itens[k];
+      if (itens[k].incluir) return null;
+    }
+    return null;
+  }
+  function localDaTarefa(itens, x) {
+    var p = fotoDoLocal(itens, x);
+    return String(x.local || (p && p.local) || '').trim();
+  }
 
   function vOrdens() {
     var o = ord();
@@ -115,6 +127,8 @@
           '<div class="ord-it-top"><span>' + esc(x.data) + ' ' + esc(x.hora) + ' · ' + esc(x.quem) + '</span>' + (x.func ? '<span>Funcionário sugerido</span>' : '<span>Sem responsável</span>') + '</div>' +
           (x.foto && o.img && o.img[x.foto] ? '<img src="' + o.img[x.foto] + '" alt="foto" style="display:block;max-width:100%;max-height:200px;border-radius:8px;margin:6px 0">' : (x.foto ? '<p class="small muted" style="margin:4px 0">Foto ' + esc(x.foto) + ' (não encontrada no arquivo)</p>' : '')) +
           (x.foto ? '<label class="ord-chk"><input type="checkbox" data-ord="fotoIncluir" data-id="' + x.id + '"' + (x.fotoIncluir ? ' checked' : '') + '> Imprimir a foto na ordem</label>' : '') +
+          (x.foto ? '<label class="ord-chk"><input type="checkbox" data-ord="fotoLocal" data-id="' + x.id + '"' + (x.fotoLocal ? ' checked' : '') + '> Esta é a foto do local (placa da porta)</label>' : '') +
+          (!x.fotoLocal && fotoDoLocal(o.itens, x) ? '<p class="small muted" style="margin:4px 0">Placa vinculada: ' + esc(fotoDoLocal(o.itens, x).local || 'escreva o nome do local no campo Local da placa') + '</p>' : '') +
           '<input type="text" data-ord="local" data-id="' + x.id + '" value="' + esc(x.local || '') + '" placeholder="Local (ex.: Quarto Amor)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card,#fff);color:inherit">' +
           '<textarea data-ord="texto" data-id="' + x.id + '" placeholder="Escreva a tarefa (ex.: consertar a porta do quarto 3)">' + esc(x.texto) + '</textarea>' +
           '<select data-ord="func" data-id="' + x.id + '">' + opc + '</select>' +
@@ -213,13 +227,23 @@
       doc.autoTable({
         startY: y + 47, margin: { left: 14, right: 14 },
         head: [['Nº', 'Tarefas a executar']], theme: 'grid',
-        body: itens.map(function (x, k) { var tx = String(x.texto || '').trim() || 'Ver a foto abaixo'; return [String(k + 1), (x.local ? x.local.trim() + ': ' : '') + tx]; }),
+        body: itens.map(function (x, k) { var tx = String(x.texto || '').trim() || 'Ver a foto abaixo'; var lg = localDaTarefa(o.itens, x); return [String(k + 1), (lg ? lg + ': ' : '') + tx]; }),
         headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 11, cellPadding: 3, valign: 'middle' },
         columnStyles: { 0: { cellWidth: 14, halign: 'center' } }
       });
       var py = doc.lastAutoTable.finalY + 8;
       for (var k2 = 0; k2 < itens.length; k2++) {
         var x = itens[k2];
+        var pl = fotoDoLocal(o.itens, x);
+        if (pl && o.img && o.img[pl.foto]) {
+          var pp = doc.getImageProperties(o.img[pl.foto]);
+          var pw = 70, ph = pw * pp.height / pp.width;
+          if (py + ph + 14 > 280) { doc.addPage(); py = 15; }
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 0, 0);
+          doc.text('Local' + (localDaTarefa(o.itens, x) ? ': ' + localDaTarefa(o.itens, x) : ''), 14, py);
+          doc.addImage(o.img[pl.foto], 'JPEG', 14, py + 2, pw, ph);
+          py += ph + 8;
+        }
         if (!x.foto || !x.fotoIncluir || !o.img || !o.img[x.foto]) continue;
         var props = doc.getImageProperties(o.img[x.foto]);
         var w = 110, h = w * props.height / props.width;
@@ -266,7 +290,7 @@
     try {
       await gravarOrdem({
         id: 'ord_' + Date.now().toString(36), data: o.data, arquivo: o.arquivo, criadoEm: new Date().toISOString(),
-        itens: inc.map(function (x) { return { texto: String(x.texto).trim(), local: String(x.local || '').trim(), func: x.func || '', status: 'pendente' }; })
+        itens: inc.map(function (x) { return { texto: String(x.texto).trim(), local: localDaTarefa(o.itens, x), func: x.func || '', status: 'pendente' }; })
       });
       toast('Ordem salva. Marque o que for sendo feito na seção 4.');
     } catch (e) {
@@ -313,6 +337,7 @@
     if (k === 'func') { it.func = t.value; return render(); }
     if (k === 'incluir') { it.incluir = t.checked; return render(); }
     if (k === 'fotoIncluir') { it.fotoIncluir = t.checked; return render(); }
+    if (k === 'fotoLocal') { it.fotoLocal = t.checked; it.incluir = !t.checked; return render(); }
     if (k === 'local') { it.local = t.value; return; }
   });
   document.addEventListener('input', function (ev) {
