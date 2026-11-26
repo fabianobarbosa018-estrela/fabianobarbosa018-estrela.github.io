@@ -101,8 +101,8 @@
       '<label class="ord-arq">Escolher arquivo (.zip ou .txt)<input type="file" accept=".zip,.txt,application/zip,text/plain" data-ord="arq"></label>' +
       (o.arquivo ? '<p class="small muted" style="margin:8px 0 0">' + esc(o.arquivo) + ' · ' + o.msgs + ' mensagem(ns) lida(s)</p>' : '<p class="small muted" style="margin:8px 0 0">No WhatsApp: abra a conversa, Mais opções → Mais → Exportar conversa → Sem mídia.</p>') +
       '<div class="fld" style="margin-top:10px"><label class="f">Ou cole o texto da conversa</label><textarea data-ord="colar" rows="4" placeholder="Abra o _chat.txt, copie tudo e cole aqui" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:transparent;color:inherit;font:inherit"></textarea><button class="btn" data-act="ordColar" style="margin-top:6px;width:100%">Usar texto colado</button></div>' +
-      (o.todas ? '<div class="row" style="gap:8px;margin-top:10px"><div class="fld" style="flex:1"><label class="f">Período: de</label><input type="date" data-ord="de" value="' + esc(o.de || '') + '"></div><div class="fld" style="flex:1"><label class="f">até</label><input type="date" data-ord="ate" value="' + esc(o.ate || '') + '"></div></div>' : '') +
-      '<div class="fld" style="margin-top:10px"><label class="f">Data da ordem</label><input type="date" data-ord="data" value="' + esc(o.data) + '"></div></div>';
+      '<div class="fld" style="margin-top:10px"><label class="f">Data da ordem</label><input type="date" data-ord="data" value="' + esc(o.data) + '"></div>' +
+      (o.todas ? '<div class="fld" style="margin-top:12px"><label class="f">Filtrar mensagens por período (opcional)</label><div class="row" style="gap:8px"><div class="fld" style="flex:1"><label class="small muted">de</label><input type="date" data-ord="de" value="' + esc(o.de || '') + '"></div><div class="fld" style="flex:1"><label class="small muted">até</label><input type="date" data-ord="ate" value="' + esc(o.ate || '') + '"></div></div>' + ((o.de || o.ate) && !o.itens.length ? '<p class="ord-aviso">Nenhuma mensagem nesse período. <button class="btn" data-act="ordLimparPeriodo" style="margin-top:6px">Limpar período</button></p>' : '') + '</div>' : '') + '</div>';
 
     if (o.itens.length) {
       var inc = o.itens.filter(function (x) { return x.incluir; });
@@ -286,6 +286,7 @@
   root.ordAcao = function (el) {
     var a = el.dataset.act, o = ord();
     if (a === 'ordSalvar') return salvarOrdemAtual();
+    if (a === 'ordLimparPeriodo') { o.de = ''; o.ate = ''; aplicarPeriodo(o); return render(); }
     if (a === 'ordAdd') { seq++; o.itens.push({ id: seq, data: C.hojeISO(), hora: '', quem: 'Manual', texto: '', func: '', incluir: true }); return render(); }
     if (a === 'ordLimpar') { UI.ord = { itens: [], data: C.hojeISO(), arquivo: '', msgs: 0 }; return render(); }
     if (a === 'ordPDF') return gerarPDF();
