@@ -11,7 +11,7 @@
   var VERBO_INICIO = /^(trocar|colocar|consertar|tirar|tapar|pintar|rocar|jogar|ver|concluir|arrumar|limpar|lavar|instalar|cortar|retirar|guardar|varrer|regar|podar|substituir|apertar|emassar|reparar|ajustar|desentupir|providenciar|buscar|levar|organizar|fazer|verificar|checar|conferir|separar|recolher|entregar|tratar|cuidar|montar|desmontar|trocar)\b/;
   var PROBLEMA = /(nao funciona|nao esta funcionando|nao estao funcionando|entupid|quebrad|vazand|vazamento|solto|rachad|infiltra|queimad|desligad|sujo|sujeira|manchad)/;
   var LINHA = /^[‎‏﻿]*\[?(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(?:-\s*)?([^:]{1,60}?):\s?(.*)$/;
-  var seq = 0;
+  var seq = 0, zipAtual = null;
 
   function norm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function escRe(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -63,10 +63,16 @@
   }
 
   function montarItens(msgs) {
-    return msgs.filter(function (m) { return pareceTarefa(m.texto); }).map(function (m) {
+    var itens = [];
+    msgs.forEach(function (m) {
+      var fotoM = m.texto.match(/<anexado:\s*([^>]+)>/i), foto = fotoM && /PHOTO/i.test(fotoM[1]) && /\.jpe?g$/i.test(fotoM[1].trim()) ? fotoM[1].trim() : '';
+      var texto = m.texto.replace(/<anexado:[^>]*>/gi, '').replace(/[\u200e\u200f]/g, '').trim();
+      if (!pareceTarefa(texto) && !foto) return;
       seq++;
-      return { id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: m.texto.trim(), func: acharFuncionario(m.texto), incluir: !ehFuncionario(m.quem) };
+      itens.push({ id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: texto, foto: foto, fotoIncluir: !!foto,
+        func: texto ? acharFuncionario(texto) : '', incluir: !ehFuncionario(m.quem) && !!texto });
     });
+    return itens;
   }
 
   function atualizarState(id) { return ord().itens.find(function (x) { return x.id === id; }); }
@@ -107,13 +113,15 @@
         }).join('');
         return '<div class="ord-it' + (x.incluir ? '' : ' off') + '">' +
           '<div class="ord-it-top"><span>' + esc(x.data) + ' ' + esc(x.hora) + ' · ' + esc(x.quem) + '</span>' + (x.func ? '<span>Funcionário sugerido</span>' : '<span>Sem responsável</span>') + '</div>' +
-          '<textarea data-ord="texto" data-id="' + x.id + '">' + esc(x.texto) + '</textarea>' +
+          (x.foto && o.img && o.img[x.foto] ? '<img src="' + o.img[x.foto] + '" alt="foto" style="display:block;max-width:100%;max-height:200px;border-radius:8px;margin:6px 0">' : (x.foto ? '<p class="small muted" style="margin:4px 0">Foto ' + esc(x.foto) + ' (não encontrada no arquivo)</p>' : '')) +
+          (x.foto ? '<label class="ord-chk"><input type="checkbox" data-ord="fotoIncluir" data-id="' + x.id + '"' + (x.fotoIncluir ? ' checked' : '') + '> Imprimir a foto na ordem</label>' : '') +
+          '<textarea data-ord="texto" data-id="' + x.id + '" placeholder="Escreva a tarefa (ex.: consertar a porta do quarto 3)">' + esc(x.texto) + '</textarea>' +
           '<select data-ord="func" data-id="' + x.id + '">' + opc + '</select>' +
           '<label class="ord-chk"><input type="checkbox" data-ord="incluir" data-id="' + x.id + '"' + (x.incluir ? ' checked' : '') + '> Incluir nas ordens</label></div>';
       }).join('');
       h += '<button class="btn" data-act="ordAdd" style="width:100%">Adicionar tarefa manual</button></div>';
 
-      var semFunc = inc.filter(function (x) { return !x.func; }).length;
+      var semFunc = inc.filter(function (x) { return !x.func; }).length, semTexto = inc.filter(function (x) { return !String(x.texto || '').trim(); }).length;
       var porFunc = {};
       inc.forEach(function (x) { if (x.func) porFunc[x.func] = (porFunc[x.func] || 0) + 1; });
       h += '<div class="ord-card"><h3>3. Gerar ordens</h3>';
@@ -122,8 +130,9 @@
         return '<span>' + esc(f.nome) + ': ' + porFunc[fid] + ' tarefa(s)</span>';
       }).join('') + '</div>';
       if (semFunc) h += '<p class="ord-aviso">' + semFunc + ' tarefa(s) sem funcionário. Escolha o responsável ou desmarque para gerar.</p>';
+      if (semTexto) h += '<p class="ord-aviso">' + semTexto + ' tarefa(s) sem texto. Escreva o que deve ser feito ou desmarque.</p>';
       h += '<div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap">' +
-        '<button class="btn pri" data-act="ordPDF"' + (inc.length && !semFunc ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
+        '<button class="btn pri" data-act="ordPDF"' + (inc.length && !semFunc && !semTexto ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
         '<button class="btn" data-act="ordLimpar" style="flex:1 1 140px">Limpar</button></div></div>';
     }
     h += '</div>';
@@ -132,19 +141,32 @@
 
   /* Aceita o .txt ou o .zip que o WhatsApp exporta (o _chat.txt é lido de dentro do zip) */
   async function textoDoArquivo(file) {
+    zipAtual = null;
     if (!/\.zip$/i.test(file.name) && file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') return file.text();
     await carregarScript('libs/jszip.min.js');
     var zip = await window.JSZip.loadAsync(file);
+    zipAtual = zip;
     var nomes = Object.keys(zip.files).filter(function (n) { return /\.txt$/i.test(n) && !zip.files[n].dir; });
     var chat = nomes.find(function (n) { return /_chat\.txt$/i.test(n); }) || nomes[0];
     if (!chat) throw new Error('sem txt');
     return zip.files[chat].async('string');
   }
 
+  /* Lê as fotos citadas que estão no zip (só as que aparecem nos pedidos) */
+  async function carregarFotos(o) {
+    o.img = o.img || {};
+    if (!o.zip) return;
+    await Promise.all(o.itens.filter(function (x) { return x.foto; }).map(async function (x) {
+      if (o.img[x.foto] || !o.zip.file(x.foto)) return;
+      o.img[x.foto] = 'data:image/jpeg;base64,' + await o.zip.file(x.foto).async('base64');
+    }));
+  }
+
   function lerArquivo(file) {
     textoDoArquivo(file).then(function (txt) {
       var msgs = lerConversa(txt), o = ord();
-      o.todas = msgs; o.arquivo = file.name; o.msgs = msgs.length; aplicarPeriodo(o);
+      o.todas = msgs; o.arquivo = file.name; o.msgs = msgs.length; o.zip = zipAtual; aplicarPeriodo(o);
+      return carregarFotos(o).then(render);
       if (!msgs.length) toast('Não encontrei mensagens nesse arquivo. Use a exportação de conversa do WhatsApp.');
       render();
     }).catch(function () { toast('Não foi possível ler o arquivo. Se for o zip, confira se a conversa foi exportada do WhatsApp.'); });
@@ -156,12 +178,13 @@
     var o = ord(), inc = o.itens.filter(function (x) { return x.incluir && x.func; });
     if (!inc.length) return toast('Nenhuma tarefa para gerar.');
     var grupos = {}, ordem = [];
-    inc.forEach(function (x) { if (!grupos[x.func]) { grupos[x.func] = []; ordem.push(x.func); } grupos[x.func].push(x.texto); });
+    inc.forEach(function (x) { if (!grupos[x.func]) { grupos[x.func] = []; ordem.push(x.func); } grupos[x.func].push(x); });
     var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     var dataBR = C.dataBR(o.data);
     for (var i = 0; i < ordem.length; i++) {
       if (i > 0) doc.addPage();
       var f = (S.funcionarios || []).find(function (q) { return q.id === ordem[i]; }) || { nome: '' };
+      var itens = grupos[ordem[i]];
       var y = await pdfCabecalho(doc, 8);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(15, 76, 92);
       doc.text('ORDEM DE SERVIÇO', 14, y + 8);
@@ -175,13 +198,27 @@
       doc.autoTable({
         startY: y + 47, margin: { left: 14, right: 14 },
         head: [['Nº', 'Tarefas a executar']], theme: 'grid',
-        body: grupos[ordem[i]].map(function (t, k) { return [String(k + 1), t]; }),
+        body: itens.map(function (x, k) { return [String(k + 1), String(x.texto || '').trim() || 'Ver a foto abaixo']; }),
         headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 11, cellPadding: 3, valign: 'middle' },
         columnStyles: { 0: { cellWidth: 14, halign: 'center' } }
       });
-      var fy = doc.lastAutoTable.finalY + 30;
-      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3); doc.line(14, fy, 110, fy);
-      doc.setFontSize(10); doc.text('Assinatura do funcionário', 14, fy + 5);
+      var py = doc.lastAutoTable.finalY + 8;
+      for (var k2 = 0; k2 < itens.length; k2++) {
+        var x = itens[k2];
+        if (!x.foto || !x.fotoIncluir || !o.img || !o.img[x.foto]) continue;
+        var props = doc.getImageProperties(o.img[x.foto]);
+        var w = 110, h = w * props.height / props.width;
+        if (py + h + 12 > 280) { doc.addPage(); py = 15; }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 0, 0);
+        doc.text('Tarefa ' + (k2 + 1) + (x.texto ? ': ' + String(x.texto).slice(0, 90) : ''), 14, py);
+        doc.addImage(o.img[x.foto], 'JPEG', 14, py + 2, w, h);
+        py += h + 10;
+      }
+      var fy = Math.min(py + 12, 270);
+      if (fy < doc.internal.pageSize.getHeight() - 20) {
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3); doc.line(14, fy, 110, fy);
+        doc.setFontSize(10); doc.text('Assinatura do funcionário', 14, fy + 5);
+      }
     }
     await salvarArquivo('ordens-servico-' + o.data + '.pdf', doc.output('blob'));
   }
@@ -196,7 +233,7 @@
       var ta = document.querySelector('[data-ord="colar"]'), txt = ta ? ta.value : '';
       if (!txt.trim()) return toast('Cole o texto da conversa primeiro.');
       var msgs = lerConversa(txt);
-      o.todas = msgs; o.arquivo = 'texto colado'; o.msgs = msgs.length; aplicarPeriodo(o);
+      o.todas = msgs; o.arquivo = 'texto colado'; o.msgs = msgs.length; o.zip = null; o.img = {}; aplicarPeriodo(o);
       if (!msgs.length) toast('Não encontrei mensagens nesse texto.');
       return render();
     }
@@ -211,6 +248,7 @@
     var it = atualizarState(+t.dataset.id); if (!it) return;
     if (k === 'func') { it.func = t.value; return render(); }
     if (k === 'incluir') { it.incluir = t.checked; return render(); }
+    if (k === 'fotoIncluir') { it.fotoIncluir = t.checked; return render(); }
   });
   document.addEventListener('input', function (ev) {
     var t = ev.target;
