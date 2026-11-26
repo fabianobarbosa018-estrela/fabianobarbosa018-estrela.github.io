@@ -131,10 +131,25 @@
         return '<span>' + esc(f.nome) + ': ' + porFunc[fid] + ' tarefa(s)</span>';
       }).join('') + '</div>';
       if (semTexto) h += '<p class="ord-aviso">' + semTexto + ' tarefa(s) sem texto. Escreva o que deve ser feito ou desmarque.</p>';
+      var podeGerar = !!(inc.length && !semFunc && !semTexto);
       h += '<div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap">' +
-        '<button class="btn pri" data-act="ordPDF"' + (inc.length && !semFunc && !semTexto ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
-        '<button class="btn" data-act="ordLimpar" style="flex:1 1 140px">Limpar</button></div></div>';
+        '<button class="btn pri" data-act="ordPDF"' + (podeGerar ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
+        '<button class="btn" data-act="ordSalvar"' + (podeGerar ? '' : ' disabled') + ' style="flex:1 1 200px">Salvar ordens</button>' +
+        '<button class="btn" data-act="ordLimpar" style="flex:1 1 140px">Limpar</button></div>' +
+        '<p class="small muted" style="margin:8px 0 0">Salvar guarda o texto, o local, o funcionário e o status de cada tarefa. As fotos ficam só no PDF.</p></div>';
     }
+    var salvas = ordensSalvas();
+    h += '<div class="ord-card"><h3>4. Acompanhamento</h3>';
+    if (!salvas.length) h += '<p class="small muted" style="margin:0">Nenhuma ordem salva ainda. Depois de revisar, toque em "Salvar ordens" para marcar aqui o que já foi feito.</p>';
+    else h += salvas.map(function (ordem) {
+      var its = ordem.itens || [], feitos = its.filter(function (x) { return x.status === 'feito'; }).length;
+      return '<div class="ord-it"><div class="ord-it-top"><span>Ordem de ' + esc(C.dataBR(ordem.data)) + (ordem.arquivo ? ' · ' + esc(ordem.arquivo) : '') + '</span><span>' + feitos + ' de ' + its.length + ' feitas</span></div>' +
+        its.map(function (x, ti) {
+          var feito = x.status === 'feito';
+          return '<label class="ord-chk" style="align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)"><input type="checkbox" data-ord="status" data-id="' + esc(ordem.id) + '" data-ti="' + ti + '"' + (feito ? ' checked' : '') + '><span style="' + (feito ? 'text-decoration:line-through;opacity:.6' : '') + '"><b>' + esc(nomeFunc(x.func)) + '</b>' + (x.local ? ' · ' + esc(x.local) : '') + '<br>' + esc(x.texto || 'Ver foto no PDF') + '</span></label>';
+        }).join('') + '</div>';
+    }).join('');
+    h += '</div>';
     h += '</div>';
     return h;
   }
@@ -223,9 +238,54 @@
     await salvarArquivo('ordens-servico-' + o.data + '.pdf', doc.output('blob'));
   }
 
+  /* Ordens salvas (coleção 'ordens', só administrador): texto, local, funcionário e status. Sem fotos. */
+  var salvando = false;
+  function ordensSalvas() {
+    return (S.ordens || []).slice().sort(function (a, b) { return String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')); });
+  }
+  function nomeFunc(id) {
+    var f = (S.funcionarios || []).find(function (q) { return q.id === id; });
+    return f ? f.nome : 'Sem funcionário';
+  }
+  async function gravarOrdem(d) {
+    var dados = { data: d.data, arquivo: d.arquivo || '', criadoEm: d.criadoEm, itens: d.itens };
+    await Nuvem.rpc('esc_salvar', { p_colecao: 'ordens', p_id: d.id, p_dados: dados });
+    S.ordens = S.ordens || [];
+    var i = S.ordens.findIndex(function (x) { return x.id === d.id; });
+    var obj = Object.assign({ id: d.id }, dados);
+    if (i >= 0) S.ordens[i] = obj; else S.ordens.push(obj);
+  }
+  async function salvarOrdemAtual() {
+    if (salvando) return;
+    var o = ord(), inc = o.itens.filter(function (x) { return x.incluir; });
+    if (!inc.length) return toast('Nenhuma tarefa para salvar.');
+    if (inc.some(function (x) { return !String(x.texto || '').trim(); })) return toast('Escreva o texto de todas as tarefas incluídas antes de salvar.');
+    salvando = true;
+    try {
+      await gravarOrdem({
+        id: 'ord_' + Date.now().toString(36), data: o.data, arquivo: o.arquivo, criadoEm: new Date().toISOString(),
+        itens: inc.map(function (x) { return { texto: String(x.texto).trim(), local: String(x.local || '').trim(), func: x.func || '', status: 'pendente' }; })
+      });
+      toast('Ordem salva. Marque o que for sendo feito na seção 4.');
+    } catch (e) {
+      toast('Não foi possível salvar: ' + (e.message || 'sem conexão'));
+    } finally { salvando = false; render(); }
+  }
+  function marcarFeito(t) {
+    var ordem = (S.ordens || []).find(function (x) { return x.id === t.dataset.id; });
+    var it = ordem && (ordem.itens || [])[+t.dataset.ti];
+    if (!it) return;
+    var antes = it.status;
+    it.status = t.checked ? 'feito' : 'pendente';
+    gravarOrdem({ id: ordem.id, data: ordem.data, arquivo: ordem.arquivo, criadoEm: ordem.criadoEm, itens: ordem.itens })
+      .catch(function (e) { it.status = antes; toast('Não foi possível salvar: ' + (e.message || 'sem conexão')); })
+      .then(render);
+  }
+
   root.vOrdens = vOrdens;
   root.ordAcao = function (el) {
     var a = el.dataset.act, o = ord();
+    if (a === 'ordSalvar') return salvarOrdemAtual();
     if (a === 'ordAdd') { seq++; o.itens.push({ id: seq, data: C.hojeISO(), hora: '', quem: 'Manual', texto: '', func: '', incluir: true }); return render(); }
     if (a === 'ordLimpar') { UI.ord = { itens: [], data: C.hojeISO(), arquivo: '', msgs: 0 }; return render(); }
     if (a === 'ordPDF') return gerarPDF();
@@ -242,6 +302,7 @@
     var t = ev.target, o = ord();
     if (!t || !t.dataset || !t.dataset.ord) return;
     var k = t.dataset.ord;
+    if (k === 'status') return marcarFeito(t);
     if (k === 'arq') { if (t.files && t.files[0]) lerArquivo(t.files[0]); return; }
     if (k === 'data') { o.data = t.value || C.hojeISO(); return render(); }
     if (k === 'de' || k === 'ate') { o[k] = t.value || ''; aplicarPeriodo(o); return render(); }
