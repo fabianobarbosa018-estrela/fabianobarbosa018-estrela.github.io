@@ -1,0 +1,188 @@
+/* =====================================================================
+   ORDENS DE SERVIÇO (só administrador).
+   Importa o TXT exportado do WhatsApp, sugere as tarefas por regras
+   (palavras de pedido e nome do funcionário), o administrador revisa e
+   gera um PDF A4 com uma ordem por funcionário. Não grava nada no banco.
+   ===================================================================== */
+(function (root) {
+  'use strict';
+
+  var PALAVRAS = /(favor|preciso|precisa|precisamos|pode|podem|limpar|limpa|arrumar|arruma|organizar|organiza|fazer|faz|trocar|troca|levar|leva|buscar|busca|verificar|verifica|colocar|coloca|lavar|lava|tirar|tira|ajeitar|varrer|passar|recolher|entregar|reparar|conserta|consertar|providenciar|separar|guardar|repor|conferir|checar|cuidar|atender|pendente|urgente|quando puder|se possivel)/;
+  var LINHA = /^[‎‏﻿]*\[?(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(?:-\s*)?([^:]{1,60}?):\s?(.*)$/;
+  var seq = 0;
+
+  function norm(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function escRe(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function ord() { return (UI.ord = UI.ord || { itens: [], data: C.hojeISO(), arquivo: '', msgs: 0 }); }
+  function ativosOrd() {
+    return (S.funcionarios || []).filter(function (f) { return f.ativo; })
+      .slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
+  }
+
+  /* Lê as linhas do WhatsApp (formatos com colchetes ou com hífen) */
+  function lerConversa(txt) {
+    var msgs = [];
+    String(txt || '').replace(/\r/g, '').split('\n').forEach(function (l) {
+      var m = l.match(LINHA);
+      if (m) msgs.push({ data: m[1], hora: m[2], quem: m[3].trim(), texto: m[4] });
+      else if (msgs.length && l.trim()) msgs[msgs.length - 1].texto += '\n' + l.trim();
+    });
+    return msgs;
+  }
+
+  function pareceTarefa(t) {
+    var n = norm(t);
+    return n.length >= 8 && (PALAVRAS.test(n) || n.indexOf('?') >= 0);
+  }
+
+  /* Procura o funcionário citado (nome completo ou primeiro nome, com 3+ letras) */
+  function acharFuncionario(texto) {
+    var n = norm(texto);
+    var achados = ativosOrd().filter(function (f) {
+      var nome = norm(f.nome).trim(), primeiro = nome.split(/\s+/)[0];
+      if (nome && n.indexOf(nome) >= 0) return true;
+      return primeiro.length >= 3 && new RegExp('(^|[^a-z])' + escRe(primeiro) + '([^a-z]|$)').test(n);
+    });
+    return achados.length === 1 ? achados[0].id : '';
+  }
+
+  /* Quem mandou a mensagem é funcionário? Então é resposta, e não entra por padrão */
+  function ehFuncionario(nome) {
+    var n = norm(nome);
+    return ativosOrd().some(function (f) { return norm(f.nome).trim() === n; });
+  }
+
+  function montarItens(msgs) {
+    return msgs.filter(function (m) { return pareceTarefa(m.texto); }).map(function (m) {
+      seq++;
+      return { id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: m.texto.trim(), func: acharFuncionario(m.texto), incluir: !ehFuncionario(m.quem) };
+    });
+  }
+
+  function atualizarState(id) { return ord().itens.find(function (x) { return x.id === id; }); }
+
+  function vOrdens() {
+    var o = ord();
+    var h = '<style>' +
+      '.ord{max-width:760px;margin:0 auto}' +
+      '.ord-card{background:var(--card,#fff);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}' +
+      '.ord-card h3{margin:0 0 8px;font-size:15px;color:#0f4c5c}' +
+      '.ord-it{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px}' +
+      '.ord-it.off{opacity:.55}' +
+      '.ord-it-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted,#64748b);margin-bottom:6px;flex-wrap:wrap}' +
+      '.ord-it textarea{width:100%;min-height:60px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:transparent;color:inherit;font:inherit}' +
+      '.ord-it select{width:100%;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card,#fff);color:inherit}' +
+      '.ord-chk{display:flex;align-items:center;gap:6px;font-size:13px;margin-top:6px}' +
+      '.ord-aviso{font-size:13px;color:#a16207;margin:8px 0 0}' +
+      '.ord-arq{display:inline-block;padding:10px 14px;border-radius:10px;background:#0f4c5c;color:#fff;font-weight:700;cursor:pointer}' +
+      '.ord-arq input{display:none}' +
+      '.ord-res{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}' +
+      '.ord-res span{font-size:12.5px;background:rgba(15,76,92,.08);border-radius:999px;padding:4px 10px}' +
+      '</style><div class="ord">';
+    h += '<div class="row mb"><div><h1>Ordens de Serviço</h1><p class="sub" style="margin:0">Importe a conversa do WhatsApp, revise e imprima uma ordem por funcionário</p></div></div>';
+
+    h += '<div class="ord-card"><h3>1. Importar conversa</h3>' +
+      '<label class="ord-arq">Escolher arquivo .txt<input type="file" accept=".txt,text/plain" data-ord="arq"></label>' +
+      (o.arquivo ? '<p class="small muted" style="margin:8px 0 0">' + esc(o.arquivo) + ' · ' + o.msgs + ' mensagem(ns) lida(s)</p>' : '<p class="small muted" style="margin:8px 0 0">No WhatsApp: abra a conversa, Mais opções → Mais → Exportar conversa → Sem mídia.</p>') +
+      '<div class="fld" style="margin-top:10px"><label class="f">Data da ordem</label><input type="date" data-ord="data" value="' + esc(o.data) + '"></div></div>';
+
+    if (o.itens.length) {
+      var inc = o.itens.filter(function (x) { return x.incluir; });
+      h += '<div class="ord-card"><h3>2. Revisar pedidos</h3><p class="small muted" style="margin:0 0 8px">Confira o texto, escolha o funcionário e desmarque o que não é tarefa. Nada é atribuído sem a sua confirmação.</p>';
+      h += o.itens.map(function (x) {
+        var opc = '<option value="">— escolher funcionário —</option>' + ativosOrd().map(function (f) {
+          return '<option value="' + f.id + '"' + (x.func === f.id ? ' selected' : '') + '>' + esc(f.nome) + ' · ' + esc(nomeSetor(f.setorId)) + '</option>';
+        }).join('');
+        return '<div class="ord-it' + (x.incluir ? '' : ' off') + '">' +
+          '<div class="ord-it-top"><span>' + esc(x.data) + ' ' + esc(x.hora) + ' · ' + esc(x.quem) + '</span>' + (x.func ? '<span>Funcionário sugerido</span>' : '<span>Sem responsável</span>') + '</div>' +
+          '<textarea data-ord="texto" data-id="' + x.id + '">' + esc(x.texto) + '</textarea>' +
+          '<select data-ord="func" data-id="' + x.id + '">' + opc + '</select>' +
+          '<label class="ord-chk"><input type="checkbox" data-ord="incluir" data-id="' + x.id + '"' + (x.incluir ? ' checked' : '') + '> Incluir nas ordens</label></div>';
+      }).join('');
+      h += '<button class="btn" data-act="ordAdd" style="width:100%">Adicionar tarefa manual</button></div>';
+
+      var semFunc = inc.filter(function (x) { return !x.func; }).length;
+      var porFunc = {};
+      inc.forEach(function (x) { if (x.func) porFunc[x.func] = (porFunc[x.func] || 0) + 1; });
+      h += '<div class="ord-card"><h3>3. Gerar ordens</h3>';
+      h += '<div class="ord-res">' + Object.keys(porFunc).map(function (fid) {
+        var f = (S.funcionarios || []).find(function (q) { return q.id === fid; }) || { nome: '?' };
+        return '<span>' + esc(f.nome) + ': ' + porFunc[fid] + ' tarefa(s)</span>';
+      }).join('') + '</div>';
+      if (semFunc) h += '<p class="ord-aviso">' + semFunc + ' tarefa(s) sem funcionário. Escolha o responsável ou desmarque para gerar.</p>';
+      h += '<div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap">' +
+        '<button class="btn pri" data-act="ordPDF"' + (inc.length && !semFunc ? '' : ' disabled') + ' style="flex:1 1 200px">Gerar ordens (PDF A4)</button>' +
+        '<button class="btn" data-act="ordLimpar" style="flex:1 1 140px">Limpar</button></div></div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  function lerArquivo(file) {
+    file.text().then(function (txt) {
+      var msgs = lerConversa(txt), o = ord();
+      o.itens = montarItens(msgs); o.arquivo = file.name; o.msgs = msgs.length;
+      if (!msgs.length) toast('Não encontrei mensagens nesse arquivo. Use a exportação de conversa do WhatsApp.');
+      render();
+    }).catch(function () { toast('Não foi possível ler o arquivo.'); });
+  }
+
+  async function gerarPDF() {
+    try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
+    catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
+    var o = ord(), inc = o.itens.filter(function (x) { return x.incluir && x.func; });
+    if (!inc.length) return toast('Nenhuma tarefa para gerar.');
+    var grupos = {}, ordem = [];
+    inc.forEach(function (x) { if (!grupos[x.func]) { grupos[x.func] = []; ordem.push(x.func); } grupos[x.func].push(x.texto); });
+    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var dataBR = C.dataBR(o.data);
+    for (var i = 0; i < ordem.length; i++) {
+      if (i > 0) doc.addPage();
+      var f = (S.funcionarios || []).find(function (q) { return q.id === ordem[i]; }) || { nome: '' };
+      var y = await pdfCabecalho(doc, 8);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(15, 76, 92);
+      doc.text('ORDEM DE SERVIÇO', 14, y + 8);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+      doc.text('Hotel Fazenda Oásis', 14, y + 14);
+      doc.setDrawColor(212, 162, 55); doc.setLineWidth(0.8); doc.line(14, y + 17, 196, y + 17);
+      doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold'); doc.text('Funcionário:', 14, y + 26); doc.setFont('helvetica', 'normal'); doc.text(String(f.nome || ''), 42, y + 26);
+      doc.setFont('helvetica', 'bold'); doc.text('Setor:', 14, y + 33); doc.setFont('helvetica', 'normal'); doc.text(String(f.setorId ? nomeSetor(f.setorId) : '—'), 42, y + 33);
+      doc.setFont('helvetica', 'bold'); doc.text('Data:', 14, y + 40); doc.setFont('helvetica', 'normal'); doc.text(dataBR, 42, y + 40);
+      doc.autoTable({
+        startY: y + 47, margin: { left: 14, right: 14 },
+        head: [['Nº', 'Tarefas a executar']], theme: 'grid',
+        body: grupos[ordem[i]].map(function (t, k) { return [String(k + 1), t]; }),
+        headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 11, cellPadding: 3, valign: 'middle' },
+        columnStyles: { 0: { cellWidth: 14, halign: 'center' } }
+      });
+      var fy = doc.lastAutoTable.finalY + 30;
+      doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3); doc.line(14, fy, 110, fy);
+      doc.setFontSize(10); doc.text('Assinatura do funcionário', 14, fy + 5);
+    }
+    await salvarArquivo('ordens-servico-' + o.data + '.pdf', doc.output('blob'));
+  }
+
+  root.vOrdens = vOrdens;
+  root.ordAcao = function (el) {
+    var a = el.dataset.act, o = ord();
+    if (a === 'ordAdd') { seq++; o.itens.push({ id: seq, data: C.hojeISO(), hora: '', quem: 'Manual', texto: '', func: '', incluir: true }); return render(); }
+    if (a === 'ordLimpar') { UI.ord = { itens: [], data: C.hojeISO(), arquivo: '', msgs: 0 }; return render(); }
+    if (a === 'ordPDF') return gerarPDF();
+  };
+  document.addEventListener('change', function (ev) {
+    var t = ev.target, o = ord();
+    if (!t || !t.dataset || !t.dataset.ord) return;
+    var k = t.dataset.ord;
+    if (k === 'arq') { if (t.files && t.files[0]) lerArquivo(t.files[0]); return; }
+    if (k === 'data') { o.data = t.value || C.hojeISO(); return render(); }
+    var it = atualizarState(+t.dataset.id); if (!it) return;
+    if (k === 'func') { it.func = t.value; return render(); }
+    if (k === 'incluir') { it.incluir = t.checked; return render(); }
+  });
+  document.addEventListener('input', function (ev) {
+    var t = ev.target;
+    if (!t || !t.dataset || t.dataset.ord !== 'texto') return;
+    var it = atualizarState(+t.dataset.id); if (it) it.texto = t.value; // sem redesenhar, para não perder o cursor
+  });
+})(window);
