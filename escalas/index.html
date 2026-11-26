@@ -2417,7 +2417,7 @@ const ICON = {
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['exportar', 'Exportar e compartilhar'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -3332,7 +3332,7 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Financeiro', ['servicos', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'exportar', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  const GRUPOS_MENU = [['Principal', ['painel', 'diaria', 'mensal']], ['Gestão de pessoas', ['funcionarios', 'atestados', 'setores', 'contratos']], ['Financeiro', ['servicos', 'vt', 'relatorios', 'historico']], ['Administração', ['usuarios', 'backup', 'aparencia']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
@@ -3350,7 +3350,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, exportar: vExportar, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -3713,7 +3713,7 @@ function vEscala() {
     ${e && !aprov ? `<button class="btn ok" data-act="aprovar">${ic('check')} Aprovar escala</button>` : ''}
     ${aprov && !S.somenteLeitura ? `<button class="btn pri" data-act="editarAprovada">${ic('edit')} Editar escala</button>` : ''}
     ${aprov ? `<button class="btn" data-act="reabrir">${ic('edit')} Reabrir para edição</button>` : ''}
-    ${e ? `<a class="btn" href="#exportar" data-act="irExport">${ic('exportar')} Exportar</a>` : ''}
+    ${e ? `<button class="btn" data-act="semExpPDF">${ic('pdf')} Baixar PDF da semana</button>` : ''}
     ${e ? `<button class="btn danger sm" data-act="excluirEscala">${ic('trash')} Excluir escala</button>` : ''}
   </div></div>`;
   if (!e) {
@@ -4203,25 +4203,6 @@ function vHistorico() {
 }
 
 /* ---------------- EXPORTAR ---------------- */
-function vExportar() {
-  const fs = S.funcionarios.slice().sort((a, b) => cmpSetor(a.setorId, b.setorId) || a.nome.localeCompare(b.nome, 'pt-BR'));
-  const temEsc = UI.expPeriodo === 'semana' ? !!S.escalas[UI.semana] : semanasDoMes(UI.mes).sems.some(s => S.escalas[s]);
-  return `<div class="row mb"><div><h1>Exportar e compartilhar</h1><p class="sub" style="margin:0">PDF, Excel e impressão</p></div></div>
-  <div class="card"><div class="grid g2" style="gap:12px">
-    <div class="fld"><label class="f">Período</label><select id="expPeriodo"><option value="semana" ${UI.expPeriodo === 'semana' ? 'selected' : ''}>Semana</option><option value="mes" ${UI.expPeriodo === 'mes' ? 'selected' : ''}>Mês</option></select></div>
-    <div class="fld"><label class="f">${UI.expPeriodo === 'semana' ? 'Semana (qualquer dia dela)' : 'Mês'}</label>${UI.expPeriodo === 'semana' ? `<input type="date" id="inSemana" value="${UI.semana}">` : `<input type="month" id="inMes" value="${UI.mes}">`}</div>
-    <div class="fld"><label class="f">O que exportar</label><select id="expEscopo"><option value="completa" ${UI.expEscopo === 'completa' ? 'selected' : ''}>Escala completa (todos os setores)</option><option value="setor" ${UI.expEscopo === 'setor' ? 'selected' : ''}>Escala de um setor</option><option value="func" ${UI.expEscopo === 'func' ? 'selected' : ''}>Escala individual de um funcionário</option></select></div>
-    ${UI.expEscopo === 'setor' ? `<div class="fld"><label class="f">Setor</label><select id="expSetor">${setoresOrd().map(s => `<option value="${s.id}" ${UI.expSetor === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : ''}
-    ${UI.expEscopo === 'func' ? `<div class="fld"><label class="f">Funcionário</label><select id="expFunc">${fs.map(f => `<option value="${f.id}" ${UI.expFunc === f.id ? 'selected' : ''}>${esc(f.nome)} — ${esc(nomeSetor(f.setorId))}</option>`).join('')}</select></div>` : ''}
-  </div>
-  <p class="muted">${UI.expPeriodo === 'semana' ? 'Semana ' + semanaLabel(UI.semana) : 'Mês ' + UI.mes.split('-').reverse().join('/')} ${temEsc ? '' : ' — <b style="color:var(--err)">não há escala gerada neste período</b>'}</p>
-  <div class="row">
-    <button class="btn pri" data-act="expPDF" ${temEsc ? '' : 'disabled'}>${ic('pdf')} Baixar PDF</button>
-    <button class="btn" data-act="expXLS" ${temEsc ? '' : 'disabled'}>${ic('xls')} Exportar Excel</button>
-    <button class="btn" data-act="expPrint" ${temEsc ? '' : 'disabled'}>${ic('print')} Imprimir</button>
-  </div>
-  <p class="small muted mt">Imprimir gera um PDF em A4 paisagem pronto para impressão (abra o arquivo e imprima). Os arquivos baixados pedem sua confirmação antes de salvar.</p></div>`;
-}
 
 /* ---------------- BACKUP ---------------- */
 function vBackup() {
@@ -5683,7 +5664,7 @@ document.addEventListener('click', async ev => {
     case 'painelSem': { const k = +el.dataset.d; const base = UI.painelSem || C.inicioSemana(C.hojeISO()); UI.painelSem = k === 0 ? null : C.addDias(base, 7 * k); UI.painelDia = undefined; render(); return; }
     case 'painelDia': { const i = +el.dataset.i; const ja = el.classList.contains('sel'); UI.painelDia = ja ? null : i; render(); return; }
     case 'irGerar': UI.semana = el.dataset.sem; return;
-    case 'irExport': UI.expPeriodo = 'semana'; return;
+    case 'semExpPDF': UI.expPeriodo = 'semana'; return exportarPDF(false);
     case 'semAnt': UI.semana = C.addDias(sem, -7); return render();
     case 'semProx': UI.semana = C.addDias(sem, 7); return render();
     case 'semHoje': UI.semana = C.inicioSemana(C.hojeISO()); return render();
@@ -5811,9 +5792,6 @@ document.addEventListener('click', async ev => {
     case 'vtPDF': return vtPDF(UI.vtPer, false);
     case 'vtPrint': return vtPDF(el.dataset.p, true);
     case 'vtXLS': return vtExcel();
-    case 'expPDF': return exportarPDF(false);
-    case 'expPrint': return exportarPDF(true);
-    case 'expXLS': return exportarExcel();
     case 'backup': return baixarBackup();
     case 'salvarCfg': { const n = document.getElementById('cfgNome').value.trim(), t = document.getElementById('cfgTitulo').value.trim(), imp = document.getElementById('cfgImp').value.trim(); try { await Store.set('config', 'geral', Object.assign({}, S.config, { nomeHotel: n, tituloFolha: t || 'ESCALA DE FOLGA', textoImportante: imp, feriados: feriadosLista() })); log('sistema', 'Configurações alteradas'); toast('Configurações salvas.'); } catch (e) { } return; }
   }
