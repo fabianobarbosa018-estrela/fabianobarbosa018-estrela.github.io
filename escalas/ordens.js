@@ -92,7 +92,7 @@
     h += '<div class="row mb"><div><h1>Ordens de Serviço</h1><p class="sub" style="margin:0">Importe a conversa do WhatsApp, revise e imprima uma ordem por funcionário</p></div></div>';
 
     h += '<div class="ord-card"><h3>1. Importar conversa</h3>' +
-      '<label class="ord-arq">Escolher arquivo .txt<input type="file" accept=".txt,text/plain" data-ord="arq"></label>' +
+      '<label class="ord-arq">Escolher arquivo (.zip ou .txt)<input type="file" accept=".zip,.txt,application/zip,text/plain" data-ord="arq"></label>' +
       (o.arquivo ? '<p class="small muted" style="margin:8px 0 0">' + esc(o.arquivo) + ' · ' + o.msgs + ' mensagem(ns) lida(s)</p>' : '<p class="small muted" style="margin:8px 0 0">No WhatsApp: abra a conversa, Mais opções → Mais → Exportar conversa → Sem mídia.</p>') +
       '<div class="fld" style="margin-top:10px"><label class="f">Ou cole o texto da conversa</label><textarea data-ord="colar" rows="4" placeholder="Abra o _chat.txt, copie tudo e cole aqui" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:transparent;color:inherit;font:inherit"></textarea><button class="btn" data-act="ordColar" style="margin-top:6px;width:100%">Usar texto colado</button></div>' +
       (o.todas ? '<div class="row" style="gap:8px;margin-top:10px"><div class="fld" style="flex:1"><label class="f">Período: de</label><input type="date" data-ord="de" value="' + esc(o.de || '') + '"></div><div class="fld" style="flex:1"><label class="f">até</label><input type="date" data-ord="ate" value="' + esc(o.ate || '') + '"></div></div>' : '') +
@@ -130,13 +130,24 @@
     return h;
   }
 
+  /* Aceita o .txt ou o .zip que o WhatsApp exporta (o _chat.txt é lido de dentro do zip) */
+  async function textoDoArquivo(file) {
+    if (!/\.zip$/i.test(file.name) && file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') return file.text();
+    await carregarScript('libs/jszip.min.js');
+    var zip = await window.JSZip.loadAsync(file);
+    var nomes = Object.keys(zip.files).filter(function (n) { return /\.txt$/i.test(n) && !zip.files[n].dir; });
+    var chat = nomes.find(function (n) { return /_chat\.txt$/i.test(n); }) || nomes[0];
+    if (!chat) throw new Error('sem txt');
+    return zip.files[chat].async('string');
+  }
+
   function lerArquivo(file) {
-    file.text().then(function (txt) {
+    textoDoArquivo(file).then(function (txt) {
       var msgs = lerConversa(txt), o = ord();
       o.todas = msgs; o.arquivo = file.name; o.msgs = msgs.length; aplicarPeriodo(o);
       if (!msgs.length) toast('Não encontrei mensagens nesse arquivo. Use a exportação de conversa do WhatsApp.');
       render();
-    }).catch(function () { toast('Não foi possível ler o arquivo.'); });
+    }).catch(function () { toast('Não foi possível ler o arquivo. Se for o zip, confira se a conversa foi exportada do WhatsApp.'); });
   }
 
   async function gerarPDF() {
