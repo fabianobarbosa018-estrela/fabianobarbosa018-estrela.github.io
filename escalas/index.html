@@ -5290,7 +5290,7 @@ function vUsuarios() {
         <h3 style="margin:14px 0 6px">Permissões</h3>${usrMatriz(x.permissoes, x.ativo ? x.id : null)}
         <div class="usr-acoes">${!x.ativo ? `<button class="btn pri" data-act="usrBloquear" data-id="${x.id}" data-on="1">Desbloquear</button>` : pendSenha ? `<button class="btn pri" data-act="usrConvite" data-id="${x.id}">${ic('wa')} Enviar convite</button>` : `<button class="btn" data-act="usrConvite" data-id="${x.id}">Redefinir senha</button>`}
           <button class="btn" data-act="usrEditar" data-id="${x.id}">${ic('edit')} Editar dados</button><button class="btn" data-act="usrAtividade" data-id="${x.id}">Atividade</button>
-          ${x.sessoes ? `<button class="btn" data-act="usrSessoes" data-id="${x.id}">Encerrar sessões</button>` : ''}${x.ativo ? `<button class="btn danger" data-act="usrBloquear" data-id="${x.id}" data-on="0">Bloquear agora</button>` : ''}</div></div>`;
+          ${x.sessoes ? `<button class="btn" data-act="usrSessoes" data-id="${x.id}">Encerrar sessões</button>` : ''}${x.ativo ? `<button class="btn danger" data-act="usrBloquear" data-id="${x.id}" data-on="0">Bloquear agora</button>` : ''}<button class="btn danger" data-act="usrExcluir" data-id="${x.id}">Excluir usuário</button></div></div>`;
     }
     h += '</div>';
   });
@@ -5417,6 +5417,12 @@ async function usrBloquear(id, ligar) {
   if (!ligar && !await confirmar('Bloquear o acesso de ' + esc(x.nome) + '?', '<p>Ela é desconectada na hora e não consegue mais entrar. Os lançamentos que fez continuam guardados.</p><p class="muted">Você pode desbloquear depois.</p>', 'Bloquear acesso', true)) return;
   try { await Nuvem.rpc('esc_usuario_ativar', { p_id: +id, p_ativo: !!ligar }); toast(ligar ? 'Acesso desbloqueado.' : 'Acesso bloqueado.'); usrCarregar(); }
   catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); if (e.code === 'LIMITE_USUARIOS') return modalMsg('Limite de acessos', '<p>' + usrErro(e) + '</p>'); toast(usrErro(e)); }
+}
+async function usrExcluir(id) {
+  const x = usrPorId(id); if (!x) return;
+  if (!await confirmar('Excluir ' + esc(x.nome) + '?', '<p>Ela some da lista e não consegue mais entrar. As sessões dela são encerradas.</p><p class="muted">O histórico de lançamentos e ações continua guardado. Não dá para desfazer pelo sistema.</p>', 'Excluir usuário', true)) return;
+  try { await Nuvem.rpc('esc_usuario_excluir', { p_id: +id }); toast('Usuário excluído.'); UI.usr = null; usrCarregar(); }
+  catch (e) { if (e.code === 'SESSAO_INVALIDA') return Nuvem.sair(true); toast(usrErro(e)); }
 }
 async function usrPermissao(chk) {
   const id = chk.dataset.id;
@@ -5616,6 +5622,7 @@ document.addEventListener('click', async ev => {
     case 'usrSalvar': return usrSalvar(el);
     case 'usrConvite': return usrConvite(id);
     case 'usrBloquear': return usrBloquear(id, el.dataset.on === '1');
+    case 'usrExcluir': return usrExcluir(id);
     case 'usrAtividade': return usrAtividade(id);
     case 'usrRecarregar': ev.preventDefault(); UI.usr = null; return render();
     case 'usrAba': UI.usr.aba = el.dataset.aba; if (UI.usr.aba === 'auditoria') UI.usr.aud = undefined; return render();
