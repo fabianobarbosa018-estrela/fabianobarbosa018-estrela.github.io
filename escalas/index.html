@@ -3833,6 +3833,22 @@ function semanasDoMes(ym) {
   while (s <= fimFolha) { sems.push(s); s = C.addDias(s, 7); }
   return { ini, fim, sems };
 }
+/* Aviso da semana: fica embaixo da escala da semana. Só existe quando a escala está gerada. */
+function avisoSemanaHTML(sw, podeEditar) {
+  const e = S.escalas[sw];
+  if (!e) return '';
+  const txt = e.avisoSemana || '';
+  if (!podeEditar) return txt ? `<div class="card mb" style="margin-top:12px"><b>Aviso da semana</b><p style="white-space:pre-line;margin:6px 0 0">${esc(txt)}</p></div>` : '';
+  return `<div class="card mb" style="margin-top:12px"><b>Aviso da semana</b><p class="small muted" style="margin:4px 0 8px">Aparece embaixo da escala desta semana para quem a visualiza.</p>` +
+    `<textarea id="avisoSem" rows="3" maxlength="500" style="width:100%;box-sizing:border-box">${esc(txt)}</textarea>` +
+    `<div class="row" style="gap:8px;margin-top:8px"><button class="btn pri" data-act="salvarAvisoSem" data-sem="${sw}">Salvar aviso</button></div></div>`;
+}
+async function salvarAvisoSem(sem) {
+  const e = S.escalas[sem]; if (!e) return;
+  const txt = ((document.getElementById('avisoSem') || {}).value || '').trim();
+  try { await Store.set('escalas', sem, Object.assign({}, e, { avisoSemana: txt })); toast(txt ? 'Aviso salvo.' : 'Aviso removido.'); }
+  catch (x) { render(); }
+}
 function vMensal() {
   const { sems } = semanasDoMes(UI.mes);
   UI.setoresSel = (UI.setoresSel || []).filter(id => setorPorId(id));
@@ -3846,7 +3862,7 @@ function vMensal() {
     if (!mw.grupos.length) return hw + '<div class="card empty"><b>Nenhum funcionário para mostrar</b>Cadastre setores e funcionários.</div>';
     const podeEditar = ehAdmin() || !(S.escalas[sw] && S.escalas[sw].status === 'aprovada');
     if (!S.somenteLeitura && mw.grupos.length) hw += podeEditar ? '<p class="small muted mb">Toque num dia de um funcionário para trocar entre <b>Trabalha</b> e <b>Folga</b>.</p>' : '<div class="alert i mb"><span class="ic">i</span><div>Esta semana já foi <b>aprovada</b>. Só o administrador altera uma escala aprovada.</div></div>';
-    return hw + '<div class="sem-folha">' + folhaHTML(mw, podeEditar) + '</div>';
+    return hw + '<div class="sem-folha">' + folhaHTML(mw, podeEditar) + '</div>' + avisoSemanaHTML(sw, podeEditar);
   }
   const m = folhaModelo(Object.assign(periodoFolha('mes'), { setorIds: UI.setoresSel }));
   const faltam = sems.filter(s => !S.escalas[s]);
@@ -5729,6 +5745,7 @@ document.addEventListener('click', async ev => {
     case 'painelDia': { const i = +el.dataset.i; const ja = el.classList.contains('sel'); UI.painelDia = ja ? null : i; render(); return; }
     case 'irGerar': UI.semana = el.dataset.sem; return;
     case 'semExpPDF': UI.expPeriodo = 'semana'; return exportarPDF(false);
+    case 'salvarAvisoSem': return salvarAvisoSem(el.dataset.sem);
     case 'semAnt': UI.semana = C.addDias(sem, -7); return render();
     case 'semProx': UI.semana = C.addDias(sem, 7); return render();
     case 'semHoje': UI.semana = C.inicioSemana(C.hojeISO()); return render();
