@@ -69,7 +69,7 @@
       var texto = m.texto.replace(/<anexado:[^>]*>/gi, '').replace(/[\u200e\u200f]/g, '').trim();
       if (!pareceTarefa(texto) && !foto) return;
       seq++;
-      itens.push({ id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: texto, foto: foto, fotoIncluir: !!foto,
+      itens.push({ id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: texto, foto: foto, fotoIncluir: !!foto, local: '',
         func: texto ? acharFuncionario(texto) : '', incluir: !ehFuncionario(m.quem) && !!texto });
     });
     return itens;
@@ -115,6 +115,7 @@
           '<div class="ord-it-top"><span>' + esc(x.data) + ' ' + esc(x.hora) + ' · ' + esc(x.quem) + '</span>' + (x.func ? '<span>Funcionário sugerido</span>' : '<span>Sem responsável</span>') + '</div>' +
           (x.foto && o.img && o.img[x.foto] ? '<img src="' + o.img[x.foto] + '" alt="foto" style="display:block;max-width:100%;max-height:200px;border-radius:8px;margin:6px 0">' : (x.foto ? '<p class="small muted" style="margin:4px 0">Foto ' + esc(x.foto) + ' (não encontrada no arquivo)</p>' : '')) +
           (x.foto ? '<label class="ord-chk"><input type="checkbox" data-ord="fotoIncluir" data-id="' + x.id + '"' + (x.fotoIncluir ? ' checked' : '') + '> Imprimir a foto na ordem</label>' : '') +
+          '<input type="text" data-ord="local" data-id="' + x.id + '" value="' + esc(x.local || '') + '" placeholder="Local (ex.: Quarto Amor)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card,#fff);color:inherit">' +
           '<textarea data-ord="texto" data-id="' + x.id + '" placeholder="Escreva a tarefa (ex.: consertar a porta do quarto 3)">' + esc(x.texto) + '</textarea>' +
           '<select data-ord="func" data-id="' + x.id + '">' + opc + '</select>' +
           '<label class="ord-chk"><input type="checkbox" data-ord="incluir" data-id="' + x.id + '"' + (x.incluir ? ' checked' : '') + '> Incluir nas ordens</label></div>';
@@ -198,7 +199,7 @@
       doc.autoTable({
         startY: y + 47, margin: { left: 14, right: 14 },
         head: [['Nº', 'Tarefas a executar']], theme: 'grid',
-        body: itens.map(function (x, k) { return [String(k + 1), String(x.texto || '').trim() || 'Ver a foto abaixo']; }),
+        body: itens.map(function (x, k) { var tx = String(x.texto || '').trim() || 'Ver a foto abaixo'; return [String(k + 1), (x.local ? x.local.trim() + ': ' : '') + tx]; }),
         headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 11, cellPadding: 3, valign: 'middle' },
         columnStyles: { 0: { cellWidth: 14, halign: 'center' } }
       });
@@ -249,10 +250,11 @@
     if (k === 'func') { it.func = t.value; return render(); }
     if (k === 'incluir') { it.incluir = t.checked; return render(); }
     if (k === 'fotoIncluir') { it.fotoIncluir = t.checked; return render(); }
+    if (k === 'local') { it.local = t.value; return; }
   });
   document.addEventListener('input', function (ev) {
     var t = ev.target;
-    if (!t || !t.dataset || t.dataset.ord !== 'texto') return;
-    var it = atualizarState(+t.dataset.id); if (it) it.texto = t.value; // sem redesenhar, para não perder o cursor
+    if (!t || !t.dataset || (t.dataset.ord !== 'texto' && t.dataset.ord !== 'local')) return;
+    var it = atualizarState(+t.dataset.id); if (it) { if (t.dataset.ord === 'texto') it.texto = t.value; else it.local = t.value; } // sem redesenhar, para não perder o cursor
   });
 })(window);
