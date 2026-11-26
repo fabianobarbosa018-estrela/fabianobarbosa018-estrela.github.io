@@ -1753,6 +1753,16 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
       });
     });
 
+    // duplas: os dois do par não podem folgar no mesmo dia (aviso, para conferir antes de aprovar)
+    var NOMES_DIA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    (typeof S !== 'undefined' && S.config && Array.isArray(S.config.duplas) ? S.config.duplas : []).forEach(function (par) {
+      var a1 = at[par[0]], a2 = at[par[1]], f1 = funcPorId[par[0]], f2 = funcPorId[par[1]];
+      if (!a1 || !a2 || !f1 || !f2 || !elegivel(f1, sem) || !elegivel(f2, sem)) return;
+      var v1 = folgasDe(a1), v2 = folgasDe(a2), iguais = [];
+      for (var d = 0; d < 7; d++) if (v1[d] && v2[d]) iguais.push(NOMES_DIA[d]);
+      if (iguais.length) avisos.push({ setor: nomeSetor(f1.setorId), funcId: par[0], msg: 'Dupla ' + f1.nome + ' e ' + f2.nome + ' folgam no mesmo dia (' + iguais.join(', ') + '). As duplas não podem folgar juntas.' });
+    });
+
     // avisos: repetição em relação à semana anterior
     if (historico) {
       var ant = historico.find(function (e) { return e && e.semana === addDias(sem, -7) && e.atribuicoes; });
