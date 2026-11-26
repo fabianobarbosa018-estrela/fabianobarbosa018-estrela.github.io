@@ -70,7 +70,7 @@
       if (!pareceTarefa(texto) && !foto) return;
       seq++;
       itens.push({ id: seq, data: m.data, hora: m.hora, quem: m.quem, texto: texto, foto: foto, fotoIncluir: !!foto, local: '',
-        func: texto ? acharFuncionario(texto) : '', incluir: !ehFuncionario(m.quem) && !!texto });
+        func: texto ? acharFuncionario(texto) : '', incluir: !ehFuncionario(m.quem) });
     });
     return itens;
   }
