@@ -103,26 +103,42 @@
 
   function tituloAba(aba) { return aba === 'transporte' ? 'Vale-transporte' : 'Serviços prestados'; }
 
+  /* Marca d'água: logo claro e centralizado em todas as páginas */
+  async function marcaRelPDF(doc) {
+    var img = await logoPdfData(); if (!img) return;
+    var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), w = 120, h = 42;
+    var n = doc.internal.getNumberOfPages();
+    for (var i = 1; i <= n; i++) {
+      doc.setPage(i);
+      doc.setGState(new doc.GState({ opacity: 0.08 }));
+      try { doc.addImage(img, 'PNG', (W - w) / 2, (H - h) / 2, w, h); } catch (e) { }
+      doc.setGState(new doc.GState({ opacity: 1 }));
+    }
+  }
+
   async function exportarRelPDF() {
     try { await carregarScript('libs/jspdf.umd.min.js'); await carregarScript('libs/jspdf.plugin.autotable.min.js'); }
     catch (e) { return modalMsg('Erro', '<p>Não foi possível carregar o gerador de PDF.</p>'); }
     var ym = mdl().rel.mes, aba = mdl().rel.aba || 'servicos', d = dadosRel(ym), atual = aba === 'servicos' ? d.serv : d.vt;
-    var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var y = await pdfCabecalho(doc, 6);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(15, 76, 92);
-    doc.text(tituloAba(aba), 14, 18);
+    doc.text(tituloAba(aba), 14, y + 8);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(60, 60, 60);
-    doc.text('Hotel Fazenda Oásis · ' + nomeMes(ym), 14, 25);
-    doc.setDrawColor(212, 162, 55); doc.setLineWidth(0.8); doc.line(14, 28, 196, 28);
+    doc.text('Hotel Fazenda Oásis · ' + nomeMes(ym), 14, y + 14);
+    doc.setDrawColor(212, 162, 55); doc.setLineWidth(0.8); doc.line(14, y + 17, 196, y + 17);
     var resumo = aba === 'servicos'
       ? [['Diaristas', brl(d.serv.diaria)], ['40/60% e combinados', brl(d.serv.outros)], ['TOTAL', brl(d.serv.total)]]
       : [['TOTAL pago no mês', brl(d.vt.total)]];
-    doc.autoTable({ startY: 34, head: [['Resumo', 'Valor']], body: resumo, theme: 'grid', headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 10 }, columnStyles: { 1: { halign: 'right' } } });
+    doc.autoTable({ startY: y + 21, margin: { left: 14, right: 14 }, head: [['Resumo', 'Valor']], body: resumo, theme: 'grid', headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 10 }, columnStyles: { 1: { halign: 'right' } } });
     doc.autoTable({
-      startY: doc.lastAutoTable.finalY + 10, head: [['Nome', aba === 'servicos' ? 'Grupo' : 'Tipo', 'Motivo', 'Valor']], theme: 'grid',
+      startY: doc.lastAutoTable.finalY + 10, margin: { left: 14, right: 14 }, head: [['Nome', aba === 'servicos' ? 'Grupo' : 'Tipo', 'Motivo', 'Valor']], theme: 'grid',
       body: atual.linhas.map(function (l) { return [l.nome, l.grupo || l.tipo, l.motivo, brl(l.valor)]; }),
       headStyles: { fillColor: [15, 76, 92] }, styles: { font: 'helvetica', fontSize: 9 }, columnStyles: { 3: { halign: 'right' } }
     });
-    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    await marcaRelPDF(doc);
+    var n = doc.internal.getNumberOfPages();
+    doc.setPage(n); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
     doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), 14, 290);
     await salvarArquivo((aba === 'servicos' ? 'Servicos-prestados-' : 'Transporte-') + ym + '.pdf', doc.output('blob'));
   }
