@@ -168,11 +168,11 @@
     if (svc) h += linha('Serviços a pagar' + (rec.prestador.modal === 'diaria' ? ' (' + dias.length + ' dia(s)' + (dias.length ? ': ' + listaDias(rec.mes, dias) : '') + ')' : ''), brl(svc));
     rec.extras.forEach(x => { h += linha('Extra: ' + esc2(x.desc), brl(x.valor)); });
     if (rec.saldoAnt) h += linha('Saldo de meses anteriores', brl(rec.saldoAnt));
-    h += linha('<b>Valor bruto</b>', '<b>' + brl(r2(svc + rec.extras.reduce((a, x) => a + (+x.valor || 0), 0) + (rec.saldoAnt || 0))) + '</b>', 'rcb-sub');
+    h += linha('Valor bruto', '<b>' + brl(r2(svc + rec.extras.reduce((a, x) => a + (+x.valor || 0), 0) + (rec.saldoAnt || 0))) + '</b>', 'rcb-sub');
     rec.adiantamentos.forEach(x => { h += linha('Adiantamento: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
     rec.descontos.forEach(x => { h += linha('Desconto: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
-    h += linha('<b>Total de descontos</b>', '<b>− ' + brl(rec.totDesc) + '</b>', 'rcb-sub');
-    h += linha('<b>Valor deste recibo</b>', '<b>' + brl(rec.liquido) + '</b>', 'rcb-liq');
+    h += linha('Total de descontos', '<b>− ' + brl(rec.totDesc) + '</b>', 'rcb-sub');
+    h += linha('Valor deste recibo', '<b>' + brl(rec.liquido) + '</b>', 'rcb-liq');
     h += '</tbody></table>';
     if (rec.pendencia > 0) h += `<div class="alert w mt"><span class="ic">!</span><div><b>Pendência para conferência:</b> ${brl(rec.pendencia)} em descontos ainda não abatidos. Não foi descontado automaticamente neste recibo.</div></div>`;
     if (!rec.consistente) h += `<div class="alert w mt"><span class="ic">!</span><div>O valor do lote na tela (${brl(rec.valorRegistrado)}) não bate com o líquido deste recibo (${brl(rec.liquido)}). Confira antes de assinar.</div></div>`;
@@ -447,14 +447,22 @@
     if (!alvos.length) return;
     sincronizando = true;
     let mudou = false;
+    const novos = [];
     try {
       for (const [pid, loteId] of alvos) {
         const r = await sincronizarLote(mes, pid, loteId);
+        if (r === 'assinado') novos.push([pid, loteId]);
         if (r === 'assinado' || r === 'liberado') mudou = true;
       }
     } catch (e) { /* sem internet: tenta de novo na próxima abertura */ }
     finally { sincronizando = false; }
     if (mudou) render();
+    // Recibo que acabou de ser assinado pelo WhatsApp: já abre pronto para PDF/impressão
+    if (novos.length) {
+      const [pid, loteId] = novos[0];
+      const rr = ((S.servicos[servKey(mes, pid)] || {}).recibos || {})[loteId];
+      if (rr) verRecibo(mes, pid, loteId, rr);
+    }
   }
 
   /* Botões do recibo no cartão do lote */
