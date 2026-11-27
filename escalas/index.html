@@ -3574,10 +3574,13 @@ function anivMesHtml(hoje) {
   const mes = MESES[+hoje.slice(5, 7) - 1];
   const cap = s => s.charAt(0) + s.slice(1).toLowerCase();
   const dia = +hoje.slice(8, 10);
+  // só quem ainda não passou (hoje ou dias seguintes)
+  const ANIV_ATUAIS = ANIV_MES.filter(a => a.dia >= dia);
+  if (!ANIV_ATUAIS.length) return '';
   const primeiro = n => String(n || '').trim().split(/\s+/)[0] || '';
   const msg = n => 'Oba, ' + n + ', chegou o seu dia! 🎉🎂\n\nQue esse ano venha cheio de alegria, saúde e aquele tanto de coisa boa que você merece. Obrigado por fazer parte do time do Hotel Fazenda Oasis, a gente sente sua falta quando você não está por aqui!\n\nAproveita muito o seu dia, viu? Um abraço enorme do pessoal do Oasis! 🥳';
-  return `<section class="pd-card pd-aniv"><header><span>Aniversariantes de ${esc(cap(mes))}</span><b class="pd-n">${ANIV_MES.length}</b></header>
-    <ul class="pd-lista">` + ANIV_MES.map(a => {
+  return `<section class="pd-card pd-aniv"><header><span>Aniversariantes de ${esc(cap(mes))}</span><b class="pd-n">${ANIV_ATUAIS.length}</b></header>
+    <ul class="pd-lista">` + ANIV_ATUAIS.map(a => {
       const n = primeiro(a.nome), hoje_ = a.dia === dia;
       return `<li style="display:flex;align-items:center;gap:10px;padding:8px 0">
         <span style="width:36px;height:36px;border-radius:50%;background:#e6f2f0;color:#0f4f5c;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none">${esc(n.charAt(0).toUpperCase())}</span>
