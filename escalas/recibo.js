@@ -322,9 +322,134 @@
     };
   }
 
+  /* ---------- envio por WhatsApp (mesmo mecanismo dos contratos) ---------- */
+  const isoLocal = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const numeroRec = (mes, pid, loteId) => 'REC-' + mes.replace('-', '') + '-' + pid.slice(-4).toUpperCase() + '-' + (loteId || '').slice(-4).toUpperCase();
+  const contratoIdRec = (mes, pid, loteId) => 'rec|' + mes + '|' + pid + '|' + loteId;
+
+  /* Documento que o prestador lê e assina: foto dos valores no momento do envio */
+  function documentoRecibo(rec, numero) {
+    const p2 = n => String(n).padStart(2, '0');
+    const linhas = [];
+    if (rec.servico) linhas.push({ t: 'Serviços do lote' + (rec.prestador.modal === 'diaria' ? ' (' + rec.diasLote + ' dia(s))' : ''), v: brl(rec.servico) });
+    rec.extras.forEach(x => linhas.push({ t: 'Extra: ' + x.desc, v: brl(x.valor) }));
+    if (rec.saldoAnt) linhas.push({ t: 'Saldo de meses anteriores', v: brl(rec.saldoAnt) });
+    linhas.push({ t: 'Valor bruto', v: brl(rec.bruto), negrito: true });
+    rec.adiantamentos.forEach(x => linhas.push({ t: 'Adiantamento: ' + x.desc, v: '− ' + brl(x.valor) }));
+    rec.descontos.forEach(x => linhas.push({ t: 'Desconto: ' + x.desc, v: '− ' + brl(x.valor) }));
+    linhas.push({ t: 'Total de descontos', v: '− ' + brl(rec.totDesc), negrito: true });
+    if (rec.liquidoLote && Math.abs(rec.liquidoLote - rec.liquido) > 0.004) linhas.push({ t: 'Já pago antes deste recibo', v: '− ' + brl(rec.liquidoLote - rec.liquido) });
+    linhas.push({ t: 'Valor líquido recebido neste recibo', v: brl(rec.liquido), negrito: true });
+    return {
+      tipo: 'recibo', numero, hotel: 'Hotel Fazenda Oásis', cnpj: '52.756.106/0001-13',
+      contratada: { nome: rec.prestador.nome, doc: '' },
+      lote: rec.lote.nome, inicio: rec.mes + '-' + p2(rec.lote.de), fim: rec.mes + '-' + p2(rec.lote.ate),
+      linhas, liquido: rec.liquido, pendencia: rec.pendencia,
+      mes: rec.mes, pid: rec.pid, loteId: rec.loteId, loteObj: rec.lote,
+      servico: rec.servico, extras: rec.extras, saldoAnt: rec.saldoAnt, bruto: rec.bruto,
+      adiantamentos: rec.adiantamentos, descontos: rec.descontos, totDesc: rec.totDesc,
+      liquidoLote: rec.liquidoLote, jaPago: rec.pagoAntes, diasLote: rec.diasLote, prestador: rec.prestador
+    };
+  }
+
+  async function enviarWhats(mes, pid, loteId, btn) {
+    if (!pode('servicos') || S.somenteLeitura) return toast('Seu acesso não inclui esta função.');
+    const rec = montar(mes, pid, loteId);
+    if (!rec) return toast('Lote não encontrado.');
+    if (rec.saldo <= 0.004) return modalMsg('Recibo', '<p>Este lote já está pago.</p>');
+    if (rec.liquido <= 0) return modalMsg('Recibo', '<p>Não há valor líquido a receber neste lote.</p>');
+    if (btn) { btn.disabled = true; btn.textContent = 'Gerando link…'; }
+    try {
+      const doc = Object.assign({}, documentoRecibo(Object.assign({}, rec, { liquido: rec.saldo, liquidoLote: rec.liquido }), numeroRec(mes, pid, loteId)));
+      const r = await Nuvem.rpc('esc_recibo_link', { p_contrato_id: contratoIdRec(mes, pid, loteId), p_documento: doc, p_dias: 7 });
+      const base = location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '');
+      const url = base + 'assinar.html#' + r.link;
+      const atual = S.servicos[servKey(mes, pid)] || {};
+      await servSalvar(mes, pid, { recibosLink: Object.assign({}, atual.recibosLink || {}, { [loteId]: { id: r.id, expira: r.expira, criadoEm: agoraISO() } }) });
+      const primeiro = String(rec.prestador.nome || '').split(' ')[0];
+      const texto = 'Olá' + (primeiro ? ', ' + primeiro : '') + '! Segue o recibo de pagamento do Hotel Fazenda Oásis para você conferir e assinar pelo celular: ' + url + ' . O link vale por 7 dias.';
+      modalMsg('Link de assinatura pronto', `<p>Mande para <b>${esc2(rec.prestador.nome)}</b>. O link vale 7 dias e só serve para este recibo.</p>
+        <div class="fld mt"><label class="f">Link</label><input type="text" readonly value="${esc2(url)}" onclick="this.select()"></div>
+        <div class="row mt"><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(texto)}">Enviar pelo WhatsApp</a><button class="btn" id="rcbCopia">Copiar link</button></div>
+        <p class="small muted mt">Quando ele assinar, o lote é marcado como pago pelo líquido e o PDF assinado fica salvo aqui.</p>`);
+      setTimeout(() => { const b = document.getElementById('rcbCopia'); if (b) b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(url).then(() => toast('Link copiado.'), () => toast('Não consegui copiar.')); }; }, 50);
+      render();
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar pelo WhatsApp'; }
+      toast('Não deu para gerar o link: ' + ((e && e.message) || 'tente de novo').replace(/^[A-Z_]+:\s*/, ''));
+    }
+  }
+
+  /* Grava o recibo a partir da assinatura feita pelo link (valores do documento que foi assinado) */
+  async function gravarRemoto(mes, pid, loteId, ass) {
+    const k = servKey(mes, pid), atual = S.servicos[k] || {}, d = ass.documento || {};
+    const quando = new Date(ass.assinado_em);
+    const recibo = {
+      numero: d.numero || numeroRec(mes, pid, loteId), modalidade: MOD_TELA, origem: 'whatsapp', em: ass.assinado_em,
+      dataPagamento: isoLocal(quando), assinadoPor: ass.nome, cpf: ass.cpf, assinatura: ass.assinatura || null,
+      codigo: String(ass.documento_hash || '').slice(0, 16).toUpperCase(),
+      mes, pid, lote: d.loteObj, servico: d.servico, extras: d.extras || [], saldoAnt: d.saldoAnt || 0, bruto: d.bruto,
+      adiantamentos: d.adiantamentos || [], descontos: d.descontos || [], totDesc: d.totDesc, pendencia: d.pendencia || 0,
+      liquido: d.liquido, liquidoLote: d.liquidoLote, jaPago: d.jaPago, prestador: d.prestador, diasLote: d.diasLote
+    };
+    const pagos = Object.assign({}, servPagosDoc(atual));
+    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: d.liquidoLote, data: isoLocal(quando) });
+    const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
+    const links = Object.assign({}, atual.recibosLink || {}); delete links[loteId];
+    await servSalvar(mes, pid, { pagos, recibos, recibosLink: links });
+    log('servicos', 'Recibo assinado pelo WhatsApp: ' + (d.prestador && d.prestador.nome || '') + ' · ' + (d.loteObj && d.loteObj.nome || '') + ' · ' + brl(d.liquidoLote));
+  }
+
+  /* Consulta o link de um lote: se foi assinado, registra; se expirou ou foi cancelado, libera para reenviar */
+  async function sincronizarLote(mes, pid, loteId) {
+    const atual = S.servicos[servKey(mes, pid)] || {};
+    if (!(atual.recibosLink || {})[loteId] || (atual.recibos || {})[loteId]) return 'nada';
+    const lista = await Nuvem.rpc('esc_assinaturas_listar', { p_contrato_id: contratoIdRec(mes, pid, loteId) });
+    const ass = (lista || []).find(x => x.status === 'assinado');
+    if (ass) { await gravarRemoto(mes, pid, loteId, ass); return 'assinado'; }
+    if ((lista || []).some(x => x.status === 'pendente')) return 'pendente';
+    const links = Object.assign({}, atual.recibosLink || {}); delete links[loteId];
+    await servSalvar(mes, pid, { recibosLink: links });
+    return 'liberado';
+  }
+
+  let sincronizando = false;
+  /* Ao abrir Serviços prestados: confere os links pendentes do mês e registra as assinaturas feitas */
+  async function sincronizarMes(mes) {
+    if (sincronizando || !mes || !S.servicos) return;
+    const alvos = [];
+    Object.keys(S.servicos).forEach(k => {
+      if (k.indexOf(mes + '__') !== 0) return;
+      const l = S.servicos[k] || {};
+      Object.keys(l.recibosLink || {}).forEach(loteId => { if (!(l.recibos || {})[loteId]) alvos.push([l.pid || k.slice(mes.length + 2), loteId]); });
+    });
+    if (!alvos.length) return;
+    sincronizando = true;
+    let mudou = false;
+    try {
+      for (const [pid, loteId] of alvos) {
+        const r = await sincronizarLote(mes, pid, loteId);
+        if (r === 'assinado' || r === 'liberado') mudou = true;
+      }
+    } catch (e) { /* sem internet: tenta de novo na próxima abertura */ }
+    finally { sincronizando = false; }
+    if (mudou) render();
+  }
+
+  /* Botões do recibo no cartão do lote */
+  root.reciboBotoes = function (mes, pid, loteId, l) {
+    const r = (l.recibos || {})[loteId], pend = (l.recibosLink || {})[loteId];
+    const btnAbrir = `<button class="btn sm" data-act="rcbAbrir" data-pid="${esc2(pid)}" data-lote="${esc2(loteId)}">${r ? 'Ver recibo' : 'Emitir recibo'}</button>`;
+    if (r) return btnAbrir;
+    const aguarda = pend ? `<span class="small muted">Link enviado · aguardando assinatura</span>` : '';
+    return aguarda + btnAbrir + `<button class="btn sm pri" data-act="rcbWhats" data-pid="${esc2(pid)}" data-lote="${esc2(loteId)}">${pend ? 'Reenviar WhatsApp' : 'Enviar pelo WhatsApp'}</button>`;
+  };
+  root.reciboSincronizarMes = sincronizarMes;
+
   root.reciboAcao = function (el) {
     const act = el.dataset.act;
     if (act === 'rcbAbrir') return abrir(UI.servMes, el.dataset.pid, el.dataset.lote);
+    if (act === 'rcbWhats') return enviarWhats(UI.servMes, el.dataset.pid, el.dataset.lote, el);
   };
   root.reciboMontar = montar;
 })(window);

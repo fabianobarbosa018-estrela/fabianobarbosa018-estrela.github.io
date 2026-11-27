@@ -2692,6 +2692,7 @@ async function servCopiarTexto(txt) {
 function vServicos() {
   servNovaCache();
   UI.servMes = UI.servMes || C.hojeISO().slice(0, 7);
+  if (window.reciboSincronizarMes) setTimeout(() => window.reciboSincronizarMes(UI.servMes), 0);
   const mes = UI.servMes, ult = servDiasDoMes(mes), dd2 = dd => String(dd).padStart(2, '0');
   // "serviços" = mensais, combinados, extras, cadastro, lotes e pagamentos; "diárias" = diaristas (ver e marcar os dias). Com as duas, tudo.
   const svFull = pode('servicos'), svDia = pode('diarias');
@@ -2766,7 +2767,7 @@ function vServicos() {
     return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}${c.inicioDia ? ` · <b>começou dia ${c.inicioDia}: ${c.diasServ} de 30 dias (R$ ${servMoeda(c.valorBase)})</b>` : ''}</div></div><span class="svc-badge">${estado}</span></div>
       <div class="svc-grid"><div><span>Dias trabalhados</span><b>${nDias}</b></div><div><span>A receber</span><b>R$ ${servMoeda(q.valor)}</b></div><div><span>Já pago</span><b>R$ ${servMoeda(q.pago)}</b></div><div><span>Saldo</span><b class="${q.saldo > 0.004 ? 'neg' : ''}">R$ ${servMoeda(q.saldo)}</b></div></div>
       ${(c.descItens || []).length ? `<div class="small" style="margin:6px 0;color:#C00000"><b>Descontos</b> · abatidos ${lote ? 'deste lote' : 'no mês'}: R$ ${servMoeda(lote ? c.dsc[idx] : c.desc)}${c.descItens.map(d => `<div>• ${esc(d.desc)}: R$ ${servMoeda(d.valor)} <span class="muted">(${esc(d.lote)})</span></div>`).join('')}${c.descSobra > 0 ? `<div class="muted">Não coube no saldo: R$ ${servMoeda(c.descSobra)}</div>` : ''}</div>` : ''}
-      ${pix}<div class="svc-acoes">${svFull ? `<button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>` : ''}${acao}${svFull && lote && q.valor > 0 ? `<button class="btn sm" data-act="rcbAbrir" data-pid="${c.p.id}" data-lote="${esc(q.id)}">${(c.l.recibos || {})[q.id] ? 'Ver recibo' : 'Emitir recibo'}</button>` : ''}</div></div>`;
+      ${pix}<div class="svc-acoes">${svFull ? `<button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>` : ''}${acao}${svFull && lote && q.valor > 0 && window.reciboBotoes ? window.reciboBotoes(mes, c.p.id, q.id, c.l) : ''}</div></div>`;
   }).join('')}</div>`;
   h += svFull ? `<p class="small muted mt" style="margin-bottom:0">Lance os dias pela pesquisa acima. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p>` : `<p class="small muted mt" style="margin-bottom:0">Para marcar um dia trabalhado, pesquise o diarista pelo nome (ou toque no cartão dele) e toque no dia. Pagamentos, extras e cadastro ficam com o administrador.</p>`;
   if (lote && svFull) h += `<p class="small muted mt">O pagamento deste lote é confirmado quando cada prestador assina o recibo (botão "Emitir recibo").</p>`;
@@ -5956,7 +5957,7 @@ Store.init();
 <script src="modulos.js?v=6"></script>
 <script src="ordens.js?v=12"></script>
 <script src="rescisao.js?v=1"></script>
-<script src="recibo.js?v=2"></script>
+<script src="recibo.js?v=3"></script>
 <script src="rh.js?v=1811m"></script>
 <script src="avaliacao.js?v=9"></script>
 </body>

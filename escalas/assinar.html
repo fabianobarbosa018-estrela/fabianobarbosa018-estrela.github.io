@@ -85,17 +85,28 @@ input.erro{border-color:var(--err);background:#fff5f5}
     return h;
   }
 
+  function reciboHtml(d) {
+    var h = '<div class="card"><h1>Recibo de pagamento</h1><div class="small muted" style="text-align:center;margin-top:-6px">Nº ' + esc(d.numero) + '</div>';
+    h += '<p>Recebi do ' + esc(d.hotel) + ' (CNPJ ' + esc(d.cnpj) + ') a importância líquida de <b>' + brl(d.liquido) + '</b>, referente a serviços prestados no período de ' + dataBR(d.inicio) + ' a ' + dataBR(d.fim) + ' (' + esc(d.lote) + ').</p>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:15px">';
+    (d.linhas || []).forEach(function (l) { h += '<tr style="' + (l.negrito ? 'font-weight:700;background:#f6f8f8;' : '') + '"><td style="padding:7px 4px;border-bottom:1px solid #e5e7eb">' + esc(l.t) + '</td><td style="padding:7px 4px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + esc(l.v) + '</td></tr>'; });
+    h += '</table>';
+    if (d.pendencia > 0) h += '<p class="small muted">Pendência para conferência (não descontada neste recibo): ' + brl(d.pendencia) + '.</p>';
+    return h + '</div>';
+  }
+
   function telaAssinar(r) {
     var d = r.documento || {};
-    app.innerHTML = '<div class="alerta info small">Leia o contrato com atenção. No fim da página, informe seus dados, assine com o dedo e toque em <b>Assinar contrato</b>. Este link vale até ' + dataHora(r.expira) + '.</div>' +
-      contratoHtml(d) +
+    var rec = d.tipo === 'recibo';
+    app.innerHTML = '<div class="alerta info small">' + (rec ? 'Leia o recibo com atenção. No fim da página, informe seus dados, assine com o dedo e toque em <b>Confirmar recebimento</b>.' : 'Leia o contrato com atenção. No fim da página, informe seus dados, assine com o dedo e toque em <b>Assinar contrato</b>.') + ' Este link vale até ' + dataHora(r.expira) + '.</div>' +
+      (rec ? reciboHtml(d) : contratoHtml(d)) +
       '<div class="card" id="form"><h2>Seus dados e assinatura</h2>' +
       '<label for="nome">Nome completo</label><input type="text" id="nome" autocomplete="name" value="' + esc(d.contratada && d.contratada.nome || '') + '"><div class="msg-err" id="eNome"></div>' +
       '<label for="cpf">CPF</label><input type="text" id="cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="' + esc(mascaraCpf(d.contratada && d.contratada.doc || '')) + '"><div class="msg-err" id="eCpf"></div>' +
       '<label>Assinatura</label><div class="pad"><canvas id="pad"></canvas><div class="base"></div><div class="dica" id="dica">Assine aqui com o dedo</div></div><div class="msg-err" id="eAss"></div>' +
       '<div class="row"><button class="btn" type="button" id="limpar">Limpar assinatura</button></div>' +
-      '<label class="aceite"><input type="checkbox" id="aceite"><span>Li e concordo com todas as cláusulas deste contrato e confirmo que os dados acima são meus.</span></label><div class="msg-err" id="eAce"></div>' +
-      '<div class="row"><button class="btn pri" type="button" id="assinar">Assinar contrato</button></div>' +
+      '<label class="aceite"><input type="checkbox" id="aceite"><span>' + (rec ? 'Confirmo que recebi o valor líquido deste recibo e que os dados acima são meus.' : 'Li e concordo com todas as cláusulas deste contrato e confirmo que os dados acima são meus.') + '</span></label><div class="msg-err" id="eAce"></div>' +
+      '<div class="row"><button class="btn pri" type="button" id="assinar">' + (rec ? 'Confirmar recebimento' : 'Assinar contrato') + '</button></div>' +
       '<p class="small muted">Ao assinar ficam registrados a data e a hora, o seu aparelho e o código do texto <span class="cod">' + esc(r.codigo) + '</span>, que garante que o contrato não foi alterado.</p></div>';
     document.getElementById('aceite').addEventListener('change', function () { if (this.checked) document.getElementById('eAce').textContent = ''; });
     var cpf = document.getElementById('cpf');
@@ -167,7 +178,7 @@ input.erro{border-color:var(--err);background:#fff5f5}
     rpc('esc_assinatura_assinar', { p_link: link, p_nome: n, p_cpf: cpf.value, p_assinatura: img, p_aceite: true, p_aparelho: navigator.userAgent })
       .then(function (r) {
         window.scrollTo(0, 0);
-        msg('ok', 'Contrato assinado. Obrigado!', '<p style="margin:6px 0 0">Assinado por <b>' + esc(n) + '</b> em ' + dataHora(r.assinado_em) + '.</p><p class="small muted" style="margin:6px 0 0">Código de verificação: <span class="cod">' + esc(r.codigo) + '</span>. O ' + 'Hotel Fazenda Oasis já recebeu o contrato assinado. Você pode fechar esta página.</p>');
+        msg('ok', 'Assinatura registrada. Obrigado!', '<p style="margin:6px 0 0">Assinado por <b>' + esc(n) + '</b> em ' + dataHora(r.assinado_em) + '.</p><p class="small muted" style="margin:6px 0 0">Código de verificação: <span class="cod">' + esc(r.codigo) + '</span>. O ' + 'Hotel Fazenda Oasis já recebeu o contrato assinado. Você pode fechar esta página.</p>');
       }, function (e) {
         btn.disabled = false; btn.textContent = 'Assinar contrato';
         var m = String(e.message || '');
