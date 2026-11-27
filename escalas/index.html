@@ -2638,6 +2638,7 @@ function servPerSel(lotes) {
   if (v === 'mes') return 'mes';
   return lotes.some(x => x.id === v) ? v : (lotes[0] ? lotes[0].id : 'mes');
 }
+const servGrupoAba = { diaria: 'Diaristas', outros: 'Serviços prestados', todos: 'Todos' };
 const servGrupoNome = { diaria: 'Diaristas', outros: 'Mensais, combinados e extras', todos: 'TODOS OS SERVIÇOS' };
 /* Pesquisa de prestador: calendário do mês para lançar os dias trabalhados (diarista) */
 function servPainelDias(mes, vis) {
@@ -2713,7 +2714,7 @@ function vServicos() {
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
     <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(nomeCurto(x.nome))}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
-    <select id="selGrupo" style="flex:1;min-width:220px">${gruposOk.map(k => `<option value="${k}" ${k === grupo ? 'selected' : ''}>${servGrupoNome[k]}</option>`).join('')}</select>
+    <div class="tabs" style="width:100%;margin:0">${gruposOk.map(k => `<button class="${k === grupo ? 'on' : ''}" data-act="servGrupoTab" data-g="${k}">${servGrupoAba[k]}</button>`).join('')}</div>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
   <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label></div>`;
@@ -5637,7 +5638,7 @@ document.getElementById('burger').onclick = () => { document.getElementById('sid
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
 const ACOES_SO_ADMIN = ['rhNovo', 'rhEditar', 'rhDesligar', 'rhReativar', 'rhTransferir', 'rhFeriasAdd', 'rhFeriasDel', 'rhOcorr', 'rhDocVer', 'aprovar', 'aprovarMes', 'reabrir', 'excluirEscala', 'editarAprovada', 'escDevolver', 'novoFunc', 'importarFunc', 'editFunc', 'transfFunc', 'delFunc', 'novoSetor', 'editSetor', 'setorMover', 'delSetor', 'addSug', 'delAntigas', 'ferAdd', 'ferDel', 'ferNac', 'trocarSenha', 'listarBk', 'baixarBk', 'backup', 'salvarCfg', 'removerAssinatura', 'vtValor', 'expPDF', 'expPrint', 'expXLS', 'baixarSetor', 'enviarSetor'];
-const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
+const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servGrupoTab', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
@@ -5675,6 +5676,7 @@ document.addEventListener('click', async ev => {
     case 'servFechPrint': return servFechamento(true);
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
+    case 'servGrupoTab': UI.servGrupo = el.dataset.g; return render();
     case 'servPerChip': UI.servPer = el.dataset.id; return render();
     case 'servCopiar': return servCopiarTexto(servTextoDiaristas(UI.servMes)).then(ok => toast(ok ? 'Texto copiado. Cole onde quiser.' : 'Não consegui copiar automaticamente.'));
     case 'servAbrirDia': {
