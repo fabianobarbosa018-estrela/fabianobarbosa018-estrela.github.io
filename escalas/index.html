@@ -2701,7 +2701,7 @@ function vServicos() {
   const svFull = pode('servicos'), svDia = pode('diarias');
   const gruposOk = Object.keys(servGrupoNome).filter(k => k === 'diaria' ? svDia : k === 'outros' ? svFull : svFull && svDia);
   const grupo = UI.servGrupo = gruposOk.includes(UI.servGrupo || 'diaria') ? (UI.servGrupo || 'diaria') : gruposOk[0];
-  const lotes = servLotesMes(mes, grupo), sel = servPerSel(lotes);
+  const lotes = servLotesMes(mes, grupo), sel = grupo === 'diaria' ? 'mes' : servPerSel(lotes);
   const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
   const ativos = servPrestadores();
   if (ativos.length) servCriarMes(mes); // cria a planilha do mês (e de quem entrou depois) sem precisar clicar
@@ -2717,7 +2717,7 @@ function vServicos() {
   </div>
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
-    <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(nomeCurto(x.nome))}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
+    ${grupo === 'diaria' ? '' : `<div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(nomeCurto(x.nome))}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>`}
     ${separado ? '' : `<div class="tabs" style="width:100%;margin:0">${gruposOk.filter(k => k !== 'todos').map(k => `<button class="${k === grupo ? 'on' : ''}" data-act="servGrupoTab" data-g="${k}">${servGrupoAba[k]}</button>`).join('')}</div>`}
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
