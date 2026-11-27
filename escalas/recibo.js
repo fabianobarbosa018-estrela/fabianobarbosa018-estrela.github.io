@@ -313,7 +313,7 @@
     };
     // O pagamento do lote é confirmado aqui, pela assinatura: valor total do lote recebido
     const pagos = Object.assign({}, servPagosDoc(atual));
-    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: rec.liquido, data: hojeISO() });
+    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: rec.liquido, data: hojeISO(), pagoEm: hojeISO() });
     const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
     await servSalvar(mes, pid, { pagos, recibos });
     log('servicos', 'Recibo ' + (modalidade === MOD_TELA ? 'assinado na tela' : 'assinado à mão') + ': ' + rec.prestador.nome + ' · ' + rec.lote.nome + ' · ' + brl(rec.liquido));
@@ -423,7 +423,7 @@
       liquido: d.liquido, liquidoLote: d.liquidoLote, jaPago: d.jaPago, prestador: d.prestador, diasLote: d.diasLote, servicoAPagar: d.servicoAPagar, diasPend: d.diasPend
     };
     const pagos = Object.assign({}, servPagosDoc(atual));
-    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: d.liquidoLote, data: isoLocal(quando) });
+    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: d.liquidoLote, data: isoLocal(quando), pagoEm: isoLocal(quando) });
     const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
     const links = Object.assign({}, atual.recibosLink || {}); delete links[loteId];
     await servSalvar(mes, pid, { pagos, recibos, recibosLink: links });
