@@ -96,89 +96,70 @@
   async function gerarPDF(rec, numero, opts) {
     const ok = await servPDFLibs(); if (!ok) return null;
     const { jsPDF } = window.jspdf;
-    // Recibo em A5 deitada (metade de uma folha A4): só o necessário, sem ocupar a folha toda
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
-    // Marca d'água: logo grande e bem clara no centro da página (atrás do conteúdo)
-    const marca = await logoPdfData();
-    if (marca) {
-      try {
-        doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.07 }));
-        doc.addImage(marca, 'PNG', 62, 26, 86, 86);
-        doc.restoreGraphicsState();
-      } catch (e) { }
-    }
-    // Cabeçalho: logo, nome e CNPJ do hotel, linha separadora
-    let y = await pdfCabecalho(doc, 12);
-    doc.setTextColor(30, 40, 60);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('Hotel Fazenda Oásis', 52, 8);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('CNPJ 52.756.106/0001-13', 52, 13);
-    doc.setDrawColor(180, 190, 200); doc.line(15, 22, 195, 22);
-    doc.setTextColor(0, 0, 0);
-    y = 28;
-    // Título, número e data de emissão
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-    doc.text('RECIBO DE PAGAMENTO', 105, y + 4, { align: 'center' });
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    doc.text('Nº ' + numero, 195, y + 4, { align: 'right' });
-    doc.text('Emitido em ' + dataHoraBR(opts.em || new Date().toISOString()), 195, y + 9, { align: 'right' });
-    y += 16;
+    // Talão no tamanho do recibo da casa: faixa deitada de 210 x 100 mm, com moldura dupla
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [210, 100] });
+    const MARROM = [139, 111, 78], CINZA = [90, 90, 90], VERDE = [60, 140, 90];
     const p2 = n => String(n).padStart(2, '0');
     const mm = rec.mes.slice(5, 7), aa = rec.mes.slice(0, 4);
-    // Período = dias ainda não pagos (primeiro ao último); sem pendência, o período do lote
     const pd = rec.diasPend && rec.diasPend.length ? rec.diasPend : null;
     const de = pd ? pd[0].dia : rec.lote.de, ate = pd ? pd[pd.length - 1].dia : rec.lote.ate;
     const periodo = p2(de) + '/' + mm + '/' + aa + ' a ' + p2(ate) + '/' + mm + '/' + aa;
-    const txt = 'Recebi do Hotel Fazenda Oásis (CNPJ 52.756.106/0001-13) a importância líquida de ' + brl(rec.liquido) +
-      ', referente a serviços prestados no período de ' + periodo + ', conforme discriminado abaixo.';
-    doc.setFontSize(10);
-    const linhas = doc.splitTextToSize(txt, 180);
-    doc.text(linhas, 15, y); y += linhas.length * 5 + 4;
-    doc.setFont('helvetica', 'bold'); doc.text('Beneficiário: ' + rec.prestador.nome, 15, y); y += 6; doc.setFont('helvetica', 'normal');
+    const emitido = opts.em ? new Date(opts.em) : new Date();
+    const hojeBR = p2(emitido.getDate()) + '/' + p2(emitido.getMonth() + 1) + '/' + emitido.getFullYear();
+    const desc = pd && rec.prestador.modal === 'diaria' ? 'Diárias: ' + listaDias(rec.mes, pd) : 'Serviços prestados de ' + periodo;
 
-    const corpo = [];
-    const svcP = rec.servicoAPagar != null ? rec.servicoAPagar : rec.servico, diasP = rec.diasPend || [];
-    if (svcP) corpo.push(['Serviços a pagar' + (rec.prestador.modal === 'diaria' ? ' (' + diasP.length + ' dia(s)' + (diasP.length ? ': ' + listaDias(rec.mes, diasP) : '') + ')' : ''), brl(svcP)]);
-    (rec.extras || []).forEach(x => corpo.push(['Extra: ' + x.desc, brl(x.valor)]));
-    if (rec.saldoAnt) corpo.push(['Saldo de meses anteriores', brl(rec.saldoAnt)]);
-    const descCorpo = [];
-    rec.adiantamentos.forEach(x => descCorpo.push(['Adiantamento: ' + x.desc, '− ' + brl(x.valor)]));
-    rec.descontos.forEach(x => descCorpo.push(['Desconto: ' + x.desc, '− ' + brl(x.valor)]));
-    if (!descCorpo.length) descCorpo.push(['Descontos', 'nenhum']);
-    corpo.push(...descCorpo);
-    corpo.push([{ content: 'VALOR A RECEBER (SALDO)', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
-    doc.autoTable({ startY: y, body: corpo, theme: 'grid', styles: { fontSize: 9.5, cellPadding: 2.2 }, columnStyles: { 0: { cellWidth: 135 }, 1: { halign: 'right' } }, margin: { left: 15, right: 15 } });
-    y = doc.lastAutoTable.finalY + 6;
-
-    if (rec.pendencia > 0) {
-      doc.setFontSize(9); doc.setTextColor(160, 90, 0);
-      doc.text('Pendência para conferência (não descontada neste recibo): ' + brl(rec.pendencia), 15, y); doc.setTextColor(0, 0, 0); y += 8;
+    // Marca d'água: logo grande e bem clara no centro
+    const marca = await logoPdfData();
+    if (marca) {
+      try {
+        doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.06 }));
+        doc.addImage(marca, 'PNG', 78, 24, 54, 54);
+        doc.restoreGraphicsState();
+      } catch (e) { }
     }
+    // Moldura dupla
+    doc.setDrawColor(60, 60, 60);
+    doc.setLineWidth(0.8); doc.rect(5, 5, 200, 90);
+    doc.setLineWidth(0.3); doc.rect(7.5, 7.5, 195, 85);
+    // Logo e título
+    if (marca) { try { doc.addImage(marca, 'PNG', 12, 11, 40, 14); } catch (e) { } }
+    doc.setTextColor(...MARROM); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+    doc.text('RECIBO', 105, 22, { align: 'center' });
+    // Valor em destaque e número
+    doc.setDrawColor(60, 60, 60); doc.setLineWidth(0.3); doc.rect(152, 12, 42, 10);
+    doc.setTextColor(...VERDE); doc.setFontSize(12); doc.text(brl(rec.liquido), 173, 18.5, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...CINZA);
+    doc.text('Nº ' + numero, 194, 26, { align: 'right' });
 
-    // Assinatura
-    y = Math.max(y + 2, 98);
+    doc.setTextColor(40, 40, 40); doc.setFontSize(9.5);
+    // Linha 1: Eu, ____ Recebi do Hotel Fazenda Oásis
+    doc.text('Eu,', 14, 39); doc.setLineWidth(0.2); doc.line(22, 40, 118, 40);
+    doc.setFont('helvetica', 'bold'); doc.text(rec.prestador.nome, 24, 38.5); doc.setFont('helvetica', 'normal');
+    doc.text('Recebi do Hotel Fazenda Oásis', 122, 39);
+    // Linha 2: A importância de R$ ____ Referente a
+    doc.text('A importância de R$', 14, 50); doc.line(56, 51, 118, 51);
+    doc.setFont('helvetica', 'bold'); doc.text(servMoeda(rec.liquido), 58, 49.5); doc.setFont('helvetica', 'normal');
+    doc.text('Referente a', 122, 50);
+    // Linha 3: descrição ____ Realizado em ____
+    doc.setFontSize(8); doc.text(desc, 14, 59.5); doc.line(14, 61, 118, 61);
     doc.setFontSize(9.5);
+    doc.text('Realizado em', 122, 60); doc.line(150, 61, 196, 61); doc.text(hojeBR, 152, 59.5);
+    // Texto legal
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    doc.text('Este recibo serve como comprovante válido e está sujeito apresentação se necessário', 105, 70, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    // Assinatura
     if (opts.modalidade === MOD_TELA && opts.assinatura) {
-      try { doc.addImage(opts.assinatura, 'PNG', 60, y - 22, 80, 26); } catch (e) { }
+      try { doc.addImage(opts.assinatura, 'PNG', 66, 71, 78, 14); } catch (e) { }
     }
-    doc.line(50, y + 4, 160, y + 4);
-    doc.text(rec.prestador.nome, 105, y + 9, { align: 'center' });
-    y += 14;
-    if (opts.modalidade === MOD_TELA) {
-      doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
-      doc.text('Assinado eletronicamente por ' + rec.prestador.nome + ' em ' + dataHoraBR(opts.em) + '.', 105, y, { align: 'center' });
-      doc.text('Assinatura desenhada na tela do dispositivo. Não é certificado digital ICP-Brasil.', 105, y + 4, { align: 'center' });
-    } else {
-      doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
-      doc.text('Assinatura manual do beneficiário.', 105, y, { align: 'center' });
-    }
-    // Rodapé em todas as páginas
-    const pags = doc.getNumberOfPages();
-    for (let k = 1; k <= pags; k++) {
-      doc.setPage(k);
-      doc.setDrawColor(180, 190, 200); doc.line(15, 130, 195, 130);
-      doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
-      doc.text('Hotel Fazenda Oásis · CNPJ 52.756.106/0001-13 · Recibo ' + numero, 105, 135, { align: 'center' });
-      doc.text('Página ' + k + ' de ' + pags, 195, 139, { align: 'right' });
+    doc.setLineWidth(0.3); doc.line(62, 86, 148, 86);
+    doc.setFontSize(7.5); doc.setTextColor(40, 40, 40); doc.text(rec.prestador.nome, 105, 89, { align: 'center' });
+    // Rodapé: endereço e pendência
+    doc.setFontSize(6.5); doc.setTextColor(...CINZA);
+    doc.text('Paudalho-PE, estrada de chã do ouro.', 14, 91.2);
+    if (rec.pendencia > 0) {
+      doc.setTextColor(160, 90, 0);
+      doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 196, 91.2, { align: 'right' });
     }
     doc.setTextColor(0, 0, 0);
     return doc.output('blob');
