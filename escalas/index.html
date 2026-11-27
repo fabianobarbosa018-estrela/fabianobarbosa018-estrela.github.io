@@ -2638,7 +2638,11 @@ function servCriarMes(mes) {
 function servPerSel(lotes) {
   const v = UI.servPer;
   if (v === 'mes') return 'mes';
-  return lotes.some(x => x.id === v) ? v : (lotes[0] ? lotes[0].id : 'mes');
+  if (lotes.some(x => x.id === v)) return v;
+  // Sem escolha: no mês atual abre o lote de hoje (dia 16 em diante, o fim do mês); nos outros meses, o primeiro
+  const h = new Date(), mesHoje = h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0');
+  if (UI.servMes === mesHoje) { const hoje = lotes.find(x => h.getDate() >= x.de && h.getDate() <= x.ate); if (hoje) return hoje.id; }
+  return lotes[0] ? lotes[0].id : 'mes';
 }
 const servGrupoAba = { diaria: 'Diaristas', outros: 'Serviços prestados', todos: 'Todos' };
 const servGrupoNome = { diaria: 'Diaristas', outros: 'Mensais, combinados e extras', todos: 'TODOS OS SERVIÇOS' };
