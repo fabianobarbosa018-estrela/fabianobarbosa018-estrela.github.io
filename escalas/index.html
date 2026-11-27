@@ -2751,7 +2751,7 @@ function vServicos() {
   if (lote) {
     corpo += `<tr class="svc-sum"><td class="svc-dia">${esc(lote.nome.toUpperCase())}</td>${calcs.map(c => {
       const x = c.pagos[idx];
-      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Pago ✓ · desfazer</button>` : `<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Marcar como pago</button>`}</td>`;
+      return `<td>${x.pago ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Pago ✓ · desfazer</button>` : `<span class="small muted">Aguarda recibo</span>`}</td>`;
     }).join('')}</tr>`;
   }
   corpo += `<tr><td class="svc-dia">Ajustes</td>${vis.map(p => `<td><button class="btn sm" data-act="servAjustes" data-pid="${p.id}">Editar</button></td>`).join('')}</tr>`;
@@ -2760,7 +2760,7 @@ function vServicos() {
   h += `<div class="svc-cards">${calcs.map(c => {
     const q = pagLinha(c), nm = _capNome(c.p.nome || ''), nDias = Object.keys(c.l.dias || {}).length;
     const pix = c.p.pix ? `<div class="svc-pix">PIX ${esc(c.p.pix)}${c.p.titular ? ' · ' + esc(c.p.titular) : ''}</div>` : '';
-    const acao = svFull && lote && q.valor > 0 ? (q.pagoOk ? (q.saldo > 0.004 ? `<button class="btn sm pri" data-act="servPagarDif" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Pagar diferença R$ ${servMoeda(q.saldo)}</button>` : '') + `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` :`<button class="btn sm pri" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Marcar como pago</button>`) : '';
+    const acao = svFull && lote && q.valor > 0 && q.pagoOk ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` : '';
     const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
     const abre = c.modal === 'diaria' && svDia ? ` data-act="servAbrirDia" data-pid="${c.p.id}" style="cursor:pointer" title="Abrir para lançar os dias"` : '';
     return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}${c.inicioDia ? ` · <b>começou dia ${c.inicioDia}: ${c.diasServ} de 30 dias (R$ ${servMoeda(c.valorBase)})</b>` : ''}</div></div><span class="svc-badge">${estado}</span></div>
@@ -2769,7 +2769,7 @@ function vServicos() {
       ${pix}<div class="svc-acoes">${svFull ? `<button class="btn sm" data-act="servAjustes" data-pid="${c.p.id}">Editar</button>` : ''}${acao}${svFull && lote && q.valor > 0 ? `<button class="btn sm" data-act="rcbAbrir" data-pid="${c.p.id}" data-lote="${esc(q.id)}">${(c.l.recibos || {})[q.id] ? 'Ver recibo' : 'Emitir recibo'}</button>` : ''}</div></div>`;
   }).join('')}</div>`;
   h += svFull ? `<p class="small muted mt" style="margin-bottom:0">Lance os dias pela pesquisa acima. Em "Editar" ficam serviços extras, adiantamentos, descontos e a data e o % de cada lote.</p>` : `<p class="small muted mt" style="margin-bottom:0">Para marcar um dia trabalhado, pesquise o diarista pelo nome (ou toque no cartão dele) e toque no dia. Pagamentos, extras e cadastro ficam com o administrador.</p>`;
-  if (lote && svFull) h += `<div class="row mt"><button class="btn pri" data-act="servPagarGrupo" data-lote="${esc(lote.id)}">Marcar como pago: ${esc(servGrupoNome[grupo].toLowerCase())} deste lote</button></div>`;
+  if (lote && svFull) h += `<p class="small muted mt">O pagamento deste lote é confirmado quando cada prestador assina o recibo (botão "Emitir recibo").</p>`;
   h += `<div class="row mt" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="small muted">Todos os serviços ao imprimir:</span><select id="selFormato" style="max-width:320px"><option value="unico" ${UI.servFormato !== 'separado' ? 'selected' : ''}>Um PDF com diaristas e serviços juntos</option><option value="separado" ${UI.servFormato === 'separado' ? 'selected' : ''}>Dois PDFs separados (diaristas e serviços)</option></select></div>
   <div class="row mt"><button class="btn" data-act="servPdf">${ic('pdf')} Baixar PDF</button><button class="btn" data-act="servXls">${ic('xls')} Excel</button><button class="btn" data-act="servPrint">Imprimir</button>${grupo === 'diaria' ? '<button class="btn pri" data-act="servCopiar">Copiar texto (WhatsApp)</button>' : ''}</div>
   ${svFull ? `<div class="row mt"><button class="btn" data-act="servFechPdf">${ic('pdf')} Fechamento (PDF)</button><button class="btn pri" data-act="servFechPrint">Imprimir fechamento</button></div>` : ''}
@@ -5956,7 +5956,7 @@ Store.init();
 <script src="modulos.js?v=6"></script>
 <script src="ordens.js?v=12"></script>
 <script src="rescisao.js?v=1"></script>
-<script src="recibo.js?v=1"></script>
+<script src="recibo.js?v=2"></script>
 <script src="rh.js?v=1811m"></script>
 <script src="avaliacao.js?v=9"></script>
 </body>

@@ -62,6 +62,9 @@
 
     const totDesc = r2(totAdiant + aplicado);
     const liquido = r2(bruto - totAdiant - aplicado);
+    // Parte do líquido que já foi paga antes (pagamento parcial): este recibo cobre só o saldo
+    const pagoAntes = pg.pago ? r2(pg.valorPago != null ? pg.valorPago : pg.valor) : 0;
+    const saldo = r2(liquido - pagoAntes);
     return {
       mes, pid, loteId, lote: { id: lote.id, nome: lote.nome, de: lote.de, ate: lote.ate },
       prestador: { nome, funcao: (c.p && c.p.funcao) || '', modal: c.modal },
@@ -70,7 +73,7 @@
       descontos: descLinhas, descAplicado: aplicado, naoAbatido, pendencia,
       totDesc, liquido,
       valorRegistrado: pg.valor, consistente: liquido === r2(pg.valor),
-      pagoAntes: !!pg.pago, valorPagoAntes: pg.valorPago != null ? r2(pg.valorPago) : null
+      pagoAntes, saldo, liquidoLote: liquido
     };
   }
 
@@ -103,7 +106,8 @@
     rec.adiantamentos.forEach(x => corpo.push(['Adiantamento: ' + x.desc, '− ' + brl(x.valor)]));
     rec.descontos.forEach(x => corpo.push(['Desconto: ' + x.desc, '− ' + brl(x.valor)]));
     corpo.push([{ content: 'TOTAL DE DESCONTOS', styles: { fontStyle: 'bold' } }, { content: '− ' + brl(rec.totDesc), styles: { fontStyle: 'bold' } }]);
-    corpo.push([{ content: 'VALOR LÍQUIDO RECEBIDO', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
+    if (rec.liquidoLote && Math.abs(rec.liquidoLote - rec.liquido) > 0.004) corpo.push(['Já pago antes deste recibo (líquido do lote: ' + brl(rec.liquidoLote) + ')', '− ' + brl(rec.liquidoLote - rec.liquido)]);
+    corpo.push([{ content: 'VALOR LÍQUIDO RECEBIDO NESTE RECIBO', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
     doc.autoTable({ startY: y, body: corpo, theme: 'grid', styles: { fontSize: 9.5, cellPadding: 2.2 }, columnStyles: { 0: { cellWidth: 135 }, 1: { halign: 'right' } }, margin: { left: 15, right: 15 } });
     y = doc.lastAutoTable.finalY + 6;
 
@@ -148,7 +152,9 @@
     rec.adiantamentos.forEach(x => { h += linha('Adiantamento: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
     rec.descontos.forEach(x => { h += linha('Desconto: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
     h += linha('<b>Total de descontos</b>', '<b>− ' + brl(rec.totDesc) + '</b>', 'rcb-sub');
-    h += linha('<b>Valor líquido a receber</b>', '<b>' + brl(rec.liquido) + '</b>', 'rcb-liq');
+    h += linha('<b>Valor líquido do lote</b>', '<b>' + brl(rec.liquidoLote || rec.liquido) + '</b>', 'rcb-sub');
+    if (rec.liquidoLote && Math.abs(rec.liquidoLote - rec.liquido) > 0.004) h += linha('Já pago antes deste recibo', '− ' + brl(rec.liquidoLote - rec.liquido), 'rcb-desc');
+    h += linha('<b>Valor deste recibo</b>', '<b>' + brl(rec.liquido) + '</b>', 'rcb-liq');
     h += '</tbody></table>';
     if (rec.pendencia > 0) h += `<div class="alert w mt"><span class="ic">!</span><div><b>Pendência para conferência:</b> ${brl(rec.pendencia)} em descontos ainda não abatidos. Não foi descontado automaticamente neste recibo.</div></div>`;
     if (!rec.consistente) h += `<div class="alert w mt"><span class="ic">!</span><div>O valor do lote na tela (${brl(rec.valorRegistrado)}) não bate com o líquido deste recibo (${brl(rec.liquido)}). Confira antes de assinar.</div></div>`;
@@ -202,9 +208,7 @@
     const rec = montar(mes, pid, loteId);
     if (!rec) return toast('Lote não encontrado.');
     if (rec.liquido <= 0) return modalMsg('Recibo', '<p>Não há valor líquido a receber neste lote.</p>');
-    if (rec.pagoAntes && rec.valorPagoAntes != null && rec.valorPagoAntes !== rec.liquido) {
-      return modalMsg('Recibo', `<p>Este lote já foi marcado como pago por <b>${brl(rec.valorPagoAntes)}</b>, mas o líquido atual é <b>${brl(rec.liquido)}</b>.</p><p>Desfaça o pagamento antes de emitir o recibo.</p>`);
-    }
+    if (rec.saldo <= 0.004) return modalMsg('Recibo', '<p>Este lote já está pago e já tem recibo registrado.</p>');
     estiloRecibo();
     let modalidade = MOD_TELA, pad = null;
     const w = abrirModal(`<div class="mh">Recibo · ${esc2(rec.prestador.nome)}<div class="small muted" style="font-weight:400">${esc2(rec.lote.nome)} · ${esc2(servMesNome(mes))}</div></div>
@@ -216,7 +220,7 @@
             <label><input type="radio" name="rcbModo" value="${MOD_MANUAL}">Assinatura manual (imprimir)</label>
           </div></div>
         <div id="rcbArea"></div>
-        <label class="rcb-chk"><input type="checkbox" id="rcbOk"><span id="rcbOkTxt">Confirmo que recebi <b>${brl(rec.liquido)}</b> (valor líquido acima), referente a este lote.</span></label>
+        <label class="rcb-chk"><input type="checkbox" id="rcbOk"><span id="rcbOkTxt">Confirmo que recebi <b>${brl(rec.saldo)}</b> (valor deste recibo), referente a este lote.</span></label>
       </div>
       <div class="mf" style="flex-wrap:wrap;gap:8px"><button class="btn" data-x="c">Cancelar</button><button class="btn" id="rcbLimpar" style="display:none">Limpar assinatura</button><button class="btn" id="rcbPDF" style="display:none">Gerar PDF para assinar</button><button class="btn pri" id="rcbOkBtn" disabled>Confirmar e assinar</button></div>`);
     const q = s => w.querySelector(s);
@@ -239,14 +243,14 @@
       const pronto = modalidade === MOD_TELA ? (pad && pad.temAssinatura() && ok) : ok;
       q('#rcbOkBtn').disabled = !pronto;
       q('#rcbOkTxt').innerHTML = modalidade === MOD_TELA
-        ? `Confirmo que recebi <b>${brl(rec.liquido)}</b> (valor líquido acima), referente a este lote, e que esta assinatura é do beneficiário.`
-        : `Confirmo que o beneficiário assinou o recibo impresso no valor de <b>${brl(rec.liquido)}</b>.`;
+        ? `Confirmo que recebi <b>${brl(rec.saldo)}</b> (valor deste recibo), referente a este lote, e que esta assinatura é do beneficiário.`
+        : `Confirmo que o beneficiário assinou o recibo impresso no valor de <b>${brl(rec.saldo)}</b>.`;
     };
     w.querySelectorAll('input[name=rcbModo]').forEach(r => r.onchange = () => { modalidade = r.value; area(); });
     q('#rcbOk').onchange = atualizar;
     q('#rcbLimpar').onclick = () => { if (pad) pad.limpar(); };
     q('#rcbPDF').onclick = async () => {
-      const blob = await gerarPDF(rec, 'RASCUNHO', { modalidade: MOD_MANUAL });
+      const blob = await gerarPDF(Object.assign({}, rec, { liquido: rec.saldo, liquidoLote: rec.liquido }), 'RASCUNHO', { modalidade: MOD_MANUAL });
       if (blob) salvarArquivo('recibo-para-assinar-' + rec.lote.id + '.pdf', blob);
     };
     q('[data-x=c]').onclick = () => fecharModal(w);
@@ -278,8 +282,9 @@
       mes, pid, lote: rec.lote,
       servico: rec.servico, extras: rec.extras, saldoAnt: rec.saldoAnt, bruto: rec.bruto,
       adiantamentos: rec.adiantamentos, descontos: rec.descontos, totDesc: rec.totDesc,
-      pendencia: rec.pendencia, liquido: rec.liquido, prestador: rec.prestador, diasLote: rec.diasLote
+      pendencia: rec.pendencia, liquido: rec.saldo, liquidoLote: rec.liquido, jaPago: rec.pagoAntes, prestador: rec.prestador, diasLote: rec.diasLote
     };
+    // O pagamento do lote é confirmado aqui, pela assinatura: valor total do lote recebido
     const pagos = Object.assign({}, servPagosDoc(atual));
     pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: rec.liquido, data: hojeISO() });
     const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
