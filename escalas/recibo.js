@@ -9,6 +9,9 @@
   const brl = v => 'R$ ' + servMoeda(v);
   const agoraISO = () => new Date().toISOString();
   const hojeISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const pdIni = r => (r.diasPend && r.diasPend.length ? r.diasPend[0].dia : r.lote.de);
+  const pdFim = r => (r.diasPend && r.diasPend.length ? r.diasPend[r.diasPend.length - 1].dia : r.lote.ate);
+  const listaDias = (mes, dias) => dias.map(x => String(x.dia).padStart(2, '0') + '/' + String(mes).slice(5, 7)).join(', ');
   const dataBR = iso => (iso || '').slice(8, 10) + '/' + (iso || '').slice(5, 7) + '/' + (iso || '').slice(0, 4);
   const dataHoraBR = iso => { const d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
 
@@ -66,15 +69,26 @@
     // Parte do líquido que já foi paga antes (pagamento parcial): este recibo cobre só o saldo
     const pagoAntes = pg.pago ? r2(pg.valorPago != null ? pg.valorPago : pg.valor) : 0;
     const saldo = r2(liquido - pagoAntes);
+    // Só o que ainda falta pagar: o valor já pago abate os primeiros dias do lote, em ordem de data
+    const diasPend = [];
+    if (c.modal === 'diaria') {
+      let resto = pagoAntes;
+      Object.keys(l.dias || {}).map(Number).filter(dd => dd >= lote.de && dd <= lote.ate).sort((a, b) => a - b).forEach(dd => {
+        const v = r2(+l.dias[dd] || 0);
+        if (v <= 0) return;
+        if (resto >= v - 0.004) resto = r2(resto - v); else diasPend.push({ dia: dd, valor: v });
+      });
+    }
+    const servicoAPagar = r2(servico - pagoAntes);
     return {
       mes, pid, loteId, lote: { id: lote.id, nome: lote.nome, de: lote.de, ate: lote.ate },
       prestador: { nome, funcao: (c.p && c.p.funcao) || '', modal: c.modal },
-      diasLote, servico, extras: extrasI, totExtras, saldoAnt, bruto,
+      diasLote: diasPend.length, servico, extras: extrasI, totExtras, saldoAnt, bruto,
       adiantamentos: adiantI, totAdiant,
       descontos: descLinhas, descAplicado: aplicado, naoAbatido, pendencia,
       totDesc, liquido,
       valorRegistrado: pg.valor, consistente: liquido === r2(pg.valor),
-      pagoAntes, saldo, liquidoLote: liquido
+      pagoAntes, saldo, liquidoLote: liquido, diasPend, servicoAPagar
     };
   }
 
@@ -91,18 +105,27 @@
     y += 14;
     const p2 = n => String(n).padStart(2, '0');
     const mm = rec.mes.slice(5, 7), aa = rec.mes.slice(0, 4);
-    const periodo = p2(rec.lote.de) + '/' + mm + '/' + aa + ' a ' + p2(rec.lote.ate) + '/' + mm + '/' + aa;
+    // Período = dias ainda não pagos (primeiro ao último); sem pendência, o período do lote
+    const pd = rec.diasPend && rec.diasPend.length ? rec.diasPend : null;
+    const de = pd ? pd[0].dia : rec.lote.de, ate = pd ? pd[pd.length - 1].dia : rec.lote.ate;
+    const periodo = p2(de) + '/' + mm + '/' + aa + ' a ' + p2(ate) + '/' + mm + '/' + aa;
     const txt = 'Recebi do Hotel Fazenda Oásis (CNPJ 52.756.106/0001-13) a importância líquida de ' + brl(rec.liquido) +
-      ', referente a serviços prestados no período de ' + periodo + ' (' + rec.lote.nome + '), conforme discriminado abaixo.';
+      ', referente a serviços prestados no período de ' + periodo + ', conforme discriminado abaixo.';
     doc.setFontSize(10);
     const linhas = doc.splitTextToSize(txt, 180);
     doc.text(linhas, 15, y); y += linhas.length * 5 + 4;
     doc.setFont('helvetica', 'bold'); doc.text('Beneficiário: ' + rec.prestador.nome, 15, y); y += 6; doc.setFont('helvetica', 'normal');
 
     const corpo = [];
-    rec.adiantamentos.forEach(x => corpo.push(['Adiantamento: ' + x.desc, '− ' + brl(x.valor)]));
-    rec.descontos.forEach(x => corpo.push(['Desconto: ' + x.desc, '− ' + brl(x.valor)]));
-    if (!corpo.length) corpo.push(['Descontos', 'nenhum']);
+    const svcP = rec.servicoAPagar != null ? rec.servicoAPagar : rec.servico, diasP = rec.diasPend || [];
+    if (svcP) corpo.push(['Serviços a pagar' + (rec.prestador.modal === 'diaria' ? ' (' + diasP.length + ' dia(s)' + (diasP.length ? ': ' + listaDias(rec.mes, diasP) : '') + ')' : ''), brl(svcP)]);
+    (rec.extras || []).forEach(x => corpo.push(['Extra: ' + x.desc, brl(x.valor)]));
+    if (rec.saldoAnt) corpo.push(['Saldo de meses anteriores', brl(rec.saldoAnt)]);
+    const descCorpo = [];
+    rec.adiantamentos.forEach(x => descCorpo.push(['Adiantamento: ' + x.desc, '− ' + brl(x.valor)]));
+    rec.descontos.forEach(x => descCorpo.push(['Desconto: ' + x.desc, '− ' + brl(x.valor)]));
+    if (!descCorpo.length) descCorpo.push(['Descontos', 'nenhum']);
+    corpo.push(...descCorpo);
     corpo.push([{ content: 'VALOR A RECEBER (SALDO)', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
     doc.autoTable({ startY: y, body: corpo, theme: 'grid', styles: { fontSize: 9.5, cellPadding: 2.2 }, columnStyles: { 0: { cellWidth: 135 }, 1: { halign: 'right' } }, margin: { left: 15, right: 15 } });
     y = doc.lastAutoTable.finalY + 6;
@@ -141,15 +164,14 @@
   function resumoHtml(rec) {
     const linha = (t, v, cls) => `<tr class="${cls || ''}"><td>${esc2(t)}</td><td style="text-align:right;white-space:nowrap">${v}</td></tr>`;
     let h = '<table class="rcb-tab"><tbody>';
-    if (rec.servico) h += linha('Serviços do lote' + (rec.prestador.modal === 'diaria' ? ' (' + rec.diasLote + ' dia(s))' : ''), brl(rec.servico));
+    const svc = rec.servicoAPagar != null ? rec.servicoAPagar : rec.servico, dias = rec.diasPend || [];
+    if (svc) h += linha('Serviços a pagar' + (rec.prestador.modal === 'diaria' ? ' (' + dias.length + ' dia(s)' + (dias.length ? ': ' + listaDias(rec.mes, dias) : '') + ')' : ''), brl(svc));
     rec.extras.forEach(x => { h += linha('Extra: ' + esc2(x.desc), brl(x.valor)); });
     if (rec.saldoAnt) h += linha('Saldo de meses anteriores', brl(rec.saldoAnt));
-    h += linha('<b>Valor bruto</b>', '<b>' + brl(rec.bruto) + '</b>', 'rcb-sub');
+    h += linha('<b>Valor bruto</b>', '<b>' + brl(r2(svc + rec.extras.reduce((a, x) => a + (+x.valor || 0), 0) + (rec.saldoAnt || 0))) + '</b>', 'rcb-sub');
     rec.adiantamentos.forEach(x => { h += linha('Adiantamento: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
     rec.descontos.forEach(x => { h += linha('Desconto: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
     h += linha('<b>Total de descontos</b>', '<b>− ' + brl(rec.totDesc) + '</b>', 'rcb-sub');
-    h += linha('<b>Valor líquido do lote</b>', '<b>' + brl(rec.liquidoLote || rec.liquido) + '</b>', 'rcb-sub');
-    if (rec.liquidoLote && Math.abs(rec.liquidoLote - rec.liquido) > 0.004) h += linha('Já pago antes deste recibo', '− ' + brl(rec.liquidoLote - rec.liquido), 'rcb-desc');
     h += linha('<b>Valor deste recibo</b>', '<b>' + brl(rec.liquido) + '</b>', 'rcb-liq');
     h += '</tbody></table>';
     if (rec.pendencia > 0) h += `<div class="alert w mt"><span class="ic">!</span><div><b>Pendência para conferência:</b> ${brl(rec.pendencia)} em descontos ainda não abatidos. Não foi descontado automaticamente neste recibo.</div></div>`;
@@ -278,7 +300,7 @@
       mes, pid, lote: rec.lote,
       servico: rec.servico, extras: rec.extras, saldoAnt: rec.saldoAnt, bruto: rec.bruto,
       adiantamentos: rec.adiantamentos, descontos: rec.descontos, totDesc: rec.totDesc,
-      pendencia: rec.pendencia, liquido: rec.saldo, liquidoLote: rec.liquido, jaPago: rec.pagoAntes, prestador: rec.prestador, diasLote: rec.diasLote
+      pendencia: rec.pendencia, liquido: rec.saldo, liquidoLote: rec.liquido, jaPago: rec.pagoAntes, prestador: rec.prestador, diasLote: rec.diasLote, servicoAPagar: rec.servicoAPagar, diasPend: rec.diasPend
     };
     // O pagamento do lote é confirmado aqui, pela assinatura: valor total do lote recebido
     const pagos = Object.assign({}, servPagosDoc(atual));
@@ -326,21 +348,28 @@
   /* Documento que o prestador lê e assina: foto dos valores no momento do envio */
   function documentoRecibo(rec, numero) {
     const p2 = n => String(n).padStart(2, '0');
-    // Só o saldo a receber, com os descontos e adiantamentos que houve (se não houve, diz que não houve)
+    // Só o que falta pagar (dias ainda não pagos), com os descontos e adiantamentos que houve
     const linhas = [];
-    rec.adiantamentos.forEach(x => linhas.push({ t: 'Adiantamento: ' + x.desc, v: '− ' + brl(x.valor) }));
-    rec.descontos.forEach(x => linhas.push({ t: 'Desconto: ' + x.desc, v: '− ' + brl(x.valor) }));
-    if (!linhas.length) linhas.push({ t: 'Descontos', v: 'nenhum' });
+    const svc = rec.servicoAPagar != null ? rec.servicoAPagar : rec.servico, dias = rec.diasPend || [];
+    if (svc) linhas.push({ t: 'Serviços a pagar' + (rec.prestador.modal === 'diaria' ? ' (' + dias.length + ' dia(s)' + (dias.length ? ': ' + listaDias(rec.mes, dias) : '') + ')' : ''), v: brl(svc) });
+    (rec.extras || []).forEach(x => linhas.push({ t: 'Extra: ' + x.desc, v: brl(x.valor) }));
+    if (rec.saldoAnt) linhas.push({ t: 'Saldo de meses anteriores', v: brl(rec.saldoAnt) });
+    const descs = [];
+    rec.adiantamentos.forEach(x => descs.push({ t: 'Adiantamento: ' + x.desc, v: '− ' + brl(x.valor) }));
+    rec.descontos.forEach(x => descs.push({ t: 'Desconto: ' + x.desc, v: '− ' + brl(x.valor) }));
+    if (!descs.length) descs.push({ t: 'Descontos', v: 'nenhum' });
+    linhas.push(...descs);
     linhas.push({ t: 'Valor a receber (saldo)', v: brl(rec.liquido), negrito: true });
     return {
       tipo: 'recibo', numero, hotel: 'Hotel Fazenda Oásis', cnpj: '52.756.106/0001-13',
       contratada: { nome: rec.prestador.nome, doc: '' },
-      lote: rec.lote.nome, inicio: rec.mes + '-' + p2(rec.lote.de), fim: rec.mes + '-' + p2(rec.lote.ate),
+      lote: rec.lote.nome, inicio: rec.mes + '-' + p2(pdIni(rec)), fim: rec.mes + '-' + p2(pdFim(rec)),
       linhas, liquido: rec.liquido, pendencia: rec.pendencia,
       mes: rec.mes, pid: rec.pid, loteId: rec.loteId, loteObj: rec.lote,
       servico: rec.servico, extras: rec.extras, saldoAnt: rec.saldoAnt, bruto: rec.bruto,
       adiantamentos: rec.adiantamentos, descontos: rec.descontos, totDesc: rec.totDesc,
-      liquidoLote: rec.liquidoLote, jaPago: rec.pagoAntes, diasLote: rec.diasLote, prestador: rec.prestador
+      liquidoLote: rec.liquidoLote, jaPago: rec.pagoAntes, diasLote: rec.diasLote, prestador: rec.prestador,
+      servicoAPagar: rec.servicoAPagar, diasPend: rec.diasPend
     };
   }
 
@@ -382,7 +411,7 @@
       codigo: String(ass.documento_hash || '').slice(0, 16).toUpperCase(),
       mes, pid, lote: d.loteObj, servico: d.servico, extras: d.extras || [], saldoAnt: d.saldoAnt || 0, bruto: d.bruto,
       adiantamentos: d.adiantamentos || [], descontos: d.descontos || [], totDesc: d.totDesc, pendencia: d.pendencia || 0,
-      liquido: d.liquido, liquidoLote: d.liquidoLote, jaPago: d.jaPago, prestador: d.prestador, diasLote: d.diasLote
+      liquido: d.liquido, liquidoLote: d.liquidoLote, jaPago: d.jaPago, prestador: d.prestador, diasLote: d.diasLote, servicoAPagar: d.servicoAPagar, diasPend: d.diasPend
     };
     const pagos = Object.assign({}, servPagosDoc(atual));
     pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: d.liquidoLote, data: isoLocal(quando) });
