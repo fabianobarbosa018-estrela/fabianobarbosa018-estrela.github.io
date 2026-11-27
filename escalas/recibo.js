@@ -391,14 +391,14 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Gerando link…'; }
     try {
       const doc = Object.assign({}, documentoRecibo(Object.assign({}, rec, { liquido: rec.saldo, liquidoLote: rec.liquido }), numeroRec(mes, pid, loteId)));
-      const r = await Nuvem.rpc('esc_recibo_link', { p_contrato_id: contratoIdRec(mes, pid, loteId), p_documento: doc, p_dias: 7 });
+      const r = await Nuvem.rpc('esc_recibo_link', { p_contrato_id: contratoIdRec(mes, pid, loteId), p_documento: doc, p_dias: 1 });
       const base = location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '');
       const url = base + 'assinar.html#' + r.link;
       const atual = S.servicos[servKey(mes, pid)] || {};
       await servSalvar(mes, pid, { recibosLink: Object.assign({}, atual.recibosLink || {}, { [loteId]: { id: r.id, expira: r.expira, criadoEm: agoraISO() } }) });
       const primeiro = String(rec.prestador.nome || '').split(' ')[0];
-      const texto = 'Olá' + (primeiro ? ', ' + primeiro : '') + '! Segue o recibo de pagamento do Hotel Fazenda Oásis para você conferir e assinar pelo celular: ' + url + ' . O link vale por 7 dias.';
-      modalMsg('Link de assinatura pronto', `<p>Mande para <b>${esc2(rec.prestador.nome)}</b>. O link vale 7 dias e só serve para este recibo.</p>
+      const texto = 'Olá' + (primeiro ? ', ' + primeiro : '') + '! Segue o recibo de pagamento do Hotel Fazenda Oásis para você conferir e assinar pelo celular: ' + url + ' . O link vale por 5 minutos.';
+      modalMsg('Link de assinatura pronto', `<p>Mande para <b>${esc2(rec.prestador.nome)}</b>. O link vale 5 minutos e só serve para este recibo.</p>
         <div class="fld mt"><label class="f">Link</label><input type="text" readonly value="${esc2(url)}" onclick="this.select()"></div>
         <div class="row mt"><a class="btn pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(texto)}">Enviar pelo WhatsApp</a><button class="btn" id="rcbCopia">Copiar link</button></div>
         <p class="small muted mt">Quando ele assinar, o lote é marcado como pago pelo líquido e o PDF assinado fica salvo aqui.</p>`);
