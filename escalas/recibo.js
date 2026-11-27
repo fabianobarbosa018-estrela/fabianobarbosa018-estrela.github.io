@@ -96,13 +96,14 @@
   async function gerarPDF(rec, numero, opts) {
     const ok = await servPDFLibs(); if (!ok) return null;
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // Recibo em A5 deitada (metade de uma folha A4): só o necessário, sem ocupar a folha toda
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
     // Marca d'água: logo grande e bem clara no centro da página (atrás do conteúdo)
     const marca = await logoPdfData();
     if (marca) {
       try {
         doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.07 }));
-        doc.addImage(marca, 'PNG', 45, 95, 120, 120);
+        doc.addImage(marca, 'PNG', 62, 26, 86, 86);
         doc.restoreGraphicsState();
       } catch (e) { }
     }
@@ -154,7 +155,7 @@
     }
 
     // Assinatura
-    y = Math.max(y + 4, 200);
+    y = Math.max(y + 2, 98);
     doc.setFontSize(9.5);
     if (opts.modalidade === MOD_TELA && opts.assinatura) {
       try { doc.addImage(opts.assinatura, 'PNG', 60, y - 22, 80, 26); } catch (e) { }
@@ -174,10 +175,10 @@
     const pags = doc.getNumberOfPages();
     for (let k = 1; k <= pags; k++) {
       doc.setPage(k);
-      doc.setDrawColor(180, 190, 200); doc.line(15, 282, 195, 282);
+      doc.setDrawColor(180, 190, 200); doc.line(15, 130, 195, 130);
       doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
-      doc.text('Hotel Fazenda Oásis · CNPJ 52.756.106/0001-13 · Recibo ' + numero, 105, 287, { align: 'center' });
-      doc.text('Página ' + k + ' de ' + pags, 195, 291, { align: 'right' });
+      doc.text('Hotel Fazenda Oásis · CNPJ 52.756.106/0001-13 · Recibo ' + numero, 105, 135, { align: 'center' });
+      doc.text('Página ' + k + ' de ' + pags, 195, 139, { align: 'right' });
     }
     doc.setTextColor(0, 0, 0);
     return doc.output('blob');
