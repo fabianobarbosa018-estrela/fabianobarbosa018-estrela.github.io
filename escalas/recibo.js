@@ -99,15 +99,10 @@
     doc.setFont('helvetica', 'bold'); doc.text('Beneficiário: ' + rec.prestador.nome, 15, y); y += 6; doc.setFont('helvetica', 'normal');
 
     const corpo = [];
-    if (rec.servico) corpo.push(['Serviços do lote' + (rec.prestador.modal === 'diaria' ? ' (' + rec.diasLote + ' dia(s))' : ''), brl(rec.servico)]);
-    rec.extras.forEach(x => corpo.push(['Extra: ' + x.desc, brl(x.valor)]));
-    if (rec.saldoAnt) corpo.push(['Saldo de meses anteriores', brl(rec.saldoAnt)]);
-    corpo.push([{ content: 'VALOR BRUTO', styles: { fontStyle: 'bold' } }, { content: brl(rec.bruto), styles: { fontStyle: 'bold' } }]);
     rec.adiantamentos.forEach(x => corpo.push(['Adiantamento: ' + x.desc, '− ' + brl(x.valor)]));
     rec.descontos.forEach(x => corpo.push(['Desconto: ' + x.desc, '− ' + brl(x.valor)]));
-    corpo.push([{ content: 'TOTAL DE DESCONTOS', styles: { fontStyle: 'bold' } }, { content: '− ' + brl(rec.totDesc), styles: { fontStyle: 'bold' } }]);
-    if (rec.liquidoLote && Math.abs(rec.liquidoLote - rec.liquido) > 0.004) corpo.push(['Já pago antes deste recibo (líquido do lote: ' + brl(rec.liquidoLote) + ')', '− ' + brl(rec.liquidoLote - rec.liquido)]);
-    corpo.push([{ content: 'VALOR LÍQUIDO RECEBIDO NESTE RECIBO', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
+    if (!corpo.length) corpo.push(['Descontos', 'nenhum']);
+    corpo.push([{ content: 'VALOR A RECEBER (SALDO)', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
     doc.autoTable({ startY: y, body: corpo, theme: 'grid', styles: { fontSize: 9.5, cellPadding: 2.2 }, columnStyles: { 0: { cellWidth: 135 }, 1: { halign: 'right' } }, margin: { left: 15, right: 15 } });
     y = doc.lastAutoTable.finalY + 6;
 
@@ -330,16 +325,12 @@
   /* Documento que o prestador lê e assina: foto dos valores no momento do envio */
   function documentoRecibo(rec, numero) {
     const p2 = n => String(n).padStart(2, '0');
+    // Só o saldo a receber, com os descontos e adiantamentos que houve (se não houve, diz que não houve)
     const linhas = [];
-    if (rec.servico) linhas.push({ t: 'Serviços do lote' + (rec.prestador.modal === 'diaria' ? ' (' + rec.diasLote + ' dia(s))' : ''), v: brl(rec.servico) });
-    rec.extras.forEach(x => linhas.push({ t: 'Extra: ' + x.desc, v: brl(x.valor) }));
-    if (rec.saldoAnt) linhas.push({ t: 'Saldo de meses anteriores', v: brl(rec.saldoAnt) });
-    linhas.push({ t: 'Valor bruto', v: brl(rec.bruto), negrito: true });
     rec.adiantamentos.forEach(x => linhas.push({ t: 'Adiantamento: ' + x.desc, v: '− ' + brl(x.valor) }));
     rec.descontos.forEach(x => linhas.push({ t: 'Desconto: ' + x.desc, v: '− ' + brl(x.valor) }));
-    linhas.push({ t: 'Total de descontos', v: '− ' + brl(rec.totDesc), negrito: true });
-    if (rec.liquidoLote && Math.abs(rec.liquidoLote - rec.liquido) > 0.004) linhas.push({ t: 'Já pago antes deste recibo', v: '− ' + brl(rec.liquidoLote - rec.liquido) });
-    linhas.push({ t: 'Valor líquido recebido neste recibo', v: brl(rec.liquido), negrito: true });
+    if (!linhas.length) linhas.push({ t: 'Descontos', v: 'nenhum' });
+    linhas.push({ t: 'Valor a receber (saldo)', v: brl(rec.liquido), negrito: true });
     return {
       tipo: 'recibo', numero, hotel: 'Hotel Fazenda Oásis', cnpj: '52.756.106/0001-13',
       contratada: { nome: rec.prestador.nome, doc: '' },
