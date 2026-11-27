@@ -2064,7 +2064,7 @@ const ACOES_PERM = {
 const MOD_NOME = { escala: 'Escala', servicos: 'Serviços prestados', diarias: 'Controle de diárias', vt: 'Vale-transporte', contratos: 'Contratos', orcamentos: 'Orçamentos', usuarios: 'Usuários', conta: 'Conta', funcionarios: 'Funcionários', setores: 'Setores', config: 'Configurações', atestados: 'Atestados', auditoria: 'Histórico', avaliacao: 'Avaliação' };
 const ACAO_NOME = { ver: 'acessar', criar: 'criar/lançar', editar: 'editar', excluir: 'excluir', enviar: 'enviar para aprovação', aprovar: 'aprovar', pagamentos: 'mexer em pagamentos e fechamentos' };
 const podeAcao = (m, a) => ehAdmin() || !!(S.perms && S.perms[m] && S.perms.acoes && S.perms.acoes[m] && S.perms.acoes[m][a]);
-const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], vt: ['vt'], avaliacao: ['__desativada__'], conta: [] };
+const ROTA_PERM = { diaria: ['escala'], mensal: ['escala'], servicos: ['servicos', 'diarias'], servprest: ['servicos'], servdiar: ['diarias', 'servicos'], vt: ['vt'], avaliacao: ['__desativada__'], conta: [] };
 const rotaPermitida = r => ehAdmin() ? (r !== 'conta' && (r !== 'usuarios' || S.modo === 'nuvem')) : (r in ROTA_PERM) && (!ROTA_PERM[r].length || ROTA_PERM[r].some(pode));
 const rotaInicial = () => ehAdmin() ? 'painel' : (['mensal', 'servicos', 'vt'].find(rotaPermitida) || 'conta');
 function aplicarPerfil(p) {
@@ -2473,6 +2473,8 @@ const ICON = {
   move: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   chevL: '<path d="M15 18l-6-6 6-6"/>', chevR: '<path d="M9 18l6-6-6-6"/>',
   servicos: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
+  servprest: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
+  servdiar: '<circle cx="9" cy="7" r="4"/><path d="M17 11l2 2 4-4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>',
   pdf: '<path d="M6 2h9l5 5v15H6zM14 2v6h6"/>', xls: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
   print: '<path d="M6 9V2h12v7M6 18H4v-7h16v7h-2M8 14h8v8H8z"/>',
   wa: '<path d="M3 21l1.6-4.8A9 9 0 1121 12a9 9 0 01-13.2 7.9z"/>',
@@ -2484,7 +2486,7 @@ const ICON = {
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['rescisao', 'Rescisão'], ['servicos', 'Serviços prestados'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['ordens', 'Ordens de Serviço'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['rescisao', 'Rescisão'], ['servicos', 'Serviços prestados'], ['servprest', 'Serviços prestados'], ['servdiar', 'Diaristas'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['ordens', 'Ordens de Serviço'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -3401,7 +3403,7 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Operação', ['mensal', 'painel', 'diaria', 'ordens']], ['Gestão de pessoas', ['funcionarios', 'setores', 'atestados', 'contratos', 'rescisao']], ['Financeiro', ['servicos', 'vt', 'historico', 'relatorios']], ['Administração', ['usuarios', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  const GRUPOS_MENU = [['Operação', ['mensal', 'painel', 'diaria', 'ordens']], ['Gestão de pessoas', ['funcionarios', 'setores', 'atestados', 'contratos', 'rescisao']], ['Financeiro', ['servprest', 'servdiar', 'vt', 'historico', 'relatorios']], ['Administração', ['usuarios', 'backup', 'aparencia']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
@@ -3419,7 +3421,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { rescisao: window.vRescisao, ordens: window.vOrdens, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { rescisao: window.vRescisao, ordens: window.vOrdens, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, servprest: () => { UI.servGrupo = 'outros'; return vServicos(); }, servdiar: () => { UI.servGrupo = 'diaria'; return vServicos(); }, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -5676,7 +5678,7 @@ document.addEventListener('click', async ev => {
     case 'servFechPrint': return servFechamento(true);
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
-    case 'servGrupoTab': UI.servGrupo = el.dataset.g; return render();
+    case 'servGrupoTab': UI.servGrupo = el.dataset.g; UI.rota = el.dataset.g === 'diaria' ? 'servdiar' : 'servprest'; try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } return render();
     case 'servPerChip': UI.servPer = el.dataset.id; return render();
     case 'servCopiar': return servCopiarTexto(servTextoDiaristas(UI.servMes)).then(ok => toast(ok ? 'Texto copiado. Cole onde quiser.' : 'Não consegui copiar automaticamente.'));
     case 'servAbrirDia': {
