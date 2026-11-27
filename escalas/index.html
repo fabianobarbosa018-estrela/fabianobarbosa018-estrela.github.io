@@ -2705,7 +2705,7 @@ function vServicos() {
   const svFull = pode('servicos'), svDia = pode('diarias');
   const gruposOk = Object.keys(servGrupoNome).filter(k => k === 'diaria' ? svDia : k === 'outros' ? svFull : svFull && svDia);
   const grupo = UI.servGrupo = gruposOk.includes(UI.servGrupo || 'diaria') ? (UI.servGrupo || 'diaria') : gruposOk[0];
-  const lotes = servLotesMes(mes, grupo), sel = grupo === 'diaria' ? 'mes' : servPerSel(lotes);
+  const lotes = servLotesMes(mes, grupo), sel = servPerSel(lotes);
   const lote = lotes.find(x => x.id === sel) || null, idx = lote ? lotes.indexOf(lote) : -1;
   const ativos = servPrestadores();
   if (ativos.length) servCriarMes(mes); // cria a planilha do mês (e de quem entrou depois) sem precisar clicar
