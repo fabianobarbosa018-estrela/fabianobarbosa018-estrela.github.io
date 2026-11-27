@@ -2536,8 +2536,8 @@ const servLotesDefault = mes => [
 /* Lotes de um grupo no mês. Sem lotes salvos, vale o padrão (dia 15 e fim do mês) */
 function servLotesMes(mes, grupo) {
   if (grupo === 'todos') grupo = 'diaria'; // a visão 'todos' usa os períodos (dia 15 / fim do mês) de referência
-  const doc = S.servicos[mes + '__lotes'];
-  const todos = doc && Array.isArray(doc.lotes) ? doc.lotes : servLotesDefault(mes);
+  // Lotes fixos: 1 a 15 e 16 até o fim do mês, pagamento dia 20 e dia 5 do mês seguinte, todo mês
+  const todos = servLotesDefault(mes);
   return todos.filter(x => (x.grupo || 'outros') === grupo).slice().sort((a, b) => a.de - b.de);
 }
 /* Pagamentos de um prestador, por id de lote. Formato antigo (lista de dois) vira os lotes '15' e 'fim'. */
@@ -2712,8 +2712,7 @@ function vServicos() {
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="servAnt">${ic('chevL')}</button><input type="month" id="inServMes" value="${mes}"><button class="btn icon" data-act="servProx">${ic('chevR')}</button>
     <div class="sp"></div>
-    ${svFull ? `<button class="btn" data-act="servLotes">Lotes do mês</button>
-    <button class="btn" data-act="prestLista">Prestadores</button>` : ''}
+    ${svFull ? `<button class="btn" data-act="prestLista">Prestadores</button>` : ''}
   </div>
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
