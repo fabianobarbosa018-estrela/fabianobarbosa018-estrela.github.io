@@ -2714,7 +2714,7 @@ function vServicos() {
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
     <div class="svc-chips" style="width:100%">${lotes.map(x => `<button class="svc-chip ${x.id === sel ? 'on' : ''}" data-act="servPerChip" data-id="${esc(x.id)}">${esc(nomeCurto(x.nome))}<small>dias ${dd2(x.de)} a ${dd2(Math.min(x.ate, ult))} · paga ${C.dataBR(x.dataPadrao || '').slice(0, 5)}</small></button>`).join('')}<button class="svc-chip ${sel === 'mes' ? 'on' : ''}" data-act="servPerChip" data-id="mes">Mês inteiro<small>só para conferir</small></button></div>
-    <div class="tabs" style="width:100%;margin:0">${gruposOk.map(k => `<button class="${k === grupo ? 'on' : ''}" data-act="servGrupoTab" data-g="${k}">${servGrupoAba[k]}</button>`).join('')}</div>
+    <div class="tabs" style="width:100%;margin:0">${gruposOk.filter(k => k !== 'todos').map(k => `<button class="${k === grupo ? 'on' : ''}" data-act="servGrupoTab" data-g="${k}">${servGrupoAba[k]}</button>`).join('')}</div>
   </div>
   <label class="small" style="display:block;margin-top:8px"><input type="checkbox" id="chkSoValor" ${UI.servSoValor !== false ? 'checked' : ''}> Imprimir e exportar só quem tem valor neste período</label>
   <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="chkFechAnt" ${UI.servFechAnt !== false ? 'checked' : ''}> Fechamento: somar também saldos de lotes anteriores ainda em aberto (sem repetir o que já foi pago)</label></div>`;
