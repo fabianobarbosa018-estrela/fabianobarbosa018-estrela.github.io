@@ -3426,7 +3426,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { rescisao: window.vRescisao, ordens: window.vOrdens, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: vServicos, servprest: () => { UI.servGrupo = 'outros'; return vServicos(); }, servdiar: () => { UI.servGrupo = 'diaria'; return vServicos(); }, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { rescisao: window.vRescisao, ordens: window.vOrdens, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: () => { UI.servPer = undefined; return vServicos(); }, servprest: () => { UI.servGrupo = 'outros'; UI.servPer = undefined; return vServicos(); }, servdiar: () => { UI.servGrupo = 'diaria'; UI.servPer = undefined; return vServicos(); }, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
@@ -5683,7 +5683,7 @@ document.addEventListener('click', async ev => {
     case 'servFechPrint': return servFechamento(true);
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
-    case 'servGrupoTab': UI.servGrupo = el.dataset.g; UI.rota = el.dataset.g === 'diaria' ? 'servdiar' : 'servprest'; try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } return render();
+    case 'servGrupoTab': UI.servGrupo = el.dataset.g; UI.servPer = undefined; UI.rota = el.dataset.g === 'diaria' ? 'servdiar' : 'servprest'; try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } return render();
     case 'servPerChip': UI.servPer = el.dataset.id; return render();
     case 'servCopiar': return servCopiarTexto(servTextoDiaristas(UI.servMes)).then(ok => toast(ok ? 'Texto copiado. Cole onde quiser.' : 'Não consegui copiar automaticamente.'));
     case 'servAbrirDia': {
