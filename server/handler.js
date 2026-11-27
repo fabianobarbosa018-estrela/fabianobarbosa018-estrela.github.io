@@ -181,7 +181,8 @@ export function criarServidor(io) {
     return { enunciado: q[2], resposta: q[3] ? 'Verdadeiro' : 'Falso', explicacao: q[4] };
   }
   function estudoDoBanco(B, b) {
-    const D = B.disciplinas.find(x => DISC_BANCO[x.id] === b.disciplinaNome || x.nome === b.disciplinaNome);
+    const nomeD = /^ci[eê]ncias?$/i.test(String(b.disciplinaNome || '').trim()) ? 'Biologia' : b.disciplinaNome;
+    const D = B.disciplinas.find(x => DISC_BANCO[x.id] === nomeD || x.nome === nomeD);
     const base = { disciplina: b.disciplinaNome, assunto: b.assunto || '', texto: '', video: '', exemplo: null };
     if (!D) return base;
     const niveis = { F1I: ['F1'], F1: ['F1'], F2: ['F2', 'F1'], EM: ['EM', 'F2'] }[b.nivel] || ['F2', 'F1', 'EM'];
@@ -252,7 +253,7 @@ export function criarServidor(io) {
   }
   // ---------- Desafio diário ----------
   const ACOES_DESAFIO = ['alunoDados', 'desafioHoje', 'desafioHistorico', 'profPainel', 'desafioPainel', 'atividades'];
-  const DISC_BANCO = { portugues: 'Português', matematica: 'Matemática', historia: 'História', geografia: 'Geografia', educacao_fisica: 'Educação Física', fisica: 'Física', quimica: 'Química', ciencias_biologia: 'Biologia' };
+  const DISC_BANCO = { portugues: 'Português', matematica: 'Matemática', historia: 'História', geografia: 'Geografia', educacao_fisica: 'Educação Física', fisica: 'Física', quimica: 'Química', ciencias_biologia: 'Biologia', ingles: 'Inglês', arte: 'Arte' };
   const COTAS_50 = { 'Português': 7, 'Matemática': 7, 'História': 6, 'Geografia': 6, 'Educação Física': 6, 'Física': 6, 'Química': 6, 'Biologia': 6 };
   // anos iniciais (1º ao 3º ano): prova menor, só com assuntos e questões mais fáceis
   // anos iniciais: reforço em Matemática (metade da prova)
