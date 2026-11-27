@@ -146,20 +146,20 @@
     doc.text('Realizado em', 122, 60); doc.line(150, 61, 196, 61); doc.text(hojeBR, 152, 59.5);
     // Texto legal
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-    doc.text('Este recibo serve como comprovante válido e está sujeito apresentação se necessário', 105, 70, { align: 'center' });
+    doc.text('Este recibo serve como comprovante válido e está sujeito apresentação se necessário', 105, 66.5, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     // Assinatura
     if (opts.modalidade === MOD_TELA && opts.assinatura) {
-      try { doc.addImage(opts.assinatura, 'PNG', 66, 71, 78, 14); } catch (e) { }
+      try { doc.addImage(opts.assinatura, 'PNG', 66, 72, 78, 12); } catch (e) { }
     }
-    doc.setLineWidth(0.3); doc.line(62, 86, 148, 86);
-    doc.setFontSize(7.5); doc.setTextColor(40, 40, 40); doc.text(rec.prestador.nome, 105, 89, { align: 'center' });
+    doc.setLineWidth(0.3); doc.line(62, 85.5, 148, 85.5);
+    doc.setFontSize(8.5); doc.setTextColor(40, 40, 40); doc.text(rec.prestador.nome, 105, 88.8, { align: 'center' });
     // Rodapé: endereço e pendência
     doc.setFontSize(6.5); doc.setTextColor(...CINZA);
-    doc.text('Paudalho-PE, estrada de chã do ouro.', 14, 91.2);
+    doc.text('Paudalho-PE, estrada de chã do ouro.', 14, 90.2);
     if (rec.pendencia > 0) {
       doc.setTextColor(160, 90, 0);
-      doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 196, 91.2, { align: 'right' });
+      doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 196, 90.2, { align: 'right' });
     }
     doc.setTextColor(0, 0, 0);
     return doc.output('blob');
