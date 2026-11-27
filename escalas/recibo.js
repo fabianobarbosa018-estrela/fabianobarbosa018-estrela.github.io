@@ -97,12 +97,30 @@
     const ok = await servPDFLibs(); if (!ok) return null;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // Marca d'água: logo grande e bem clara no centro da página (atrás do conteúdo)
+    const marca = await logoPdfData();
+    if (marca) {
+      try {
+        doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.07 }));
+        doc.addImage(marca, 'PNG', 45, 95, 120, 120);
+        doc.restoreGraphicsState();
+      } catch (e) { }
+    }
+    // Cabeçalho: logo, nome e CNPJ do hotel, linha separadora
     let y = await pdfCabecalho(doc, 12);
+    doc.setTextColor(30, 40, 60);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('Hotel Fazenda Oásis', 52, 8);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('CNPJ 52.756.106/0001-13', 52, 13);
+    doc.setDrawColor(180, 190, 200); doc.line(15, 22, 195, 22);
+    doc.setTextColor(0, 0, 0);
+    y = 28;
+    // Título, número e data de emissão
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-    doc.text('RECIBO DE PAGAMENTO', 105, y + 6, { align: 'center' });
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text('Nº ' + numero, 200, y + 6, { align: 'right' });
-    y += 14;
+    doc.text('RECIBO DE PAGAMENTO', 105, y + 4, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text('Nº ' + numero, 195, y + 4, { align: 'right' });
+    doc.text('Emitido em ' + dataHoraBR(opts.em || new Date().toISOString()), 195, y + 9, { align: 'right' });
+    y += 16;
     const p2 = n => String(n).padStart(2, '0');
     const mm = rec.mes.slice(5, 7), aa = rec.mes.slice(0, 4);
     // Período = dias ainda não pagos (primeiro ao último); sem pendência, o período do lote
@@ -151,6 +169,15 @@
     } else {
       doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
       doc.text('Assinatura manual do beneficiário.', 105, y, { align: 'center' });
+    }
+    // Rodapé em todas as páginas
+    const pags = doc.getNumberOfPages();
+    for (let k = 1; k <= pags; k++) {
+      doc.setPage(k);
+      doc.setDrawColor(180, 190, 200); doc.line(15, 282, 195, 282);
+      doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
+      doc.text('Hotel Fazenda Oásis · CNPJ 52.756.106/0001-13 · Recibo ' + numero, 105, 287, { align: 'center' });
+      doc.text('Página ' + k + ' de ' + pags, 195, 291, { align: 'right' });
     }
     doc.setTextColor(0, 0, 0);
     return doc.output('blob');
