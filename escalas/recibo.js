@@ -1,0 +1,325 @@
+/* Recibo de pagamento (Serviços prestados): descontos e adiantamentos do lote, assinatura na tela ou manual, PDF.
+   Usa as funções globais de index.html (servCalc, servSalvar, servPagosDoc, abrirModal, modalMsg, salvarArquivo...).
+   Não altera dias, descontos, adiantamentos nem extras: só grava o recibo e marca o lote como pago pelo valor líquido. */
+(function (root) {
+  'use strict';
+
+  const MOD_TELA = 'tela', MOD_MANUAL = 'manual';
+  const esc2 = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const brl = v => 'R$ ' + servMoeda(v);
+  const agoraISO = () => new Date().toISOString();
+  const hojeISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const dataBR = iso => (iso || '').slice(8, 10) + '/' + (iso || '').slice(5, 7) + '/' + (iso || '').slice(0, 4);
+  const dataHoraBR = iso => { const d = new Date(iso); return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+
+  /* Índice do lote de um lançamento (mesma regra de servCalc: lote escolhido, senão pela data) */
+  function ixLote(lotes, x) {
+    const n = lotes.length;
+    if (x && x.lote) { const i = lotes.findIndex(y => y.id === x.lote); if (i >= 0) return i; }
+    if (!x || !x.data) return n - 1;
+    const dia = +String(x.data).slice(8, 10);
+    const i = lotes.findIndex(l => dia >= l.de && dia <= l.ate);
+    return i >= 0 ? i : n - 1;
+  }
+
+  /* Monta o recibo de um lote com os números atuais (não grava nada) */
+  function montar(mes, pid, loteId) {
+    const c = servCalc(mes, pid);
+    const i = c.lotes.findIndex(x => x.id === loteId);
+    if (i < 0) return null;
+    const lote = c.lotes[i], pg = c.pagos[i];
+    const l = c.l || {};
+    const nome = _capNome((c.p && c.p.nome) || '');
+
+    // Serviços do lote (diárias ou % do valor mensal) e extras
+    const extrasI = (l.extras || []).filter(x => ixLote(c.lotes, x) === i).map(x => ({ desc: x.desc || 'Serviço extra', valor: r2(+x.valor || 0) }));
+    const totExtras = r2(extrasI.reduce((a, x) => a + x.valor, 0));
+    const servico = r2(c.g[i] - totExtras);
+    const diasLote = Object.keys(l.dias || {}).filter(d => { const dd = +d; return dd >= lote.de && dd <= lote.ate; }).length;
+    const saldoAnt = i === 0 ? r2(c.ant) : 0;
+    const bruto = r2(servico + totExtras + saldoAnt);
+
+    // Adiantamentos deste lote
+    const adiantI = (l.adiant || []).filter(x => ixLote(c.lotes, x) === i).map(x => ({ desc: x.desc || 'Adiantamento', valor: r2(+x.valor || 0) }));
+    const totAdiant = r2(adiantI.reduce((a, x) => a + x.valor, 0));
+
+    // Descontos registrados para este lote e o que sobrou de lotes anteriores
+    const descI = (l.descontos || []).filter(x => ixLote(c.lotes, x) === i).map(x => ({ desc: x.desc || 'Desconto', valor: r2(+x.valor || 0) }));
+    const somaDesc = r2(descI.reduce((a, x) => a + x.valor, 0));
+    const aplicado = c.dsc[i];
+    const deAntes = r2(Math.max(0, aplicado - somaDesc));
+    const naoAbatido = r2(Math.max(0, somaDesc - aplicado));
+    const descLinhas = descI.slice();
+    if (deAntes > 0) descLinhas.push({ desc: 'Descontos de lotes anteriores que não couberam antes', valor: deAntes });
+
+    // Pendências: descontos cadastrados até este lote que ainda não foram abatidos (não são descontados aqui)
+    let demAcum = 0, abatAcum = 0;
+    for (let j = 0; j <= i; j++) {
+      demAcum += (l.descontos || []).filter(x => ixLote(c.lotes, x) === j).reduce((a, x) => a + (+x.valor || 0), 0);
+      abatAcum += c.dsc[j];
+    }
+    const pendencia = r2(Math.max(0, demAcum - abatAcum));
+
+    const totDesc = r2(totAdiant + aplicado);
+    const liquido = r2(bruto - totAdiant - aplicado);
+    return {
+      mes, pid, loteId, lote: { id: lote.id, nome: lote.nome, de: lote.de, ate: lote.ate },
+      prestador: { nome, funcao: (c.p && c.p.funcao) || '', modal: c.modal },
+      diasLote, servico, extras: extrasI, totExtras, saldoAnt, bruto,
+      adiantamentos: adiantI, totAdiant,
+      descontos: descLinhas, descAplicado: aplicado, naoAbatido, pendencia,
+      totDesc, liquido,
+      valorRegistrado: pg.valor, consistente: liquido === r2(pg.valor),
+      pagoAntes: !!pg.pago, valorPagoAntes: pg.valorPago != null ? r2(pg.valorPago) : null
+    };
+  }
+
+  /* ---------- PDF ---------- */
+  async function gerarPDF(rec, numero, opts) {
+    const ok = await servPDFLibs(); if (!ok) return null;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    let y = await pdfCabecalho(doc, 12);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text('RECIBO DE PAGAMENTO', 105, y + 6, { align: 'center' });
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.text('Nº ' + numero, 200, y + 6, { align: 'right' });
+    y += 14;
+    const p2 = n => String(n).padStart(2, '0');
+    const mm = rec.mes.slice(5, 7), aa = rec.mes.slice(0, 4);
+    const periodo = p2(rec.lote.de) + '/' + mm + '/' + aa + ' a ' + p2(rec.lote.ate) + '/' + mm + '/' + aa;
+    const txt = 'Recebi do Hotel Fazenda Oásis (CNPJ 52.756.106/0001-13) a importância líquida de ' + brl(rec.liquido) +
+      ', referente a serviços prestados no período de ' + periodo + ' (' + rec.lote.nome + '), conforme discriminado abaixo.';
+    doc.setFontSize(10);
+    const linhas = doc.splitTextToSize(txt, 180);
+    doc.text(linhas, 15, y); y += linhas.length * 5 + 4;
+    doc.setFont('helvetica', 'bold'); doc.text('Beneficiário: ' + rec.prestador.nome, 15, y); y += 6; doc.setFont('helvetica', 'normal');
+
+    const corpo = [];
+    if (rec.servico) corpo.push(['Serviços do lote' + (rec.prestador.modal === 'diaria' ? ' (' + rec.diasLote + ' dia(s))' : ''), brl(rec.servico)]);
+    rec.extras.forEach(x => corpo.push(['Extra: ' + x.desc, brl(x.valor)]));
+    if (rec.saldoAnt) corpo.push(['Saldo de meses anteriores', brl(rec.saldoAnt)]);
+    corpo.push([{ content: 'VALOR BRUTO', styles: { fontStyle: 'bold' } }, { content: brl(rec.bruto), styles: { fontStyle: 'bold' } }]);
+    rec.adiantamentos.forEach(x => corpo.push(['Adiantamento: ' + x.desc, '− ' + brl(x.valor)]));
+    rec.descontos.forEach(x => corpo.push(['Desconto: ' + x.desc, '− ' + brl(x.valor)]));
+    corpo.push([{ content: 'TOTAL DE DESCONTOS', styles: { fontStyle: 'bold' } }, { content: '− ' + brl(rec.totDesc), styles: { fontStyle: 'bold' } }]);
+    corpo.push([{ content: 'VALOR LÍQUIDO RECEBIDO', styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }, { content: brl(rec.liquido), styles: { fontStyle: 'bold', fillColor: [230, 242, 240] } }]);
+    doc.autoTable({ startY: y, body: corpo, theme: 'grid', styles: { fontSize: 9.5, cellPadding: 2.2 }, columnStyles: { 0: { cellWidth: 135 }, 1: { halign: 'right' } }, margin: { left: 15, right: 15 } });
+    y = doc.lastAutoTable.finalY + 6;
+
+    if (rec.pendencia > 0) {
+      doc.setFontSize(9); doc.setTextColor(160, 90, 0);
+      doc.text('Pendência para conferência (não descontada neste recibo): ' + brl(rec.pendencia), 15, y); doc.setTextColor(0, 0, 0); y += 8;
+    }
+
+    // Assinatura
+    y = Math.max(y + 4, 200);
+    doc.setFontSize(9.5);
+    if (opts.modalidade === MOD_TELA && opts.assinatura) {
+      try { doc.addImage(opts.assinatura, 'PNG', 60, y - 22, 80, 26); } catch (e) { }
+    }
+    doc.line(50, y + 4, 160, y + 4);
+    doc.text(rec.prestador.nome, 105, y + 9, { align: 'center' });
+    y += 14;
+    if (opts.modalidade === MOD_TELA) {
+      doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
+      doc.text('Assinado eletronicamente por ' + rec.prestador.nome + ' em ' + dataHoraBR(opts.em) + '.', 105, y, { align: 'center' });
+      doc.text('Assinatura desenhada na tela do dispositivo. Não é certificado digital ICP-Brasil.', 105, y + 4, { align: 'center' });
+    } else {
+      doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
+      doc.text('Assinatura manual do beneficiário.', 105, y, { align: 'center' });
+    }
+    doc.setTextColor(0, 0, 0);
+    return doc.output('blob');
+  }
+
+  function nomeArquivo(rec, numero) {
+    return 'recibo-' + numero + '-' + rec.prestador.nome.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pdf';
+  }
+
+  /* ---------- tela ---------- */
+  function resumoHtml(rec) {
+    const linha = (t, v, cls) => `<tr class="${cls || ''}"><td>${esc2(t)}</td><td style="text-align:right;white-space:nowrap">${v}</td></tr>`;
+    let h = '<table class="rcb-tab"><tbody>';
+    if (rec.servico) h += linha('Serviços do lote' + (rec.prestador.modal === 'diaria' ? ' (' + rec.diasLote + ' dia(s))' : ''), brl(rec.servico));
+    rec.extras.forEach(x => { h += linha('Extra: ' + esc2(x.desc), brl(x.valor)); });
+    if (rec.saldoAnt) h += linha('Saldo de meses anteriores', brl(rec.saldoAnt));
+    h += linha('<b>Valor bruto</b>', '<b>' + brl(rec.bruto) + '</b>', 'rcb-sub');
+    rec.adiantamentos.forEach(x => { h += linha('Adiantamento: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
+    rec.descontos.forEach(x => { h += linha('Desconto: ' + esc2(x.desc), '− ' + brl(x.valor), 'rcb-desc'); });
+    h += linha('<b>Total de descontos</b>', '<b>− ' + brl(rec.totDesc) + '</b>', 'rcb-sub');
+    h += linha('<b>Valor líquido a receber</b>', '<b>' + brl(rec.liquido) + '</b>', 'rcb-liq');
+    h += '</tbody></table>';
+    if (rec.pendencia > 0) h += `<div class="alert w mt"><span class="ic">!</span><div><b>Pendência para conferência:</b> ${brl(rec.pendencia)} em descontos ainda não abatidos. Não foi descontado automaticamente neste recibo.</div></div>`;
+    if (!rec.consistente) h += `<div class="alert w mt"><span class="ic">!</span><div>O valor do lote na tela (${brl(rec.valorRegistrado)}) não bate com o líquido deste recibo (${brl(rec.liquido)}). Confira antes de assinar.</div></div>`;
+    return h;
+  }
+
+  /* Canvas de assinatura: dedo no celular ou mouse no computador */
+  function iniciarPad(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 300, h = cv.clientHeight || 180;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+    let desenhando = false, ultimo = null, tocou = false;
+    const pos = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    cv.onpointerdown = e => { desenhando = true; try { cv.setPointerCapture(e.pointerId); } catch (_) { } ultimo = pos(e); e.preventDefault(); };
+    cv.onpointermove = e => {
+      if (!desenhando) return;
+      const p = pos(e); ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ultimo = p; tocou = true; e.preventDefault(); if (pad.onChange) pad.onChange(tocou);
+    };
+    const fim = () => { desenhando = false; ultimo = null; };
+    cv.onpointerup = fim; cv.onpointercancel = fim;
+    const pad = {
+      onChange: null,
+      limpar() { ctx.clearRect(0, 0, w, h); tocou = false; if (pad.onChange) pad.onChange(false); },
+      temAssinatura() { return tocou; },
+      png() { return cv.toDataURL('image/png'); }
+    };
+    return pad;
+  }
+
+  function estiloRecibo() {
+    if (document.getElementById('rcbCss')) return;
+    const s = document.createElement('style'); s.id = 'rcbCss';
+    s.textContent = `.rcb-tab{width:100%;border-collapse:collapse;font-size:14px}.rcb-tab td{padding:7px 4px;border-bottom:1px solid var(--line,#e5e7eb)}
+      .rcb-sub td{background:#f6f8f8}.rcb-desc td:last-child{color:#b91c1c}.rcb-liq td{background:#e6f2f0;font-size:16px;border-bottom:0}
+      .rcb-pad{width:100%;height:200px;border:2px dashed #94a3b8;border-radius:12px;background:#fff;touch-action:none;display:block}
+      .rcb-modo{display:flex;gap:8px;flex-wrap:wrap}.rcb-modo label{flex:1;min-width:150px;border:1px solid var(--line,#d1d5db);border-radius:10px;padding:10px;cursor:pointer}
+      .rcb-modo input{margin-right:6px}.rcb-chk{display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px}`;
+    document.head.appendChild(s);
+  }
+
+  /* Abre o recibo de um lote: ver (se já assinado) ou emitir */
+  async function abrir(mes, pid, loteId) {
+    if (!pode('servicos')) return toast('Seu acesso não inclui esta função.');
+    const k = servKey(mes, pid);
+    const guardado = (S.servicos[k] && S.servicos[k].recibos || {})[loteId];
+    if (guardado) return verRecibo(mes, pid, loteId, guardado);
+    const rec = montar(mes, pid, loteId);
+    if (!rec) return toast('Lote não encontrado.');
+    if (rec.liquido <= 0) return modalMsg('Recibo', '<p>Não há valor líquido a receber neste lote.</p>');
+    if (rec.pagoAntes && rec.valorPagoAntes != null && rec.valorPagoAntes !== rec.liquido) {
+      return modalMsg('Recibo', `<p>Este lote já foi marcado como pago por <b>${brl(rec.valorPagoAntes)}</b>, mas o líquido atual é <b>${brl(rec.liquido)}</b>.</p><p>Desfaça o pagamento antes de emitir o recibo.</p>`);
+    }
+    estiloRecibo();
+    let modalidade = MOD_TELA, pad = null;
+    const w = abrirModal(`<div class="mh">Recibo · ${esc2(rec.prestador.nome)}<div class="small muted" style="font-weight:400">${esc2(rec.lote.nome)} · ${esc2(servMesNome(mes))}</div></div>
+      <div class="mbd" id="rcbCorpo">
+        ${resumoHtml(rec)}
+        <div class="fld mt"><label class="f">Como será assinado</label>
+          <div class="rcb-modo">
+            <label><input type="radio" name="rcbModo" value="${MOD_TELA}" checked>Assinar na tela</label>
+            <label><input type="radio" name="rcbModo" value="${MOD_MANUAL}">Assinatura manual (imprimir)</label>
+          </div></div>
+        <div id="rcbArea"></div>
+        <label class="rcb-chk"><input type="checkbox" id="rcbOk"><span id="rcbOkTxt">Confirmo que recebi <b>${brl(rec.liquido)}</b> (valor líquido acima), referente a este lote.</span></label>
+      </div>
+      <div class="mf" style="flex-wrap:wrap;gap:8px"><button class="btn" data-x="c">Cancelar</button><button class="btn" id="rcbLimpar" style="display:none">Limpar assinatura</button><button class="btn" id="rcbPDF" style="display:none">Gerar PDF para assinar</button><button class="btn pri" id="rcbOkBtn" disabled>Confirmar e assinar</button></div>`);
+    const q = s => w.querySelector(s);
+    const area = () => {
+      if (modalidade === MOD_TELA) {
+        q('#rcbArea').innerHTML = `<div class="fld mt"><label class="f">Assinatura do beneficiário (use o dedo ou o mouse)</label><canvas id="rcbPad" class="rcb-pad"></canvas></div>`;
+        q('#rcbLimpar').style.display = ''; q('#rcbPDF').style.display = 'none';
+        const cv = q('#rcbPad');
+        pad = iniciarPad(cv);
+        pad.onChange = () => atualizar();
+      } else {
+        q('#rcbArea').innerHTML = `<p class="small muted mt">Imprima o recibo, o beneficiário assina no papel e depois você confirma aqui. Nenhuma assinatura digital é registrada neste modo.</p>`;
+        q('#rcbLimpar').style.display = 'none'; q('#rcbPDF').style.display = '';
+        pad = null;
+      }
+      q('#rcbOk').checked = false; atualizar();
+    };
+    const atualizar = () => {
+      const ok = q('#rcbOk').checked;
+      const pronto = modalidade === MOD_TELA ? (pad && pad.temAssinatura() && ok) : ok;
+      q('#rcbOkBtn').disabled = !pronto;
+      q('#rcbOkTxt').innerHTML = modalidade === MOD_TELA
+        ? `Confirmo que recebi <b>${brl(rec.liquido)}</b> (valor líquido acima), referente a este lote, e que esta assinatura é do beneficiário.`
+        : `Confirmo que o beneficiário assinou o recibo impresso no valor de <b>${brl(rec.liquido)}</b>.`;
+    };
+    w.querySelectorAll('input[name=rcbModo]').forEach(r => r.onchange = () => { modalidade = r.value; area(); });
+    q('#rcbOk').onchange = atualizar;
+    q('#rcbLimpar').onclick = () => { if (pad) pad.limpar(); };
+    q('#rcbPDF').onclick = async () => {
+      const blob = await gerarPDF(rec, 'RASCUNHO', { modalidade: MOD_MANUAL });
+      if (blob) salvarArquivo('recibo-para-assinar-' + rec.lote.id + '.pdf', blob);
+    };
+    q('[data-x=c]').onclick = () => fecharModal(w);
+    q('#rcbOkBtn').onclick = async () => {
+      const ok = q('#rcbOk').checked;
+      if (!ok) return;
+      if (modalidade === MOD_TELA && !(pad && pad.temAssinatura())) return toast('Faça a assinatura antes de confirmar.');
+      q('#rcbOkBtn').disabled = true;
+      try {
+        await gravar(mes, pid, loteId, rec, modalidade, modalidade === MOD_TELA ? pad.png() : null);
+        fecharModal(w);
+      } catch (e) {
+        q('#rcbOkBtn').disabled = false;
+        toast('Não consegui salvar o recibo. Tente de novo.');
+      }
+    };
+    area();
+  }
+
+  /* Grava o recibo assinado e marca o lote como pago pelo líquido (sem tocar em dias, descontos ou adiantamentos) */
+  async function gravar(mes, pid, loteId, rec, modalidade, assinatura) {
+    const k = servKey(mes, pid);
+    const atual = S.servicos[k] || {};
+    const agora = agoraISO();
+    const numero = 'REC-' + mes.replace('-', '') + '-' + pid.slice(-4).toUpperCase() + '-' + (rec.lote.id || '').slice(-4).toUpperCase();
+    const recibo = {
+      numero, modalidade, em: agora, dataPagamento: hojeISO(),
+      assinadoPor: rec.prestador.nome, assinatura: assinatura || null,
+      mes, pid, lote: rec.lote,
+      servico: rec.servico, extras: rec.extras, saldoAnt: rec.saldoAnt, bruto: rec.bruto,
+      adiantamentos: rec.adiantamentos, descontos: rec.descontos, totDesc: rec.totDesc,
+      pendencia: rec.pendencia, liquido: rec.liquido, prestador: rec.prestador, diasLote: rec.diasLote
+    };
+    const pagos = Object.assign({}, servPagosDoc(atual));
+    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: rec.liquido, data: hojeISO() });
+    const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
+    await servSalvar(mes, pid, { pagos, recibos });
+    log('servicos', 'Recibo ' + (modalidade === MOD_TELA ? 'assinado na tela' : 'assinado à mão') + ': ' + rec.prestador.nome + ' · ' + rec.lote.nome + ' · ' + brl(rec.liquido));
+    render();
+    const blob = await gerarPDF(recibo, numero, { modalidade, assinatura, em: agora });
+    const w = abrirModal(`<div class="mh">Recibo assinado</div><div class="mbd">
+      <p><b>${esc2(numero)}</b> · ${brl(recibo.liquido)} · ${esc2(recibo.prestador.nome)}</p>
+      <p class="small muted">Registrado em ${dataHoraBR(agora)}. O valor líquido foi marcado como pago.</p></div>
+      <div class="mf"><button class="btn" data-x="c">Fechar</button><button class="btn pri" data-x="p">Ver, imprimir ou compartilhar PDF</button></div>`);
+    w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+    w.querySelector('[data-x=p]').onclick = () => { if (blob) salvarArquivo(nomeArquivo(recibo, numero), blob); };
+  }
+
+  /* Recibo já emitido: mostra o registro guardado (não recalcula) */
+  async function verRecibo(mes, pid, loteId, r) {
+    estiloRecibo();
+    const linhas = [
+      ['Número', esc2(r.numero)],
+      ['Modo', r.modalidade === MOD_TELA ? 'Assinado na tela' : 'Assinado à mão (impresso)'],
+      ['Registrado em', dataHoraBR(r.em)],
+      ['Valor líquido', brl(r.liquido)]
+    ].map(([t, v]) => `<tr><td>${t}</td><td style="text-align:right">${v}</td></tr>`).join('');
+    const w = abrirModal(`<div class="mh">Recibo · ${esc2(r.prestador.nome)}<div class="small muted" style="font-weight:400">${esc2(r.lote.nome)} · ${esc2(servMesNome(mes))}</div></div>
+      <div class="mbd">${resumoHtml({ ...r, consistente: true, pendencia: r.pendencia || 0 })}
+        <table class="rcb-tab mt"><tbody>${linhas}</tbody></table>
+        ${r.assinatura ? `<div class="mt"><span class="small muted">Assinatura registrada</span><img src="${r.assinatura}" alt="Assinatura" style="display:block;max-width:100%;height:110px;object-fit:contain;border:1px solid var(--line,#e5e7eb);border-radius:10px;background:#fff"></div>` : ''}
+      </div>
+      <div class="mf"><button class="btn" data-x="c">Fechar</button><button class="btn pri" data-x="p">Ver, imprimir ou compartilhar PDF</button></div>`);
+    w.querySelector('[data-x=c]').onclick = () => fecharModal(w);
+    w.querySelector('[data-x=p]').onclick = async () => {
+      const blob = await gerarPDF(r, r.numero, { modalidade: r.modalidade, assinatura: r.assinatura, em: r.em });
+      if (blob) salvarArquivo(nomeArquivo(r, r.numero), blob);
+    };
+  }
+
+  root.reciboAcao = function (el) {
+    const act = el.dataset.act;
+    if (act === 'rcbAbrir') return abrir(UI.servMes, el.dataset.pid, el.dataset.lote);
+  };
+  root.reciboMontar = montar;
+})(window);
