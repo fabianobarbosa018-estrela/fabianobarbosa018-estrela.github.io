@@ -98,6 +98,9 @@ input.erro{border-color:var(--err);background:#fff5f5}
   function telaAssinar(r) {
     var d = r.documento || {};
     var rec = d.tipo === 'recibo';
+    var titulo = rec ? 'Assinatura de recibo' : 'Assinatura de contrato';
+    document.title = titulo + ' · Hotel Fazenda Oasis';
+    var hdr = document.querySelector('header b'); if (hdr) hdr.textContent = titulo;
     app.innerHTML = '<div class="alerta info small">' + (rec ? 'Leia o recibo com atenção. No fim da página, informe seus dados, assine com o dedo e toque em <b>Confirmar recebimento</b>.' : 'Leia o contrato com atenção. No fim da página, informe seus dados, assine com o dedo e toque em <b>Assinar contrato</b>.') + ' Este link vale até ' + dataHora(r.expira) + '.</div>' +
       (rec ? reciboHtml(d) : contratoHtml(d)) +
       '<div class="card" id="form"><h2>Seus dados e assinatura</h2>' +

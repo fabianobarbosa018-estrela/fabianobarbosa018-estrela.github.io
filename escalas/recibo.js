@@ -35,7 +35,8 @@
     const extrasI = (l.extras || []).filter(x => ixLote(c.lotes, x) === i).map(x => ({ desc: x.desc || 'Serviço extra', valor: r2(+x.valor || 0) }));
     const totExtras = r2(extrasI.reduce((a, x) => a + x.valor, 0));
     const servico = r2(c.g[i] - totExtras);
-    const diasLote = Object.keys(l.dias || {}).filter(d => { const dd = +d; return dd >= lote.de && dd <= lote.ate; }).length;
+    // só conta os dias que foram lançados com valor (os que de fato trabalhou)
+    const diasLote = Object.keys(l.dias || {}).filter(d => { const dd = +d; return dd >= lote.de && dd <= lote.ate && (+l.dias[d] || 0) > 0; }).length;
     const saldoAnt = i === 0 ? r2(c.ant) : 0;
     const bruto = r2(servico + totExtras + saldoAnt);
 
