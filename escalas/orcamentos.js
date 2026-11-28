@@ -258,7 +258,7 @@
   var DIAS_ALERTA_CONTRATO = 5;
   // situação do contrato no dia de hoje (calculada, não gravada): elaboracao | aguardando | ativo | vencendo | vencido | encerrado | cancelado
   var SITUACOES_CONTRATO = {
-    elaboracao: ['Em elaboração', 'b-draft'], aguardando: ['Aguardando assinatura', 'b-blue'], ativo: ['Ativo', 'b-ok'],
+    elaboracao: ['Em elaboração', 'b-draft'], aguardando: ['Aguardando assinatura', 'b-blue'], aguardando_inicio: ['Aguardando início', 'b-blue'], ativo: ['Ativo', 'b-ok'],
     vencendo: ['Vence em breve', 'b-warn'], vencido: ['Vencido', 'b-err'], encerrado: ['Encerrado', 'b-off'], cancelado: ['Cancelado', 'b-off']
   };
   function diasEntre(a, b) { var pa = String(a).split('-'), pb = String(b).split('-'); return Math.round((Date.UTC(+pb[0], +pb[1] - 1, +pb[2]) - Date.UTC(+pa[0], +pa[1] - 1, +pa[2])) / 864e5); }
@@ -274,6 +274,8 @@
     var fim = fimContrato(c);
     if (fim && hoje && fim < hoje) return 'vencido';
     if (c.status === 'aguardando') return 'aguardando';
+    // início futuro: ainda não está vigente, não pode aparecer como ativo
+    if (c.inicio && hoje && c.inicio > hoje) return 'aguardando_inicio';
     if (fim && hoje && diasEntre(hoje, fim) <= DIAS_ALERTA_CONTRATO) return 'vencendo';
     return 'ativo';
   }

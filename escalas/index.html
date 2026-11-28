@@ -3801,6 +3801,7 @@ function vPainel() {
 
   ${atalhos.length ? `<nav class="pd-rap" style="grid-template-columns:repeat(${atalhos.length},1fr)">${atalhos.map(([h, i, t]) => `<a href="${h}"><span>${i}</span>${t}</a>`).join('')}</nav>` : ''}
 
+  ${ehAdmin() ? contratosVencendoHtml() : ''}
   ${ehAdmin() ? `<section class="pd-card pd-fin">
     <header><span>Financeiro · próximos pagamentos</span><a href="#servicos" class="pd-lk">Abrir ${ico.chev}</a></header>
     ${finLinha('Dia 20 <small>serviços 1 a 15</small>', sp20)}
@@ -3811,6 +3812,19 @@ function vPainel() {
   ${al.length ? `<section class="pd-card pd-al"><header><span>Central de alertas</span><b class="pd-n ${al.some(a => a.t === 'e') ? 'err' : 'warn'}">${al.length}</b></header>${alertasBloco()}</section>` : ''}
 </div>`;
   function inatTxt() { const n = S.funcionarios.length - ativos.length; return n ? ' · ' + n + ' inativo(s)' : ''; }
+}
+/* Painel: contratos que vencem em até 5 dias ou já venceram (usa a mesma regra da tela de contratos) */
+function contratosVencendoHtml() {
+  if (!window.OrcCalc) return '';
+  const hoje = C.hojeISO();
+  const lista = (S.orcamentos || []).filter(o => o.tipoRegistro === 'contrato' && ['vencendo', 'vencido'].includes(OrcCalc.situacaoContrato(o, hoje)));
+  if (!lista.length) return '';
+  const linhas = lista.slice(0, 5).map(c => {
+    const s = OrcCalc.situacaoContrato(c, hoje), f = OrcCalc.fimContrato(c), d = f ? OrcCalc.diasEntre(hoje, f) : null;
+    const txt = s === 'vencido' ? 'Venceu há ' + (-d) + ' dia(s)' : (d === 0 ? 'Vence hoje' : 'Vence em ' + d + ' dia(s)');
+    return `<div class="pd-fl"><span>${esc(c.contratadoNome || '(sem nome)')} <small>${esc(c.numero || '')}</small></span><b>${esc(txt)}</b></div>`;
+  }).join('');
+  return `<section class="pd-card pd-al"><header><span>Contratos próximos do vencimento</span><b class="pd-n warn">${lista.length}</b></header>${linhas}${lista.length > 5 ? `<div class="small" style="margin-top:6px">+ ${lista.length - 5} outro(s) na tela de contratos</div>` : ''}</section>`;
 }
 function alertasBloco() {
   const al = alertasGerais();
@@ -6017,10 +6031,10 @@ document.addEventListener('touchstart', ev => {
 irRota();
 Store.init();
 </script>
-<script src="orcamentos.js?v=1811b"></script>
+<script src="orcamentos.js?v=1812"></script>
 <script src="atestados_ler.js?v=1711b"></script>
 <script src="atestados.js?v=1811b"></script>
-<script src="modulos.js?v=6"></script>
+<script src="modulos.js?v=7"></script>
 <script src="ordens.js?v=12"></script>
 <script src="rescisao.js?v=1"></script>
 <script src="recibo.js?v=15"></script>
