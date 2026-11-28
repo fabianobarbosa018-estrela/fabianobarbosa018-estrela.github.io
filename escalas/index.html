@@ -2530,8 +2530,7 @@ const grupoDe = p => ((p && p.modalidade) || 'diaria') === 'diaria' ? 'diaria' :
 const servLotesDefault = mes => [
   { id: '15', nome: 'Dia 15', grupo: 'outros', de: 1, ate: 15, pctPadrao: 40, dataPadrao: mes + '-20' },
   { id: 'fim', nome: 'Fim do mês', grupo: 'outros', de: 16, ate: servDiasDoMes(mes), pctPadrao: 60, dataPadrao: servMesVizinho(mes, 1) + '-05' },
-  { id: 'd15', nome: 'Dia 15', grupo: 'diaria', de: 1, ate: 15, pctPadrao: 0, dataPadrao: mes + '-20' },
-  { id: 'dfim', nome: 'Fim do mês', grupo: 'diaria', de: 16, ate: servDiasDoMes(mes), pctPadrao: 0, dataPadrao: servMesVizinho(mes, 1) + '-05' }
+  { id: 'mesd', nome: 'Diárias do mês', grupo: 'diaria', de: 1, ate: servDiasDoMes(mes), pctPadrao: 0, dataPadrao: mes + '-20' }
 ];
 /* Lotes de um grupo no mês. Sem lotes salvos, vale o padrão (dia 15 e fim do mês) */
 function servLotesMes(mes, grupo) {
@@ -2544,6 +2543,20 @@ function servLotesMes(mes, grupo) {
 function servPagosDoc(l) {
   const pg = (l && l.pagos) || {};
   return Array.isArray(pg) ? { '15': pg[0] || {}, 'fim': pg[1] || {} } : pg;
+}
+/* Diaristas: pagamentos são lançamentos (valor e data), sem quinzena. Dados antigos (dia 15 / fim do mês) viram lançamentos. */
+function servListaDia(l) {
+  if (l && Array.isArray(l.pagosDia)) return l.pagosDia;
+  const pg = servPagosDoc(l || {}), out = [];
+  ['mesd', 'd15', 'dfim'].forEach(k => { const o = pg[k]; if (o && o.pago) out.push({ id: 'L' + k, valor: r2(o.valorPago != null ? o.valorPago : 0), data: (o.pagoEm || '').slice(0, 10) }); });
+  return out;
+}
+/* Monta o que gravar para um pagamento: diarista entra na lista; os outros, no lote */
+function servPatchPagar(atual, loteId, valor, data) {
+  if (loteId === 'mesd') { const lista = servListaDia(atual).slice(); lista.push({ id: 'p' + Date.now(), valor: r2(valor), data }); return { pagosDia: lista }; }
+  const pagos = Object.assign({}, servPagosDoc(atual));
+  pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: r2(valor), data, pagoEm: data });
+  return { pagos };
 }
 /* Dias do mês que não estão em nenhum lote do grupo */
 function servDiasSemLote(mes, grupo) {
@@ -2590,7 +2603,9 @@ function servCalc(mes, pid) {
   const dsc = []; let sobra = 0;
   lotes.forEach((x, i) => { const pede = r2(demanda[i] + sobra); const ap = r2(Math.min(pede, Math.max(disp[i], 0))); dsc.push(ap); sobra = r2(pede - ap); });
   const valores = lotes.map((x, i) => r2(disp[i] - dsc[i]));
+  const listaDia = modal === 'diaria' ? servListaDia(l) : null;
   const pagos = lotes.map((x, i) => {
+    if (listaDia) { const soma = r2(listaDia.reduce((a, y) => a + (+y.valor || 0), 0)); return { id: x.id, nome: x.nome, de: x.de, ate: x.ate, pct: 0, valor: valores[i], data: '', pago: listaDia.length > 0, valorPago: listaDia.length ? soma : undefined, pagamentos: listaDia }; }
     const o = pg[x.id] || {};
     return { id: x.id, nome: x.nome, de: x.de, ate: x.ate, pct: pctDe(x), valor: valores[i], data: o.data || x.dataPadrao || '', pago: !!o.pago, valorPago: o.valorPago != null ? r2(o.valorPago) : undefined };
   });
@@ -2716,7 +2731,7 @@ function vServicos() {
   <div class="card mb"><div class="row">
     <button class="btn icon" data-act="servAnt">${ic('chevL')}</button><input type="month" id="inServMes" value="${mes}"><button class="btn icon" data-act="servProx">${ic('chevR')}</button>
     <div class="sp"></div>
-    ${svFull ? `<button class="btn" data-act="prestLista">Prestadores</button>` : ''}
+    ${svFull ? `<button class="btn" data-act="prestLista" data-grupo="${UI.servGrupo === 'todos' ? 'diaria' : (UI.servGrupo || 'diaria')}">${(UI.servGrupo || 'diaria') === 'diaria' ? 'Diaristas' : 'Prestadores'}</button>` : ''}
   </div>
   <div class="row mt" style="gap:8px"><input type="search" id="inServBusca" placeholder="Pesquisar prestador pelo nome" value="${esc(UI.servBusca || '')}" style="flex:1;min-width:0"></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap">
@@ -2772,7 +2787,7 @@ function vServicos() {
     const acao = false && svFull && lote && q.valor > 0 && q.pagoOk ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(q.id)}">Desfazer pagamento</button>` : '';
     const estado = q.valor <= 0.004 ? 'Sem valor' : q.saldo > 0.004 ? 'Em aberto' : 'Pago';
     // Pagamentos já lançados, um por lote, com a data e a opção de desfazer cada um
-    const pagLista = (c.pagos || []).map(x => (x && x.pago) ? `<div class="small" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><span>Pago em ${x.pagoEm ? x.pagoEm.split('-').reverse().join('/') : '(sem data)'}: <b>R$ ${servMoeda(x.valorPago != null ? x.valorPago : x.valor)}</b></span>${svFull ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Desfazer</button>` : ''}</div>` : '').join('');
+    const pagLista = c.modal === 'diaria' ? servListaDia(c.l).map(x => `<div class="small" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><span>Pago em ${x.data ? x.data.split('-').reverse().join('/') : '(sem data)'}: <b>R$ ${servMoeda(x.valor)}</b></span>${svFull ? `<button class="btn sm" data-act="servDiaDesfazer" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Desfazer</button>` : ''}</div>`).join('') + (svFull ? `<div class="small" style="margin-top:6px"><button class="btn sm pri" data-act="servDiaPagar" data-pid="${c.p.id}">+ Lançar pagamento</button></div>` : '') : (c.pagos || []).map(x => (x && x.pago) ? `<div class="small" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><span>Pago em ${x.pagoEm ? x.pagoEm.split('-').reverse().join('/') : '(sem data)'}: <b>R$ ${servMoeda(x.valorPago != null ? x.valorPago : x.valor)}</b></span>${svFull ? `<button class="btn sm" data-act="servPagar" data-pid="${c.p.id}" data-lote="${esc(x.id)}">Desfazer</button>` : ''}</div>` : '').join('');
     const abre = c.modal === 'diaria' && svDia ? ` data-act="servAbrirDia" data-pid="${c.p.id}" style="cursor:pointer" title="Abrir para lançar os dias"` : '';
     return `<div class="svc-card ${q.saldo > 0.004 ? 'aberto' : 'quitado'}"${abre}><div class="svc-card-h"><div><b>${esc(nm)}</b><div class="small muted">${esc(c.p.funcao || '—')} · ${esc(SERV_MOD[c.modal] || '')}${c.inicioDia ? ` · <b>começou dia ${c.inicioDia}: ${c.diasServ} de 30 dias (R$ ${servMoeda(c.valorBase)})</b>` : ''}</div></div><span class="svc-badge">${estado}</span></div>
       <div class="svc-grid"><div><span>Já pago</span><b>R$ ${servMoeda(q.pago)}</b></div><div><span>Saldo</span><b class="${q.saldo > 0.004 ? 'neg' : ''}">R$ ${servMoeda(q.saldo)}</b></div></div>
@@ -2870,6 +2885,7 @@ async function servAjSalvar(el) {
     descontos: lerLinhas('descontos').map(o => ({ desc: (o.desc || '').trim(), data: o.data || '', lote: o.lote || '', valor: o.valor })),
     pagos
   };
+  if (grupoDe(S.prestadores.find(x => x.id === pid)) === 'diaria') patch.pagosDia = servListaDia(S.servicos[servKey(mes, pid)] || {});
   const vi = w.querySelector('#ajValor'); if (vi) patch.valor = r2(vi.value);
   const ii = w.querySelector('#ajInicio'); if (ii) { const d = Math.round(+ii.value || 0); patch.inicioDia = d > 1 && d <= 30 ? d : null; }
   fecharModal(w);
@@ -2879,6 +2895,7 @@ async function servAjSalvar(el) {
 /* Marca ou desmarca como pago um lote de um prestador, com confirmação */
 /* Paga só a diferença de um lote já pago (diárias lançadas depois do pagamento) */
 async function servPagarDiferenca(mes, pid, loteId) {
+  if (loteId === 'mesd') return servDiaPagar(mes, pid);
   const c = servCalc(mes, pid), x = c.pagos.find(y => y.id === loteId);
   if (!x || !x.pago) return;
   const dif = r2(x.valor - (x.valorPago != null ? x.valorPago : x.valor));
@@ -2894,6 +2911,7 @@ async function servPagarDiferenca(mes, pid, loteId) {
   render();
 }
 async function servPagar(mes, pid, loteId) {
+  if (loteId === 'mesd') return servDiaPagar(mes, pid);
   const c = servCalc(mes, pid), x = c.pagos.find(y => y.id === loteId);
   if (!x) return;
   const desfazer = x.pago, nome = _capNome((c.p || {}).nome || '');
@@ -2913,23 +2931,51 @@ async function servPagarGrupo(mes, loteId) {
   const lotesG = servLotesMes(mes, UI.servGrupo || 'diaria'), idxG = lotesG.findIndex(x => x.id === loteId);
   const lote = lotesG[idxG];
   if (!lote) return;
+  const ehDia = loteId === 'mesd';
   const alvo = servPrestadoresGrupo().filter(p => S.servicos[servKey(mes, p.id)]).map(p => {
     const c = servCalc(mes, p.id), x = c.pagos[idxG];
-    return { c, x, pid: p.id };
-  }).filter(o => o.x && !o.x.pago && o.x.valor > 0);
+    return { c, x, pid: p.id, pend: ehDia ? c.saldo : (x.pago ? 0 : x.valor) };
+  }).filter(o => o.x && o.pend > 0.004);
   if (!alvo.length) return toast('Nada pendente neste grupo para este lote.');
-  const total = r2(alvo.reduce((a, o) => a + o.x.valor, 0));
-  const lista = alvo.map(o => `<li>${esc(_capNome(o.c.p.nome))}: R$ ${servMoeda(o.x.valor)}</li>`).join('');
+  const total = r2(alvo.reduce((a, o) => a + o.pend, 0));
+  const lista = alvo.map(o => `<li>${esc(_capNome(o.c.p.nome))}: R$ ${servMoeda(o.pend)}</li>`).join('');
   const ok = await modalMsg('Confirmar pagamentos',
     `<p>Marcar como pagos <b>${alvo.length}</b> pagamento(s) de <b>${esc(nomeCurto(lote.nome))}</b> (${servMesNome(mes)}), ${esc(servGrupoNome[UI.servGrupo || 'diaria'].toLowerCase())}, total <b>R$ ${servMoeda(total)}</b>?</p><ul>${lista}</ul>`,
     [{ t: 'Cancelar', v: false }, { t: 'Confirmar pagamentos', c: 'pri', v: true }]);
   if (!ok) return;
   for (const o of alvo) {
-    const novo = Object.assign({}, servPagosDoc(o.c.l));
-    novo[o.x.id] = Object.assign({}, novo[o.x.id], { pago: true, valorPago: o.x.valor, pagoEm: hojeISO() });
-    try { await servSalvar(mes, o.pid, { pagos: novo }); } catch (e) { }
+    try { await servSalvar(mes, o.pid, servPatchPagar(S.servicos[servKey(mes, o.pid)] || {}, loteId, o.pend, hojeISO())); } catch (e) { }
   }
   log('servicos', 'Pagos em lote: ' + lote.nome + ' · ' + alvo.length + ' pessoa(s) · R$ ' + servMoeda(total));
+  render();
+}
+/* Diarista: lançar um pagamento (valor e data), desfazer um lançamento */
+function servDiaPagar(mes, pid) {
+  const c = servCalc(mes, pid), nome = _capNome((c.p || {}).nome || '');
+  const w = abrirModal(`<div class="mh">Lançar pagamento · ${esc(nome)}</div><div class="mbd">
+    <p class="small muted">Saldo em aberto: <b>R$ ${servMoeda(c.saldo)}</b> · ${servMesNome(mes)}</p>
+    <div class="row mt"><label style="flex:1">Valor (R$)<input id="diaValor" type="number" step="0.01" min="0" value="${(c.saldo > 0 ? c.saldo : 0).toFixed(2)}"></label><label style="flex:1">Data do pagamento<input id="diaData" type="date" value="${hojeISO()}"></label></div>
+    </div><div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="servDiaSalvar" data-pid="${esc(pid)}" data-mes="${mes}">Salvar pagamento</button></div>`, true);
+  return w;
+}
+async function servDiaSalvar(el) {
+  const w = el.closest('.mbg'), mes = el.dataset.mes, pid = el.dataset.pid;
+  const valor = r2((w.querySelector('#diaValor') || {}).value || 0), data = (w.querySelector('#diaData') || {}).value || '';
+  if (!(valor > 0)) return toast('Informe um valor maior que zero.');
+  if (!data) return toast('Informe a data do pagamento.');
+  fecharModal(w);
+  const nome = _capNome((S.prestadores.find(x => x.id === pid) || {}).nome || '');
+  try { await servSalvar(mes, pid, servPatchPagar(S.servicos[servKey(mes, pid)] || {}, 'mesd', valor, data)); log('servicos', 'Pago: ' + nome + ' · ' + mes + ' · R$ ' + servMoeda(valor) + ' em ' + data); } catch (e) { }
+  render();
+}
+async function servDiaDesfazer(mes, pid, entryId) {
+  const lista = servListaDia(S.servicos[servKey(mes, pid)] || {});
+  const x = lista.find(y => y.id === entryId);
+  if (!x) return;
+  const ok = await modalMsg('Desfazer pagamento', `<p>Desfazer o pagamento de <b>R$ ${servMoeda(x.valor)}</b>${x.data ? ' de ' + x.data.split('-').reverse().join('/') : ''}?</p>`, [{ t: 'Cancelar', v: false }, { t: 'Desfazer', c: 'pri', v: true }]);
+  if (!ok) return;
+  const nome = _capNome((S.prestadores.find(p => p.id === pid) || {}).nome || '');
+  try { await servSalvar(mes, pid, { pagosDia: lista.filter(y => y.id !== entryId) }); log('servicos', 'Pagamento desfeito: ' + nome + ' · ' + mes + ' · R$ ' + servMoeda(x.valor)); } catch (e) { }
   render();
 }
 /* Lotes do mês: nome, dias, % padrão e data padrão. Valem para todos os prestadores. */
@@ -2944,7 +2990,7 @@ function servLotesEditar(mes) {
   abrirModal(`<div class="mh">Lotes de pagamento · ${servMesNome(mes)}</div>
     <div class="mbd">
       <p class="small muted">Cada grupo tem os seus lotes, e eles não dependem um do outro. Dentro do mesmo grupo, os lotes não podem se sobrepor. A data e o % de cada pessoa ficam em "Editar".</p>
-      ${secao('diaria')}${secao('outros')}
+      ${secao('outros')}
       <div class="row mt"><button class="btn sm" data-act="lotePreset" data-mes="${mes}">Voltar para o padrão (dia 15 e fim do mês)</button></div>
     </div>
     <div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="lotesSalvar" data-mes="${mes}">Salvar lotes</button></div>`, true);
@@ -2972,14 +3018,19 @@ async function servLotesSalvar(el) {
 }
 
 /* ----- Cadastro de prestadores ----- */
-function servPrestLista() {
-  const linhas = S.prestadores.slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || '', 'pt-BR')).map(p => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_capNome(p.nome))}</b><div class="small muted">${esc(p.funcao || '—')} · ${esc(SERV_MOD[p.modalidade] || '')}${p.ativo === false ? ' · inativo' : ''}</div></div><button class="btn sm" data-act="prestEditar" data-id="${p.id}">Editar</button></div>`).join('');
-  abrirModal(`<div class="mh">Prestadores</div><div class="mbd">${linhas || '<p class="muted">Nenhum prestador cadastrado.</p>'}</div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button><button class="btn pri" data-act="prestNovo">+ Novo prestador</button></div>`, true);
+function servPrestLista(grupo) {
+  const g = grupo || UI.servGrupo || 'diaria', ehDia = g === 'diaria';
+  const linhas = S.prestadores.filter(p => grupoDe(p) === (ehDia ? 'diaria' : 'outros')).slice().sort((a, b) => ((a.ordem ?? 9999) - (b.ordem ?? 9999)) || (a.nome || '').localeCompare(b.nome || '', 'pt-BR')).map(p => `<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>${esc(_capNome(p.nome))}</b><div class="small muted">${esc(p.funcao || '—')} · ${esc(SERV_MOD[p.modalidade] || '')}${p.ativo === false ? ' · inativo' : ''}</div></div><button class="btn sm" data-act="prestEditar" data-id="${p.id}">Editar</button></div>`).join('');
+  const rotulo = ehDia ? 'diarista' : 'prestador';
+  abrirModal(`<div class="mh">${ehDia ? 'Diaristas' : 'Prestadores de serviço'}</div><div class="mbd">${linhas || `<p class="muted">Nenhum ${rotulo} cadastrado.</p>`}</div><div class="mf"><button class="btn" data-act="ajFechar">Fechar</button><button class="btn pri" data-act="prestNovo" data-grupo="${g}">+ Novo ${rotulo}</button></div>`, true);
 }
-function servPrestForm(id) {
-  const p = (id && S.prestadores.find(x => x.id === id)) || { modalidade: 'diaria', ativo: true };
-  const opts = Object.entries(SERV_MOD).map(([k, v]) => `<option value="${k}" ${p.modalidade === k ? 'selected' : ''}>${v}</option>`).join('');
-  abrirModal(`<div class="mh">${id ? 'Editar prestador' : 'Novo prestador'}</div><div class="mbd">
+function servPrestForm(id, grupo) {
+  const ehDia = grupo === 'diaria';
+  const p = (id && S.prestadores.find(x => x.id === id)) || { modalidade: ehDia ? 'diaria' : 'mensal', ativo: true };
+  // Novo diarista só tem a modalidade diária; prestador de serviço tem as outras
+  const opts = Object.entries(SERV_MOD).filter(([k]) => !id ? (ehDia ? k === 'diaria' : k !== 'diaria') : true).map(([k, v]) => `<option value="${k}" ${p.modalidade === k ? 'selected' : ''}>${v}</option>`).join('');
+  const titulo = id ? (grupoDe(p) === 'diaria' ? 'Editar diarista' : 'Editar prestador') : (ehDia ? 'Novo diarista' : 'Novo prestador');
+  abrirModal(`<div class="mh">${titulo}</div><div class="mbd">
     <div class="fld"><label class="f">Nome</label><input id="pNome" value="${esc(p.nome || '')}"></div>
     <div class="fld"><label class="f">Setor ou função</label><input id="pFuncao" value="${esc(p.funcao || '')}" placeholder="Ex.: Campo, Copa, Limpeza"></div>
     <div class="fld"><label class="f">Modalidade de pagamento</label><select id="pMod">${opts}</select></div>
@@ -2987,7 +3038,7 @@ function servPrestForm(id) {
     <div class="fld"><label class="f">Chave PIX</label><input id="pPix" value="${esc(p.pix || '')}"></div>
     <div class="fld"><label class="f">Nome do titular</label><input id="pTitular" value="${esc(p.titular || '')}"></div>
     <label class="small"><input type="checkbox" id="pAtivo" ${p.ativo !== false ? 'checked' : ''}> Ativo (aparece nas planilhas)</label>
-  </div><div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="prestSalvar" data-id="${id || ''}">Salvar</button></div>`);
+  </div><div class="mf"><button class="btn" data-act="ajFechar">Cancelar</button><button class="btn pri" data-act="prestSalvar" data-id="${id || ''}" data-grupo="${ehDia ? 'diaria' : 'outros'}">Salvar</button></div>`);
 }
 async function servPrestSalvar(el) {
   const w = el.closest('.mbg');
@@ -5647,7 +5698,7 @@ document.getElementById('burger').onclick = () => { document.getElementById('sid
 document.getElementById('shade').onclick = () => { document.getElementById('side').classList.remove('open'); document.getElementById('shade').classList.remove('on'); };
 
 const ACOES_SO_ADMIN = ['rhNovo', 'rhEditar', 'rhDesligar', 'rhReativar', 'rhTransferir', 'rhFeriasAdd', 'rhFeriasDel', 'rhOcorr', 'rhDocVer', 'aprovar', 'aprovarMes', 'reabrir', 'excluirEscala', 'editarAprovada', 'escDevolver', 'novoFunc', 'importarFunc', 'editFunc', 'transfFunc', 'delFunc', 'novoSetor', 'editSetor', 'setorMover', 'delSetor', 'addSug', 'delAntigas', 'ferAdd', 'ferDel', 'ferNac', 'trocarSenha', 'listarBk', 'baixarBk', 'backup', 'salvarCfg', 'removerAssinatura', 'vtValor', 'expPDF', 'expPrint', 'expXLS', 'baixarSetor', 'enviarSetor'];
-const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servGrupoTab', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
+const ACOES_SERVICOS_COMPLETO = ['prestLista', 'prestNovo', 'prestEditar', 'prestSalvar', 'servAjustes', 'ajSalvar', 'servPagar', 'servDiaPagar', 'servDiaSalvar', 'servDiaDesfazer', 'servGrupoTab', 'servPagarGrupo', 'servPagarDif', 'servLotes', 'lotesSalvar', 'servFechPdf', 'servFechPrint'];
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
@@ -5670,8 +5721,8 @@ document.addEventListener('click', async ev => {
     case 'irMes': UI.mes = el.dataset.mes; UI.visaoSemana = null; return;
     case 'servAnt': UI.servMes = servMesVizinho(UI.servMes || C.hojeISO().slice(0, 7), -1); return render();
     case 'servProx': UI.servMes = servMesVizinho(UI.servMes || C.hojeISO().slice(0, 7), 1); return render();
-    case 'prestLista': return servPrestLista();
-    case 'prestNovo': fecharModal(el.closest('.mbg')); return servPrestForm(null);
+    case 'prestLista': return servPrestLista(el.dataset.grupo);
+    case 'prestNovo': fecharModal(el.closest('.mbg')); return servPrestForm(null, el.dataset.grupo);
     case 'prestEditar': fecharModal(el.closest('.mbg')); return servPrestForm(el.dataset.id);
     case 'prestSalvar': return servPrestSalvar(el);
     case 'servAjustes': return servAjustes(UI.servMes, el.dataset.pid);
@@ -5685,6 +5736,9 @@ document.addEventListener('click', async ev => {
     case 'servFechPrint': return servFechamento(true);
     case 'servXls': return servXls();
     case 'servPagar': return servPagar(UI.servMes, el.dataset.pid, el.dataset.lote);
+    case 'servDiaPagar': return servDiaPagar(UI.servMes, el.dataset.pid);
+    case 'servDiaSalvar': return servDiaSalvar(el);
+    case 'servDiaDesfazer': return servDiaDesfazer(UI.servMes, el.dataset.pid, el.dataset.lote);
     case 'servGrupoTab': UI.servGrupo = el.dataset.g; UI.servPer = undefined; UI.rota = el.dataset.g === 'diaria' ? 'servdiar' : 'servprest'; try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } return render();
     case 'servPerChip': UI.servPer = el.dataset.id; return render();
     case 'servCopiar': return servCopiarTexto(servTextoDiaristas(UI.servMes)).then(ok => toast(ok ? 'Texto copiado. Cole onde quiser.' : 'Não consegui copiar automaticamente.'));
@@ -5968,7 +6022,7 @@ Store.init();
 <script src="modulos.js?v=6"></script>
 <script src="ordens.js?v=12"></script>
 <script src="rescisao.js?v=1"></script>
-<script src="recibo.js?v=13"></script>
+<script src="recibo.js?v=14"></script>
 <script src="rh.js?v=1811m"></script>
 <script src="avaliacao.js?v=9"></script>
 </body>

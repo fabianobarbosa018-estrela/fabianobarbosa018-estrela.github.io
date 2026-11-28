@@ -312,10 +312,10 @@
       pendencia: rec.pendencia, liquido: rec.saldo, liquidoLote: rec.liquido, jaPago: rec.pagoAntes, prestador: rec.prestador, diasLote: rec.diasLote, servicoAPagar: rec.servicoAPagar, diasPend: rec.diasPend
     };
     // O pagamento do lote é confirmado aqui, pela assinatura: valor total do lote recebido
-    const pagos = Object.assign({}, servPagosDoc(atual));
-    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: rec.liquido, data: hojeISO(), pagoEm: hojeISO() });
-    const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
-    await servSalvar(mes, pid, { pagos, recibos });
+    const chave = loteId === 'mesd' ? 'mesd_' + Date.now() : loteId;
+    const patch = servPatchPagar(atual, loteId, rec.liquido, hojeISO());
+    const recibos = Object.assign({}, atual.recibos || {}, { [chave]: recibo });
+    await servSalvar(mes, pid, Object.assign(patch, { recibos }));
     log('servicos', 'Recibo ' + (modalidade === MOD_TELA ? 'assinado na tela' : 'assinado à mão') + ': ' + rec.prestador.nome + ' · ' + rec.lote.nome + ' · ' + brl(rec.liquido));
     render();
     const blob = await gerarPDF(recibo, numero, { modalidade, assinatura, em: agora });
@@ -422,11 +422,11 @@
       adiantamentos: d.adiantamentos || [], descontos: d.descontos || [], totDesc: d.totDesc, pendencia: d.pendencia || 0,
       liquido: d.liquido, liquidoLote: d.liquidoLote, jaPago: d.jaPago, prestador: d.prestador, diasLote: d.diasLote, servicoAPagar: d.servicoAPagar, diasPend: d.diasPend
     };
-    const pagos = Object.assign({}, servPagosDoc(atual));
-    pagos[loteId] = Object.assign({}, pagos[loteId], { pago: true, valorPago: d.liquidoLote, data: isoLocal(quando), pagoEm: isoLocal(quando) });
-    const recibos = Object.assign({}, atual.recibos || {}, { [loteId]: recibo });
+    const chave = loteId === 'mesd' ? 'mesd_' + Date.now() : loteId;
+    const patch = servPatchPagar(atual, loteId, d.liquidoLote, isoLocal(quando));
+    const recibos = Object.assign({}, atual.recibos || {}, { [chave]: recibo });
     const links = Object.assign({}, atual.recibosLink || {}); delete links[loteId];
-    await servSalvar(mes, pid, { pagos, recibos, recibosLink: links });
+    await servSalvar(mes, pid, Object.assign(patch, { recibos, recibosLink: links }));
     log('servicos', 'Recibo assinado pelo WhatsApp: ' + (d.prestador && d.prestador.nome || '') + ' · ' + (d.loteObj && d.loteObj.nome || '') + ' · ' + brl(d.liquidoLote));
   }
 
