@@ -994,7 +994,12 @@
       '<div class="orc-lista-h"><b>' + (f.texto || f.situacao || temPeriodo ? 'Resultado' : 'Contratos') + '</b><span class="small muted">' + rows.length + ' contrato(s)</span></div>';
     if (!todos.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum contrato ainda. Toque em “+ Novo contrato”.</p></div>';
     if (!rows.length) return h + '<div class="card"><p class="muted" style="margin:0">Nenhum contrato encontrado. <a href="#" data-act="orcCtrLimpar">Limpar filtros</a></p></div>';
-    return h + '<div class="orc-lista">' + rows.map(cartaoCtr).join('') + '</div><p class="small muted">Os modelos de contrato devem passar por revisão jurídica antes de serem usados.</p>';
+    var ordemSit = ['vencido', 'vencendo', 'ativo', 'aguardando_inicio', 'aguardando', 'elaboracao', 'encerrado', 'cancelado'];
+    var corpoLista = !f.situacao ? ordemSit.map(function (sit) {
+      var g = rows.filter(function (c) { return sitCtr(c) === sit; });
+      return g.length ? '<div class="orc-lista-h"><b>' + SIT_CTR[sit][0] + '</b><span class="small muted">' + g.length + '</span></div><div class="orc-lista">' + g.map(cartaoCtr).join('') + '</div>' : '';
+    }).join('') : '<div class="orc-lista">' + rows.map(cartaoCtr).join('') + '</div>';
+    return h + corpoLista + '<p class="small muted">Os modelos de contrato devem passar por revisão jurídica antes de serem usados.</p>';
   }
   function cartaoCtr(c) {
     var setor = nomeSetorCtr(c.setorId), av = avisoVenc(c);
@@ -1015,6 +1020,7 @@
     if (!ro && s !== 'cancelado' && s !== 'encerrado') acoes.push('<button class="btn" data-act="orcCtrEditar" data-id="' + eh(c.id) + '">Editar</button>');
     if (!ro && (c.status === 'rascunho' || c.status === 'aguardando')) acoes.push('<button class="btn" data-act="orcCtrMarcarAssinado" data-id="' + eh(c.id) + '">Assinado em papel</button>');
     if (!ro && (c.status === 'assinado' || c.status === 'encerrado') && !c.renovadoPara) acoes.push('<button class="btn" data-act="orcCtrRenovar" data-id="' + eh(c.id) + '">Renovar</button>');
+    if (!ro) acoes.push('<button class="btn" data-act="orcCtrDuplicar" data-id="' + eh(c.id) + '">Duplicar</button>');
     if (!ro && c.status === 'assinado') acoes.push('<button class="btn" data-act="orcCtrEncerrar" data-id="' + eh(c.id) + '">Encerrar</button>');
     if (!ro && (c.status === 'rascunho' || c.status === 'aguardando')) acoes.push('<button class="btn danger" data-act="orcCtrCancelar" data-id="' + eh(c.id) + '">Cancelar contrato</button>');
     var ligacoes = (c.renovadoDe ? '<div class="small">Renovação do contrato <a href="#" data-act="orcCtrVer" data-id="' + eh(c.renovadoDe) + '">' + eh(c.renovadoDeNumero || 'anterior') + '</a></div>' : '') +
@@ -1320,6 +1326,16 @@
     });
   }
   // renovar: cria um novo contrato a partir deste; o anterior fica no histórico, ligado ao novo
+  /* Duplicar: cria um rascunho novo com os mesmos dados, sem ligação com o original (o original não muda) */
+  function duplicarContrato(id) {
+    if (!exigeEscrita()) return;
+    var c = contratos().find(function (x) { return x.id === id; }); if (!c) return;
+    var novo = copiaProfunda(c);
+    ['id', 'historico', 'documentos', 'criadoEm', 'criadoPor', 'atualizadoEm', 'assinadoEm', 'encerradoEm', 'encerradoPor', 'motivoEncerramento', 'renovadoPara', 'renovadoParaNumero', 'renovadoDe', 'renovadoDeNumero'].forEach(function (k) { delete novo[k]; });
+    Object.assign(novo, { numero: OrcCalc.proximoNumeroContrato(contratos(), hojeISO().slice(0, 4)), status: 'rascunho', duplicadoDe: c.id, duplicadoDeNumero: c.numero });
+    prepararContrato(novo); marcarCriacao(novo);
+    gravarCtr(novo, true).then(function (ok) { if (ok) { toast('Contrato duplicado como rascunho.'); abrirContrato(novo.id); } });
+  }
   function renovarContrato(id) {
     if (!exigeEscrita()) return;
     var c = contratos().find(function (x) { return x.id === id; }); if (!c) return;
@@ -1463,6 +1479,7 @@
       case 'orcCtrEncerrar': if (ev) ev.preventDefault(); return encerrarContrato(id, 'encerrar');
       case 'orcCtrCancelar': return encerrarContrato(id, 'cancelar');
       case 'orcCtrRenovar': if (ev) ev.preventDefault(); return renovarContrato(id);
+      case 'orcCtrDuplicar': if (ev) ev.preventDefault(); return duplicarContrato(id);
       case 'orcCtrMarcarAssinado': return marcarAssinado(id);
       case 'orcCtrPdfVer': { var cv = contratos().find(function (x) { return x.id === id; }); if (!cv) return; await guardarVersao(cv); return gerarContratoPdf(contratos().find(function (x) { return x.id === id; }) || cv); }
       case 'orcCtrPdfVersao': { var cx = contratos().find(function (x) { return x.id === id; }); var vv = cx && (cx.documentos || [])[+el.dataset.v]; if (vv) return gerarContratoPdf(cx, vv.doc); return; }
