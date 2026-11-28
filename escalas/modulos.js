@@ -7,6 +7,7 @@
   var MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   /* Abas: título (PDF/Excel), rótulo do total no painel */
   var ABAS = {
+    geral: { titulo: 'Relatório geral', total: 'Total efetivamente pago no mês', arq: 'Geral-' },
     diaria: { titulo: 'Diaristas', total: 'Total de diaristas pagos', arq: 'Diaristas-' },
     outros: { titulo: 'Serviços 40/60% e combinados', total: 'Total de serviços 40/60% e combinados', arq: 'Servicos-' },
     transporte: { titulo: 'Vale-transporte', total: 'Total de vale-transporte pago', arq: 'Transporte-' }
@@ -43,7 +44,9 @@
     });
     var ord = function (a, b) { return (a.grupo < b.grupo ? -1 : a.grupo > b.grupo ? 1 : 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'); };
     dia.sort(ord); outros.sort(ord); vtL.sort(ord);
+    var todos = dia.concat(outros, vtL).sort(ord);
     return {
+      geral: { linhas: todos, total: arred(diaTot + outTot + vtTot), diaria: arred(diaTot), outros: arred(outTot), transporte: arred(vtTot), pendente: arred(servSaldoPorData().total) },
       diaria: { linhas: dia, total: arred(diaTot) },
       outros: { linhas: outros, total: arred(outTot) },
       transporte: { linhas: vtL, total: arred(vtTot) }
@@ -80,10 +83,20 @@
     h += '<div class="rel-top"><div><h1>Relatórios</h1><p class="sub" style="margin:0">' + esc(nomeMes(ym)) + '</p></div>' +
       '<input type="month" data-mdl="relMes" value="' + esc(ym) + '"></div>';
     h += '<div class="rel-abas">' +
+      '<button class="rel-aba' + (aba === 'geral' ? ' on' : '') + '" data-act="mdlAba" data-aba="geral">Geral</button>' +
       '<button class="rel-aba' + (aba === 'diaria' ? ' on' : '') + '" data-act="mdlAba" data-aba="diaria">Diaristas</button>' +
       '<button class="rel-aba' + (aba === 'outros' ? ' on' : '') + '" data-act="mdlAba" data-aba="outros">Serviços</button>' +
       '<button class="rel-aba' + (aba === 'transporte' ? ' on' : '') + '" data-act="mdlAba" data-aba="transporte">Transporte</button></div>';
     h += '<div class="rel-hero"><span>' + esc(ABAS[aba].total) + '</span><b>' + brl(atual.total) + '</b><small>' + esc(nomeMes(ym)) + '</small></div>';
+    if (aba === 'geral') {
+      var cel = 'background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:10px';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+        '<div style="' + cel + '"><small class="muted">Diaristas pagos</small><b style="display:block;color:#0f4c5c">' + brl(d.geral.diaria) + '</b></div>' +
+        '<div style="' + cel + '"><small class="muted">Serviços pagos</small><b style="display:block;color:#0f4c5c">' + brl(d.geral.outros) + '</b></div>' +
+        '<div style="' + cel + '"><small class="muted">Vale-transporte pago</small><b style="display:block;color:#0f4c5c">' + brl(d.geral.transporte) + '</b></div>' +
+        '<div style="' + cel + '"><small class="muted">Total pendente (todos os meses)</small><b style="display:block;color:#8a6414">' + brl(d.geral.pendente) + '</b></div>' +
+        '</div>';
+    }
     h += '<div class="rel-card"><div class="rel-cab"><b>Quem recebeu?</b><span class="small muted">' + atual.linhas.length + ' pagamento(s)</span></div>';
     if (atual.linhas.length) {
       h += '<ul class="rel-lista">' + atual.linhas.slice(0, lim).map(function (l) {
