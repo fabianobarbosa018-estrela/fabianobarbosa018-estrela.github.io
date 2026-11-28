@@ -133,8 +133,7 @@
     return `<div class="orc-card rh-card rh-c ${situacao(f)}" data-func="${f.id}">
       <div class="rh-c-top"><span class="rh-av">${esc(iniciais(f.nome))}</span>
         <div class="rh-c-info"><b class="rh-c-nome">${esc(f.nome)}</b>
-          <div class="rh-c-linha">${ic1}<span>${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}</span></div>
-          <div class="rh-c-linha">${ic2}<span>${f.dataEntrada ? 'Entrada ' + br(f.dataEntrada) : 'Entrada não informada'}${vinc ? ' · ' + esc(vinc) : ''}${!f.ativo && r.desligamento ? ' · desligado em ' + br(r.desligamento.data) : ''}</span></div>
+          <div class="rh-c-linha">${ic1}<span>${esc(nomeSetor(f.setorId))}</span></div>
         </div>
         <div class="rh-c-sit">${badge(f)}</div></div>
       <div class="rh-c-bt"><button class="btn sm pri" data-act="rhFicha" data-id="${f.id}">Ficha</button>${soLer() ? '' : `<button class="btn sm" data-act="rhEditar" data-id="${f.id}">Editar</button>`}</div></div>`;
@@ -142,14 +141,14 @@
   const iniciais = n => String(n || '?').trim().split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
   /* ---------- ficha individual ---------- */
-  const ABAS = [['dados', 'Dados'], ['historico', 'Histórico'], ['afast', 'Afastamentos'], ['ferias', 'Férias'], ['ocorr', 'Advertências e suspensões'], ['docs', 'Documentos'], ['pag', 'Pagamentos']];
+  const ABAS = [['dados', 'Dados'], ['escala', 'Escalas e folgas'], ['historico', 'Histórico'], ['afast', 'Afastamentos'], ['ferias', 'Férias'], ['ocorr', 'Advertências e suspensões'], ['docs', 'Documentos'], ['pag', 'Pagamentos']];
   function ficha(f) {
     const s = st(), r = rhDe(f.id), ro = soLer();
     let h = `<div class="orc-topo"><button class="btn" data-act="rhVoltar">← Funcionários</button>${ro ? '' : `<div class="row" style="gap:6px"><button class="btn" data-act="rhLink" data-id="${f.id}">Link de cadastro</button><button class="btn" data-act="rhEditar" data-id="${f.id}">Editar</button></div>`}</div>
       <div class="card mb rh-cab"><span class="rh-av g">${esc(iniciais(f.nome))}</span><div style="flex:1;min-width:0"><h2 style="margin:0">${esc(f.nome)}</h2><div class="small muted">${esc(nomeSetor(f.setorId))}${f.funcao ? ' · ' + esc(f.funcao) : ''}${f.dataEntrada ? ' · desde ' + br(f.dataEntrada) : ''}</div></div>${badge(f)}</div>`;
     if (!f.ativo && r.desligamento) h += `<div class="alert e"><span class="ic">!</span><div><b>Desligado em ${br(r.desligamento.data)}</b> · ${esc((TIPOS_DESL.find(t => t[0] === r.desligamento.tipo) || [0, ''])[1])}${r.desligamento.motivo ? ' · ' + esc(r.desligamento.motivo) : ''}<div class="small">Registrado por ${esc(r.desligamento.por || '—')} em ${dtHora(r.desligamento.em)}</div></div></div>`;
     h += '<div class="orc-chips rh-abas">' + ABAS.map(a => `<button class="orc-chip${s.aba === a[0] ? ' on' : ''}" data-act="rhAba" data-a="${a[0]}">${a[1]}</button>`).join('') + '</div>';
-    const corpo = { dados: abaDados, historico: abaHistorico, afast: abaAfast, ferias: abaFerias, ocorr: abaOcorr, docs: abaDocs, pag: abaPag }[s.aba] || abaDados;
+    const corpo = { dados: abaDados, escala: abaEscala, historico: abaHistorico, afast: abaAfast, ferias: abaFerias, ocorr: abaOcorr, docs: abaDocs, pag: abaPag }[s.aba] || abaDados;
     return h + corpo(f, r, ro);
   }
   const linha = (l, v) => v ? `<div><span class="small muted">${l}</span><div>${v}</div></div>` : '';
@@ -180,6 +179,19 @@
     const setores = (r.historicoSetores || []).slice().sort((a, b) => String(a.em).localeCompare(String(b.em)));
     return `<div class="card mb"><h3 style="margin:0 0 6px">Histórico de setores</h3>${setores.length ? '<ul class="list-sm">' + setores.map(x => `<li><span>${x.de ? esc(x.de) + ' → ' : ''}<b>${esc(x.para)}</b></span><span class="small muted">${br(String(x.em).slice(0, 10))}</span></li>`).join('') + '</ul>' : `<p class="small muted" style="margin:0">Sempre no setor ${esc(nomeSetor(f.setorId))}.</p>`}</div>
       <div class="card mb"><h3 style="margin:0 0 6px">Histórico de alterações</h3>${ev.length ? '<ul class="list-sm rh-ev">' + ev.slice(0, 80).map(x => `<li><span><b>${x.t}</b>${x.d ? '<div class="small">' + x.d + '</div>' : ''}</span><span class="small muted">${x.em ? dtHora(x.em) : ''}${x.por ? '<br>' + esc(x.por) : ''}</span></li>`).join('') + '</ul>' : '<p class="small muted" style="margin:0">Sem registros ainda.</p>'}</div>`;
+  }
+  /* Escalas e folgas do mês atual, lidas direto das escalas cadastradas (nada é gravado aqui) */
+  function abaEscala(f) {
+    const hoje = C.hojeISO(), ym = hoje.slice(0, 7), p = ym.split('-').map(Number);
+    const n = new Date(Date.UTC(p[0], p[1], 0)).getUTCDate();
+    let trab = 0, folga = 0, ferias = 0, sem = 0;
+    for (let i = 1; i <= n; i++) {
+      const d = ym + '-' + String(i).padStart(2, '0'), e = S.escalas[C.inicioSemana(d)];
+      const st = C.statusDia(e && e.atribuicoes ? e.atribuicoes[f.id] : null, d, f, !!e);
+      if (st === 'T' || st === 'X') trab++; else if (st === 'F') folga++; else if (st === 'V') ferias++; else if (!e) sem++;
+    }
+    return `<div class="card mb"><h3 style="margin:0 0 6px">${esc(ym.split('-').reverse().join('/'))}</h3>
+      <ul class="list-sm"><li><span>Dias trabalhados</span><b>${trab}</b></li><li><span>Folgas</span><b>${folga}</b></li><li><span>Férias</span><b>${ferias}</b></li>${sem ? `<li><span>Dias sem escala gerada</span><b>${sem}</b></li>` : ''}</ul></div>`;
   }
   function abaAfast(f) {
     const a = (UI.ats && UI.ats.lista) ? UI.ats.lista.filter(x => x.func_id === f.id) : null;
