@@ -2486,7 +2486,7 @@ const ICON = {
   conta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
 };
 const ic = n => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[n] + '</svg>';
-const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'], ['rescisao', 'Rescisão'], ['servicos', 'Serviços prestados'], ['servprest', 'Serviços prestados'], ['servdiar', 'Diaristas'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['ordens', 'Ordens de Serviço'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
+const ROTAS = [['painel', 'Painel'], ['diaria', 'Escala diária'], ['mensal', 'Escala mensal'], ['funcionarios', 'Funcionários'], ['atestados', 'Atestados'], ['setores', 'Setores'], ['contratos', 'Contratos'],['servicos', 'Serviços prestados'], ['servprest', 'Serviços prestados'], ['servdiar', 'Diaristas'], ['vt', 'Vale-transporte'], ['relatorios', 'Relatórios'], ['ordens', 'Ordens de Serviço'], ['historico', 'Histórico'], ['usuarios', 'Usuários e Permissões'], ['backup', 'Backup e configurações'], ['aparencia', 'Aparência e tema'], ['conta', 'Minha conta']];
 
 const _cap1 = t => (t || '').charAt(0).toUpperCase() + (t || '').slice(1);
 const _capNome = t => (t || '').replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
@@ -3461,7 +3461,7 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Operação', ['mensal', 'painel', 'diaria', 'ordens']], ['Gestão de pessoas', ['funcionarios', 'setores', 'atestados', 'contratos', 'rescisao']], ['Financeiro', ['servprest', 'servdiar', 'vt', 'historico', 'relatorios']], ['Administração', ['usuarios', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  const GRUPOS_MENU = [['Operação', ['mensal', 'painel', 'diaria', 'ordens']], ['Gestão de pessoas', ['funcionarios', 'setores', 'atestados', 'contratos']], ['Financeiro', ['servprest', 'servdiar', 'vt', 'historico', 'relatorios']], ['Administração', ['usuarios', 'backup', 'aparencia']], ['Conta', ['conta']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
@@ -3479,7 +3479,7 @@ function render() {
     try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { }
   }
   const sy = window.scrollY;
-  const fn = { rescisao: window.vRescisao, ordens: window.vOrdens, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: () => { UI.servPer = undefined; return vServicos(); }, servprest: () => { UI.servGrupo = 'outros'; UI.servPer = undefined; return vServicos(); }, servdiar: () => { UI.servGrupo = 'diaria'; UI.servPer = undefined; return vServicos(); }, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
+  const fn = { ordens: window.vOrdens, relatorios: window.vRelatorios, orcamentos: window.vOrcamentos, contratos: window.vContratos, diaria: vPainel, aparencia: vAparencia, usuarios: vUsuarios, conta: vConta, novidades: vNovidades, atestados: window.vAtestados, painel: vPainel, escala: vEscala, mensal: vMensal, servicos: () => { UI.servPer = undefined; return vServicos(); }, servprest: () => { UI.servGrupo = 'outros'; UI.servPer = undefined; return vServicos(); }, servdiar: () => { UI.servGrupo = 'diaria'; UI.servPer = undefined; return vServicos(); }, vt: vVT, avaliacao: window.vAvaliacao, funcionarios: window.vRH, setores: vSetores, historico: vHistorico, backup: vBackup }[UI.rota] || vPainel;
   let topo = '';
   if (S.lento) topo += '<div class="alert w"><span class="ic">!</span><div>Os dados estão demorando para carregar. O que aparece pode estar desatualizado.</div></div>';
   if (S.modo === 'local' && window.STANDALONE) { if (S.localFalhou) topo += '<div class="alert e"><span class="ic">!</span><div>Este navegador não está permitindo salvar dados. Abra o arquivo no Google Chrome, Edge ou Firefox (fora da janela anônima).</div></div>'; }
