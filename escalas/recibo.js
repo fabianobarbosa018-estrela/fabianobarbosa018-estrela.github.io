@@ -96,71 +96,70 @@
   async function gerarPDF(rec, numero, opts) {
     const ok = await servPDFLibs(); if (!ok) return null;
     const { jsPDF } = window.jspdf;
-    // Talão no tamanho do recibo da casa: faixa deitada de 210 x 100 mm, com moldura dupla
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [210, 100] });
-    const MARROM = [139, 111, 78], CINZA = [90, 90, 90], VERDE = [60, 140, 90];
+    const W = 210, H = 140;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [W, H] });
+    const VERDE = [22, 74, 52], OURO = [190, 150, 62], TEXTO = [28, 58, 44], CINZA = [120, 120, 120], LARANJA = [160, 90, 0];
     const p2 = n => String(n).padStart(2, '0');
-    const mm = rec.mes.slice(5, 7), aa = rec.mes.slice(0, 4);
-    const pd = rec.diasPend && rec.diasPend.length ? rec.diasPend : null;
-    const de = pd ? pd[0].dia : rec.lote.de, ate = pd ? pd[pd.length - 1].dia : rec.lote.ate;
-    const periodo = p2(de) + '/' + mm + '/' + aa + ' a ' + p2(ate) + '/' + mm + '/' + aa;
     const emitido = opts.em ? new Date(opts.em) : new Date();
     const hojeBR = p2(emitido.getDate()) + '/' + p2(emitido.getMonth() + 1) + '/' + emitido.getFullYear();
-    const desc = pd && rec.prestador.modal === 'diaria' ? 'Diárias: ' + listaDias(rec.mes, pd) : 'Serviços prestados de ' + periodo;
-
-    // Marca d'água: logo grande e bem clara no centro
+    const pd = rec.diasPend && rec.diasPend.length ? rec.diasPend : null;
+    const mm = rec.mes.slice(5, 7), aa = rec.mes.slice(0, 4);
+    const de = pd ? pd[0].dia : rec.lote.de, ate = pd ? pd[pd.length - 1].dia : rec.lote.ate;
+    const desc = pd && rec.prestador.modal === 'diaria' ? 'Diárias: ' + listaDias(rec.mes, pd) : 'Serviços prestados de ' + p2(de) + '/' + mm + '/' + aa + ' a ' + p2(ate) + '/' + mm + '/' + aa;
     const marca = await logoPdfData();
-    if (marca) {
-      try {
-        doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.06 }));
-        doc.addImage(marca, 'PNG', 78, 24, 54, 54);
-        doc.restoreGraphicsState();
-      } catch (e) { }
-    }
-    // Moldura dupla
-    doc.setDrawColor(60, 60, 60);
-    doc.setLineWidth(0.8); doc.rect(5, 5, 200, 90);
-    doc.setLineWidth(0.3); doc.rect(7.5, 7.5, 195, 85);
-    // Logo e título
-    if (marca) { try { doc.addImage(marca, 'PNG', 12, 11, 40, 14); } catch (e) { } }
-    doc.setTextColor(...MARROM); doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
-    doc.text('RECIBO', 105, 22, { align: 'center' });
-    // Valor em destaque e número
-    doc.setDrawColor(60, 60, 60); doc.setLineWidth(0.3); doc.rect(152, 12, 42, 10);
-    doc.setTextColor(...VERDE); doc.setFontSize(12); doc.text(brl(rec.liquido), 173, 18.5, { align: 'center' });
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...CINZA);
-    doc.text('Nº ' + numero, 194, 26, { align: 'right' });
+    const ajusta = (txt, max, tam) => { let t = tam; doc.setFontSize(t); while (doc.getTextWidth(txt) > max && t > 6) { t -= 0.5; doc.setFontSize(t); } return t; };
+    const linha = (x1, x2, y, cor, lw) => { doc.setDrawColor(...(cor || TEXTO)); doc.setLineWidth(lw || 0.25); doc.line(x1, y, x2, y); };
+    const curva = (p0, c, p1, n = 24) => { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, d = t * t; out.push([a * p0[0] + b * c[0] + d * p1[0], a * p0[1] + b * c[1] + d * p1[1]]); } return out; };
+    const espelho = pts => pts.map(([x, y]) => [W - x, H - y]);
+    const poligono = (pts, cor) => { doc.setFillColor(...cor); const rel = pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]); doc.lines(rel, pts[0][0], pts[0][1], [1, 1], 'F', true); };
+    const traco = (pts, cor, lw) => { doc.setDrawColor(...cor); doc.setLineWidth(lw); for (let i = 1; i < pts.length; i++) doc.line(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]); };
 
-    doc.setTextColor(40, 40, 40); doc.setFontSize(9.5);
-    // Linha 1: Eu, ____ Recebi do Hotel Fazenda Oásis
-    doc.text('Eu,', 14, 39); doc.setLineWidth(0.2); doc.line(22, 40, 118, 40);
-    doc.setFont('helvetica', 'bold'); doc.text(rec.prestador.nome, 24, 38.5); doc.setFont('helvetica', 'normal');
-    doc.text('Recebi do Hotel Fazenda Oásis', 122, 39);
-    // Linha 2: A importância de R$ ____ Referente a
-    doc.text('A importância de R$', 14, 50); doc.line(56, 51, 118, 51);
-    doc.setFont('helvetica', 'bold'); doc.text(servMoeda(rec.liquido), 58, 49.5); doc.setFont('helvetica', 'normal');
-    doc.text('Referente a', 122, 50);
-    // Linha 3: descrição ____ Realizado em ____
-    doc.setFontSize(8); doc.text(desc, 14, 59.5); doc.line(14, 61, 118, 61);
-    doc.setFontSize(9.5);
-    doc.text('Realizado em', 122, 60); doc.line(150, 61, 196, 61); doc.text(hojeBR, 152, 59.5);
-    // Texto legal
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-    doc.text('Este recibo serve como comprovante válido e está sujeito apresentação se necessário', 105, 66.5, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    // Assinatura
-    if (opts.modalidade === MOD_TELA && opts.assinatura) {
-      try { doc.addImage(opts.assinatura, 'PNG', 66, 72, 78, 12); } catch (e) { }
-    }
-    doc.setLineWidth(0.3); doc.line(62, 85.5, 148, 85.5);
-    doc.setFontSize(8.5); doc.setTextColor(40, 40, 40); doc.text(rec.prestador.nome, 105, 88.8, { align: 'center' });
-    // Rodapé: endereço e pendência
-    doc.setFontSize(6.5); doc.setTextColor(...CINZA);
-    doc.text('Paudalho-PE, estrada de chã do ouro.', 14, 90.2);
-    if (rec.pendencia > 0) {
-      doc.setTextColor(160, 90, 0);
-      doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 196, 90.2, { align: 'right' });
-    }
+    if (marca) { try { doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.06 })); doc.addImage(marca, 'PNG', 55, 52, 100, 35); doc.restoreGraphicsState(); } catch (e) { } }
+
+    // Cantos decorativos: faixa verde com filete dourado (cima à esquerda e baixo à direita)
+    const faixa = [[5, 5], [5, 42], ...curva([5, 42], [5, 12], [42, 5]).slice(1)];
+    poligono(faixa, VERDE);
+    traco(curva([5, 47], [14, 15], [47, 5]), OURO, 1.1);
+    poligono(espelho(faixa), VERDE);
+    traco(espelho(curva([5, 47], [14, 15], [47, 5])), OURO, 1.1);
+    // Moldura verde externa e dourada interna, cantos arredondados
+    doc.setDrawColor(...VERDE); doc.setLineWidth(0.9); doc.roundedRect(5, 5, W - 10, H - 10, 4, 4);
+    doc.setDrawColor(...OURO); doc.setLineWidth(0.35); doc.roundedRect(7.5, 7.5, W - 15, H - 15, 3, 3);
+
+    if (marca) { try { doc.addImage(marca, 'PNG', 18, 15, 56, 19.7); } catch (e) { } }
+    traco([[92, 14], [92, 42]], OURO, 0.6);
+    doc.setFillColor(...VERDE); doc.roundedRect(114, 14, 80, 24, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('times', 'bold'); doc.setFontSize(26);
+    doc.text('RECIBO', 154, 31, { align: 'center' });
+    traco([[114, 41.5], [194, 41.5]], OURO, 0.6);
+    doc.setDrawColor(...OURO); doc.setLineWidth(0.6); doc.setFillColor(255, 255, 255); doc.roundedRect(120, 46, 74, 14, 2, 2, 'FD');
+    doc.setTextColor(...VERDE); doc.setFont('times', 'bold'); doc.setFontSize(11); doc.text('Nº', 125, 55);
+    linha(134, 190, 55.5, VERDE, 0.3);
+    doc.setFont('times', 'normal'); doc.setFontSize(8); doc.setTextColor(...CINZA); doc.text(numero, 189, 53, { align: 'right' });
+
+    doc.setTextColor(...TEXTO); doc.setFont('times', 'normal'); doc.setFontSize(11.5);
+    const y1 = 77, y2 = 88, y3 = 99, y4 = 110;
+    doc.text('Eu,', 14, y1); linha(24, 140, y1 + 1);
+    doc.setFont('times', 'bold'); ajusta(rec.prestador.nome, 114, 11.5); doc.text(rec.prestador.nome, 26, y1 - 0.8); doc.setFont('times', 'normal');
+    doc.setFontSize(11.5); doc.text(', recebi do Hotel Fazenda Oásis', 141, y1);
+    doc.text('a importância de R$', 14, y2); linha(60, 136, y2 + 1);
+    doc.setFont('times', 'bold'); doc.text(servMoeda(rec.liquido), 62, y2 - 0.8); doc.setFont('times', 'normal'); doc.text('.', 137, y2);
+    doc.text('Referente a', 14, y3); linha(44, 196, y3 + 1);
+    doc.setFontSize(ajusta(desc, 150, 11)); doc.text(desc, 46, y3 - 0.8); doc.setFontSize(11.5);
+    doc.text('Realizado em', 14, y4); linha(50, 110, y4 + 1);
+    doc.setFont('times', 'bold'); doc.text(hojeBR, 52, y4 - 0.8); doc.setFont('times', 'normal');
+    if (rec.pendencia > 0) { doc.setFontSize(8); doc.setTextColor(...LARANJA); doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 14, 117); }
+
+    doc.setFont('times', 'italic'); doc.setFontSize(9.5); doc.setTextColor(...VERDE);
+    doc.text('Este recibo serve como comprovante de recebimento.', 105, 118, { align: 'center' });
+    traco([[40, 123], [96, 123]], OURO, 0.4); traco([[114, 123], [170, 123]], OURO, 0.4);
+    doc.setFillColor(...OURO); doc.lines([[3, 3], [-3, 3], [-3, -3]], 102, 120, [1, 1], 'F', true);
+    doc.setFillColor(...VERDE); doc.circle(17, 128.5, 1.7, 'F');
+    doc.setFillColor(255, 255, 255); doc.circle(17, 128.5, 0.6, 'F');
+    doc.setFont('times', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...TEXTO); doc.text('Paudalho – PE', 22, 130);
+    if (opts.modalidade === MOD_TELA && opts.assinatura) { try { doc.addImage(opts.assinatura, 'PNG', 136, 113, 50, 11); } catch (e) { } }
+    linha(132, 190, 126, TEXTO, 0.3);
+    doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...CINZA); doc.text('Assinatura de quem recebeu', 161, 130, { align: 'center' });
     doc.setTextColor(0, 0, 0);
     return doc.output('blob');
   }
