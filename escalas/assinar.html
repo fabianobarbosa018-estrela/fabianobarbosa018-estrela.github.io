@@ -88,6 +88,7 @@ input.erro{border-color:var(--err);background:#fff5f5}
   function reciboHtml(d) {
     var h = '<div class="card"><h1>Recibo de pagamento</h1><div class="small muted" style="text-align:center;margin-top:-6px">Nº ' + esc(d.numero) + '</div>';
     h += '<p>Recebi do ' + esc(d.hotel) + ' (CNPJ ' + esc(d.cnpj) + ') a importância líquida de <b>' + brl(d.liquido) + '</b>, referente a serviços prestados no período de ' + dataBR(d.inicio) + ' a ' + dataBR(d.fim) + '.</p>';
+    h += '<p>Declaro, para os devidos fins, que recebi do Hotel Fazenda Oásis a quantia acima indicada, referente ao pagamento pelo serviço descrito abaixo, dando quitação do valor recebido.</p>';
     h += '<table style="width:100%;border-collapse:collapse;font-size:15px">';
     (d.linhas || []).forEach(function (l) { h += '<tr style="' + (l.negrito ? 'font-weight:700;background:#f6f8f8;' : '') + '"><td style="padding:7px 4px;border-bottom:1px solid #e5e7eb">' + esc(l.t) + '</td><td style="padding:7px 4px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + esc(l.v) + '</td></tr>'; });
     h += '</table>';

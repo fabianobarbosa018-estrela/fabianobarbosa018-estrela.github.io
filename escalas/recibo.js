@@ -96,7 +96,7 @@
   async function gerarPDF(rec, numero, opts) {
     const ok = await servPDFLibs(); if (!ok) return null;
     const { jsPDF } = window.jspdf;
-    const W = 210, H = 140;
+    const W = 210, H = 167;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [W, H] });
     const VERDE = [22, 74, 52], OURO = [190, 150, 62], TEXTO = [28, 58, 44], CINZA = [120, 120, 120], LARANJA = [160, 90, 0];
     const p2 = n => String(n).padStart(2, '0');
@@ -138,28 +138,32 @@
     doc.setFont('times', 'normal'); doc.setFontSize(8); doc.setTextColor(...CINZA); doc.text(numero, 189, 53, { align: 'right' });
 
     doc.setTextColor(...TEXTO); doc.setFont('times', 'normal'); doc.setFontSize(11.5);
-    const y1 = 77, y2 = 88, y3 = 99, y4 = 110;
+    // Declaração fixa de quitação: fica entre o valor e o campo "Referente a" (quebra em linhas pela largura da folha)
+    const DECL = 'Declaro, para os devidos fins, que recebi do Hotel Fazenda Oásis a quantia acima indicada, referente ao pagamento pelo serviço descrito abaixo, dando quitação do valor recebido.';
+    const yD = 96.5, declLinhas = doc.splitTextToSize(DECL, 182);
+    const y1 = 77, y2 = 88, y3 = yD + (declLinhas.length - 1) * 4.8 + 11.5, y4 = y3 + 11;
     doc.text('Eu,', 14, y1); linha(24, 140, y1 + 1);
     doc.setFont('times', 'bold'); ajusta(rec.prestador.nome, 114, 11.5); doc.text(rec.prestador.nome, 26, y1 - 0.8); doc.setFont('times', 'normal');
     doc.setFontSize(11.5); doc.text(', recebi do Hotel Fazenda Oásis', 141, y1);
     doc.text('a importância de R$', 14, y2); linha(60, 136, y2 + 1);
     doc.setFont('times', 'bold'); doc.text(servMoeda(rec.liquido), 62, y2 - 0.8); doc.setFont('times', 'normal'); doc.text('.', 137, y2);
+    doc.setFontSize(10); declLinhas.forEach((ln, i) => doc.text(ln, 14, yD + i * 4.8)); doc.setFontSize(11.5);
     doc.text('Referente a', 14, y3); linha(44, 196, y3 + 1);
     doc.setFontSize(ajusta(desc, 150, 11)); doc.text(desc, 46, y3 - 0.8); doc.setFontSize(11.5);
     doc.text('Realizado em', 14, y4); linha(50, 110, y4 + 1);
     doc.setFont('times', 'bold'); doc.text(hojeBR, 52, y4 - 0.8); doc.setFont('times', 'normal');
-    if (rec.pendencia > 0) { doc.setFontSize(8); doc.setTextColor(...LARANJA); doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 14, 117); }
+    if (rec.pendencia > 0) { doc.setFontSize(8); doc.setTextColor(...LARANJA); doc.text('Pendência de ' + brl(rec.pendencia) + ' não descontada neste recibo', 14, y4 + 7); }
 
     doc.setFont('times', 'italic'); doc.setFontSize(9.5); doc.setTextColor(...VERDE);
-    doc.text('Este recibo serve como comprovante de recebimento.', 105, 118, { align: 'center' });
-    traco([[40, 123], [96, 123]], OURO, 0.4); traco([[114, 123], [170, 123]], OURO, 0.4);
-    doc.setFillColor(...OURO); doc.lines([[3, 3], [-3, 3], [-3, -3]], 102, 120, [1, 1], 'F', true);
-    doc.setFillColor(...VERDE); doc.circle(17, 128.5, 1.7, 'F');
-    doc.setFillColor(255, 255, 255); doc.circle(17, 128.5, 0.6, 'F');
-    doc.setFont('times', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...TEXTO); doc.text('Paudalho – PE', 22, 130);
-    if (opts.modalidade === MOD_TELA && opts.assinatura) { try { doc.addImage(opts.assinatura, 'PNG', 136, 113, 50, 11); } catch (e) { } }
-    linha(132, 190, 126, TEXTO, 0.3);
-    doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...CINZA); doc.text('Assinatura de quem recebeu', 161, 130, { align: 'center' });
+    doc.text('Este recibo serve como comprovante de recebimento.', 105, 140, { align: 'center' });
+    traco([[40, 145], [96, 145]], OURO, 0.4); traco([[114, 145], [170, 145]], OURO, 0.4);
+    doc.setFillColor(...OURO); doc.lines([[3, 3], [-3, 3], [-3, -3]], 102, 142, [1, 1], 'F', true);
+    doc.setFillColor(...VERDE); doc.circle(17, 150.5, 1.7, 'F');
+    doc.setFillColor(255, 255, 255); doc.circle(17, 150.5, 0.6, 'F');
+    doc.setFont('times', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...TEXTO); doc.text('Paudalho – PE', 22, 152);
+    if (opts.modalidade === MOD_TELA && opts.assinatura) { try { doc.addImage(opts.assinatura, 'PNG', 136, 135, 50, 11); } catch (e) { } }
+    linha(132, 190, 148, TEXTO, 0.3);
+    doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...CINZA); doc.text('Assinatura de quem recebeu', 161, 152, { align: 'center' });
     doc.setTextColor(0, 0, 0);
     return doc.output('blob');
   }
