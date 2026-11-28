@@ -1109,8 +1109,8 @@ input.sw:disabled{opacity:.5;cursor:not-allowed}
 .brand small{font-size:11px}
 .menu-min{top:10px}
 .side .nav{padding:4px 8px 8px;overscroll-behavior:contain;scroll-padding:8px 0}
-.nav-g{margin-top:6px;border-top:0;padding:10px 12px 4px;font-size:10px;letter-spacing:.9px;color:rgba(255,255,255,.5)}
-.nav-g:first-child{margin-top:0;padding-top:4px}
+.nav-g{margin-top:6px;border-top:1px solid rgba(255,255,255,.1);padding:12px 12px 4px;font-size:10px;letter-spacing:.9px;color:rgba(255,255,255,.55)}
+.nav-g:first-child{margin-top:0;padding-top:4px;border-top:0}
 .nav a{padding:8px 10px;gap:10px;font-size:14px;margin-bottom:1px;border-radius:8px;line-height:1.2}
 .nav a svg{width:18px;height:18px}
 .nav a.on{background:#fff;color:var(--pri);font-weight:700}
@@ -3461,7 +3461,8 @@ function render() {
   document.getElementById('app').classList.toggle('readonly', S.somenteLeitura);
   // nenhuma tela é desenhada sem permissão, mesmo abrindo o endereço direto
   if (S.pronto && !S.precisaLogin && !rotaPermitida(UI.rota)) { UI.rota = rotaInicial(); if (!(conviteDaUrl() && ehAdmin())) { try { history.replaceState(null, '', '#' + UI.rota); } catch (e) { } } }
-  const GRUPOS_MENU = [['Operação', ['mensal', 'painel', 'diaria']], ['Gestão de pessoas', ['funcionarios', 'setores', 'atestados', 'contratos']], ['Financeiro', ['servprest', 'servdiar', 'vt', 'historico', 'relatorios']], ['Administração', ['usuarios', 'backup', 'aparencia']], ['Conta', ['conta']]];
+  // Menu: 1 Operação · 2 Gestão de pessoas · 3 Financeiro · 4 Outros · 5 Administração. "Escala diária" fica só para funcionários (o admin usa o Painel).
+  const GRUPOS_MENU = [['Operação', ['mensal', 'painel', 'diaria']], ['Gestão de pessoas', ['funcionarios', 'setores', 'atestados', 'contratos']], ['Financeiro', ['servprest', 'servdiar', 'vt', 'relatorios']], ['Outros', ['historico']], ['Administração', ['aparencia', 'backup', 'usuarios']]];
   // "Escala diária" e "Painel" mostram a mesma tela: o admin vê só o Painel; o funcionário (sem Painel) vê a Escala diária
   if (ehAdmin() && UI.rota === 'diaria') { UI.rota = 'painel'; try { history.replaceState(null, '', '#painel'); } catch (e) { } }
   const nomeRota = r => (ROTAS.find(x => x[0] === r) || [0, r])[1];
