@@ -3804,7 +3804,7 @@ function vPainel() {
     <header><span>Financeiro · próximos pagamentos</span><a href="#servicos" class="pd-lk">Abrir ${ico.chev}</a></header>
     ${finLinha('Dia 20 <small>serviços 1 a 15</small>', sp20)}
     ${finLinha('Dia 05 <small>serviços 16 ao fim</small>', sp05)}
-    <div class="pd-fl pd-fl-t"><span>Total em aberto${saldo.itens.some(x => x.atraso) ? ' <i class="pd-atr">há atraso</i>' : ''}</span><b>R$ ${servMoeda(saldo.total)}</b><small>já pago no mês: R$ ${servMoeda(jaPago.total)}${saldo.semData ? ' · ' + saldo.semData + ' lote(s) sem data' : ''}</small></div>
+    <div class="pd-fl pd-fl-t"><span>Total em aberto${saldo.itens.some(x => x.atraso) ? ' <i class="pd-atr">R$ ' + servMoeda(r2(saldo.itens.filter(x => x.atraso).reduce((t, x) => t + x.valor, 0))) + ' em atraso</i>' : ''}</span><b>R$ ${servMoeda(saldo.total)}</b><small>já pago no mês: R$ ${servMoeda(jaPago.total)}${saldo.semData ? ' · ' + saldo.semData + ' lote(s) sem data' : ''}</small></div>
   </section>` : ''}
 
   ${al.length ? `<section class="pd-card pd-al"><header><span>Central de alertas</span><b class="pd-n ${al.some(a => a.t === 'e') ? 'err' : 'warn'}">${al.length}</b></header>${alertasBloco()}</section>` : ''}
