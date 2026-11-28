@@ -3801,6 +3801,7 @@ function vPainel() {
 
   ${atalhos.length ? `<nav class="pd-rap" style="grid-template-columns:repeat(${atalhos.length},1fr)">${atalhos.map(([h, i, t]) => `<a href="${h}"><span>${i}</span>${t}</a>`).join('')}</nav>` : ''}
 
+  ${ehAdmin() ? aprovacoesHtml() : ''}
   ${ehAdmin() ? contratosVencendoHtml() : ''}
   ${ehAdmin() ? `<section class="pd-card pd-fin">
     <header><span>Financeiro · próximos pagamentos</span><a href="#servicos" class="pd-lk">Abrir ${ico.chev}</a></header>
@@ -3812,6 +3813,16 @@ function vPainel() {
   ${al.length ? `<section class="pd-card pd-al"><header><span>Central de alertas</span><b class="pd-n ${al.some(a => a.t === 'e') ? 'err' : 'warn'}">${al.length}</b></header>${alertasBloco()}</section>` : ''}
 </div>`;
   function inatTxt() { const n = S.funcionarios.length - ativos.length; return n ? ' · ' + n + ' inativo(s)' : ''; }
+}
+/* Painel: quantidade de pedidos e escalas aguardando aprovação (mesma contagem da tela de usuários) */
+function aprovacoesHtml() {
+  if (S.modo !== 'nuvem' || !S.pronto || S.precisaLogin) return '';
+  if (UI.aprovCont === undefined) {
+    UI.aprovCont = 'carregando';
+    Nuvem.rpc('esc_usuarios_painel', {}).then(p => { UI.aprovCont = p ? (p.pedidos || 0) + (p.escalas || 0) : 0; render(); }, () => { UI.aprovCont = null; });
+  }
+  if (typeof UI.aprovCont !== 'number' || UI.aprovCont <= 0) return '';
+  return `<a class="pd-card pd-al" href="#usuarios" style="display:flex;justify-content:space-between;align-items:center;text-decoration:none;color:inherit"><span><b>Aprovações aguardando</b></span><b class="pd-n warn">${UI.aprovCont}</b></a>`;
 }
 /* Painel: contratos que vencem em até 5 dias ou já venceram (usa a mesma regra da tela de contratos) */
 function contratosVencendoHtml() {
